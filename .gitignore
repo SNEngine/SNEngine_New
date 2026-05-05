@@ -1,0 +1,63 @@
+# ====================== .NET / Visual Studio ======================
+bin/
+obj/
+*.user
+*.suo
+*.sdf
+*.opensdf
+*.sln.cache
+*.launchSettings.json
+# Visual Studio cache
+.vs/
+*.vsidx
+*.suo
+*.user
+
+# ====================== Build & Publish ======================
+Release/
+Debug/
+publish/
+build/
+out/
+
+# ====================== NuGet ======================
+packages/
+*.nupkg
+*.snupkg
+
+# ====================== Visual Studio Code ======================
+.vscode/
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# ====================== Rider / JetBrains ======================
+.idea/
+*.sln.iml
+
+# ====================== Avalonia / Silk.NET ======================
+Assets/bin/
+Assets/obj/
+
+# ====================== Temporary / Logs ======================
+*.log
+logs/
+crash-*.txt
+
+# ====================== OS ======================
+.DS_Store
+Thumbs.db
+*.tmp
+
+# ====================== Project Specific ======================
+SNEngine.Test/assets/          # если не хочешь коммитить тестовые ассеты
+**/assets/**/*.png
+**/assets/**/*.jpg
+**/assets/**/*.jpeg
+
+# ====================== User data ======================
+*.snproj.user
+*.save
+*.sav

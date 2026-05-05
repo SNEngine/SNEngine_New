@@ -1,12 +1,20 @@
+using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Markup.Xaml;
+using SNEngine.Studio.ViewModels;
 
-namespace SNEngine.Studio.Views
+namespace SNEngine.Studio.Views;
+
+public partial class MainWindow : Window
 {
-    public partial class MainWindow : Window
+    public MainWindow()
     {
-        public MainWindow()
-        {
-            InitializeComponent();
-        }
+        InitializeComponent();
+        DataContext = new MainViewModel();
+    }
+
+    private void InitializeComponent()
+    {
+        AvaloniaXamlLoader.Load(this);
     }
 }

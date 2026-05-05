@@ -4,7 +4,8 @@ using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Platform.Storage;
 using ReactiveUI;
 using SNEngine.API;
-using SNEngine.Assets.Package;
+using SNEngine.Builder;
+using SNEngine.Builder.Strategies;
 using SNEngine.Studio.Models;
 using System;
 using System.IO;
@@ -31,13 +32,13 @@ public class MainViewModel : ReactiveObject
 
     public ReactiveCommand<Unit, Unit> CreateNewProjectCommand { get; }
     public ReactiveCommand<Unit, Unit> OpenProjectCommand { get; }
-    public ReactiveCommand<Unit, Unit> BuildProjectCommand { get; }
+    public ReactiveCommand<Unit, Unit> BuildGameCommand { get; }     // ← Сборка игры
 
     public MainViewModel()
     {
         CreateNewProjectCommand = ReactiveCommand.CreateFromTask(CreateNewProjectAsync);
         OpenProjectCommand = ReactiveCommand.CreateFromTask(OpenProjectAsync);
-        BuildProjectCommand = ReactiveCommand.CreateFromTask(BuildProjectAsync);
+        BuildGameCommand = ReactiveCommand.CreateFromTask(BuildGameAsync);
     }
 
     private async Task CreateNewProjectAsync()
@@ -127,7 +128,7 @@ public class MainViewModel : ReactiveObject
         }
     }
 
-    private async Task BuildProjectAsync()
+    private async Task BuildGameAsync()
     {
         if (CurrentProject == null || string.IsNullOrEmpty(CurrentProject.ProjectPath))
         {
@@ -135,26 +136,30 @@ public class MainViewModel : ReactiveObject
             return;
         }
 
-        StatusText = "🔨 Сборка проекта...";
+        StatusText = "🔨 Запуск сборки игры...";
 
         try
         {
-            string assetsPath = Path.Combine(CurrentProject.ProjectPath, "assets");
-
-            if (!Directory.Exists(assetsPath))
+            var settings = new BuildSettings
             {
-                StatusText = "❌ Папка assets не найдена в проекте";
-                return;
-            }
+                GameTitle = CurrentProject.ProjectName,
+                Version = "1.0.0"
+            };
 
-            // Прямой вызов сборщика
-            PakBuilder.PackSmart(assetsPath, Path.Combine(CurrentProject.ProjectPath, "build"));
+            // Используем новую систему стратегий
+            var result = await GameBuilder.BuildAsync(
+                projectPath: CurrentProject.ProjectPath,
+                platform: "windows",
+                settings: settings);
 
-            StatusText = $"✅ Сборка завершена! Пакеты .snpk созданы в папке build";
+            if (result.Success)
+                StatusText = $"✅ Сборка Windows завершена!\n→ {result.OutputPath}";
+            else
+                StatusText = $"❌ Ошибка сборки: {result.Message}";
         }
         catch (Exception ex)
         {
-            StatusText = $"❌ Ошибка сборки: {ex.Message}";
+            StatusText = $"❌ Критическая ошибка сборки: {ex.Message}";
         }
     }
 }

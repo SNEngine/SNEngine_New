@@ -1,0 +1,38 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    
+    <!-- Название шаблона -->
+    <AssemblyName>SNEngine.Runtime</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\SNEngine.API\SNEngine.API.csproj" />
+    <ProjectReference Include="..\SNEngine.Core\SNEngine.Core.csproj" />
+    <ProjectReference Include="..\SNEngine.Data\SNEngine.Data.csproj" />
+  </ItemGroup>
+
+  <!-- Post-Build: копируем ВСЁ в PlayerTemplates -->
+  <Target Name="CopyFullRuntimeToPlayerTemplates" AfterTargets="Build">
+    <PropertyGroup>
+      <PlayerTemplatesDir>$(SolutionDir)SNEngine.Studio\PlayerTemplates\Windows</PlayerTemplatesDir>
+      <SourceBinDir>$(TargetDir)</SourceBinDir>
+    </PropertyGroup>
+
+    <Message Text="=== Copying FULL SNEngine Runtime to PlayerTemplates\Windows ===" Importance="high" />
+    <Message Text="From: $(SourceBinDir)" Importance="high" />
+    <Message Text="To:   $(PlayerTemplatesDir)" Importance="high" />
+
+    <MakeDir Directories="$(PlayerTemplatesDir)" />
+
+    <!-- Robocopy — надёжный способ скопировать всё -->
+    <Exec Command="robocopy &quot;$(SourceBinDir.TrimEnd('\'))&quot; &quot;$(PlayerTemplatesDir)&quot; /E /XO /NP /NJH /NJS /NFL /NDL" 
+          IgnoreExitCode="true" />
+
+    <Message Text="✅ FULL Runtime successfully copied to PlayerTemplates\Windows" Importance="high" />
+  </Target>
+</Project>

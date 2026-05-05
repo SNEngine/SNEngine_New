@@ -1,0 +1,25 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:SNEngine.Studio.ViewModels"
+        x:Class="SNEngine.Studio.Views.BuildDialog"
+        Title="Сборка игры"
+        Width="480" Height="320"
+        x:DataType="vm:BuildDialogViewModel">
+
+    <Grid Margin="20" RowDefinitions="Auto,*,Auto">
+        <TextBlock Text="Сборка проекта" FontSize="18" FontWeight="Bold" Grid.Row="0"/>
+
+        <StackPanel Grid.Row="1" Spacing="15" VerticalAlignment="Center">
+            <TextBlock Text="{Binding ProjectName}" FontSize="16"/>
+            <TextBlock Text="{Binding Status}" FontSize="14"/>
+            
+            <ProgressBar IsIndeterminate="True" Height="8" Margin="0,10"/>
+        </StackPanel>
+
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="10">
+            <Button Content="Отмена" Command="{Binding CancelCommand}" Padding="20,8"/>
+            <Button Content="Собрать (Windows)" Command="{Binding BuildCommand}" 
+                    Padding="25,8" IsEnabled="{Binding CanBuild}"/>
+        </StackPanel>
+    </Grid>
+</Window>

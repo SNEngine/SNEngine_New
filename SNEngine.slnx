@@ -4,6 +4,7 @@
   <Project Path="SNEngine.Build/SNEngine.Build.csproj" Id="606fd1e3-6fd8-4a34-8052-bc07129909f5" />
   <Project Path="SNEngine.Builder/SNEngine.Builder.csproj" Id="ebdd6991-2983-485b-be8d-f10a78760c3d" />
   <Project Path="SNEngine.Data/SNEngine.Data.csproj" Id="1b463888-f3e1-470c-9780-f619102bb91f" />
+  <Project Path="SNEngine.Runtime/SNEngine.Runtime.csproj" Id="5dc96dad-e612-407d-a97f-3986ed0948ff" />
   <Project Path="SNEngine.Studio/SNEngine.Studio.csproj" Id="9cabe631-ae17-4be5-9376-b1416f97699a" />
   <Project Path="SNEngine.Test/SNEngine.Test.csproj" Id="61f95ca2-ab33-4042-b209-cda3eba4c965" />
   <Project Path="SNEngine.UI/SNEngine.UI.csproj" Id="257b08ea-825a-4642-8a31-bdb11c916064" />

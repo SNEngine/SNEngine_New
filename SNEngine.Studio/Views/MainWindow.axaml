@@ -7,7 +7,6 @@
         x:Class="SNEngine.Studio.Views.MainWindow"
         Title="SNEngine Studio"
         x:DataType="vm:MainViewModel">
-	<!-- ← ЭТО САМОЕ ВАЖНОЕ -->
 
 	<Design.DataContext>
 		<vm:MainViewModel/>
@@ -24,18 +23,21 @@
 			<Button Content="Открыть проект"
                     Command="{Binding OpenProjectCommand}"
                     Padding="20,8"/>
-			<Button Content="Собрать проект"
-                    Command="{Binding BuildProjectCommand}"
+
+			<!-- Кнопка сборки -->
+			<Button Content="Собрать игру (Windows)"
+                    Command="{Binding BuildGameCommand}"
                     Padding="20,8"
                     IsEnabled="{Binding CurrentProject.IsLoaded}"/>
 		</StackPanel>
 
-		<!-- Main Area -->
-		<TextBlock Grid.Row="1"
-                   Text="{Binding StatusText}"
-                   HorizontalAlignment="Center"
-                   VerticalAlignment="Center"
-                   FontSize="18"
-                   Foreground="White"/>
+		<!-- Основная область -->
+		<Grid Grid.Row="1">
+			<TextBlock Text="{Binding StatusText}"
+                       HorizontalAlignment="Center"
+                       VerticalAlignment="Center"
+                       FontSize="18"
+                       Foreground="White"/>
+		</Grid>
 	</Grid>
 </Window>

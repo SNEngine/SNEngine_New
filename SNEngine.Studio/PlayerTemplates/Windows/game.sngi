@@ -1,0 +1,18 @@
+{
+  "Id": "9f8e4d2a-7b1c-4f5e-9a3d-2c8e7f1b9a0d",
+  "Name": "yuki_story",
+  "CreatedAt": "2026-05-05T18:45:00Z",
+  
+  "title": "Юки и Вишнёвый Сад",
+  "version": "1.0.0",
+  "author": "Your Name",
+  
+  "resolution": "600x800",
+  "fullScreen": false,
+  "windowWidth": 600,
+  "windowHeight": 800,
+  
+  "startScene": "main",
+  
+  "description": "Тестовая визуальная новелла на SNEngine"
+}

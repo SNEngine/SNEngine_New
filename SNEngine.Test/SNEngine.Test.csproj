@@ -8,6 +8,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\SNEngine.API\SNEngine.API.csproj" />
     <ProjectReference Include="..\SNEngine.Core\SNEngine.Core.csproj" />
   </ItemGroup>
 

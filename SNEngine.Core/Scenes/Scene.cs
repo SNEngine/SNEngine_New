@@ -4,31 +4,26 @@ using System.Collections.Generic;
 namespace SNEngine.Core.Scenes;
 
 /// <summary>
-/// Base abstract class for all scenes in SNEngine.
-/// Uses GameObject + Component architecture.
+/// Base abstract scene class. All scenes should inherit from this.
 /// </summary>
 public abstract class Scene
 {
-    /// <summary>
-    /// All GameObjects currently in this scene.
-    /// </summary>
     protected readonly List<GameObject> _gameObjects = new();
 
+    public string Name { get; set; } = "Untitled Scene";
+
     /// <summary>
-    /// Called when the scene is first loaded.
-    /// Use this to create GameObjects and add components.
+    /// Called when scene is loaded.
     /// </summary>
     public virtual void OnLoad() { }
 
     /// <summary>
-    /// Called every frame for logic updates.
+    /// Called every frame for logic.
     /// </summary>
     public virtual void Update(double deltaTime)
     {
         foreach (var go in _gameObjects)
-        {
             go.Update(deltaTime);
-        }
     }
 
     /// <summary>
@@ -37,30 +32,45 @@ public abstract class Scene
     public virtual void Render(Renderer renderer)
     {
         foreach (var go in _gameObjects)
-        {
             renderer.DrawGameObject(go);
-        }
     }
 
-    /// <summary>
-    /// Called when the scene is being unloaded.
-    /// Use this to clean up resources if needed.
-    /// </summary>
     public virtual void OnUnload() { }
 
-    /// <summary>
-    /// Adds a GameObject to the scene.
-    /// </summary>
-    protected void AddGameObject(GameObject go)
+    // ====================== Helper methods for API ======================
+
+    public void AddGameObject(GameObject go) => _gameObjects.Add(go);
+
+    public GameObject? GetGameObject(string name)
     {
-        _gameObjects.Add(go);
+        return _gameObjects.Find(go => go.Name == name);
+    }
+
+    public bool ContainsGameObject(GameObject go) => _gameObjects.Contains(go);
+
+    /// <summary>
+    /// Returns or creates a background GameObject.
+    /// </summary>
+    public GameObject GetOrCreateBackground()
+    {
+        var bg = GetGameObject("Background");
+        if (bg != null) return bg;
+
+        bg = new GameObject { Name = "Background" };
+        AddGameObject(bg);
+        return bg;
     }
 
     /// <summary>
-    /// Removes a GameObject from the scene.
+    /// Clears all GameObjects in the scene.
     /// </summary>
-    protected bool RemoveGameObject(GameObject go)
+    public void Clear()
     {
-        return _gameObjects.Remove(go);
+        _gameObjects.Clear();
     }
+
+    /// <summary>
+    /// Quick access to create an empty scene.
+    /// </summary>
+    public static EmptyScene Empty(string name = "Empty Scene") => new EmptyScene { Name = name };
 }

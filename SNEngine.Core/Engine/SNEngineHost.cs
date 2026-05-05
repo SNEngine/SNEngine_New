@@ -2,11 +2,12 @@
 using Silk.NET.OpenGL;
 using SNEngine.Core.Assets;
 using SNEngine.Core.Rendering;
-using SNEngine.Core.Scenes;
-using System;
 
 namespace SNEngine.Core.Engine;
 
+/// <summary>
+/// Main engine host with safe cleanup, centered window and robust disposal.
+/// </summary>
 public class SNEngineHost : IDisposable
 {
     private IWindow? _window;
@@ -18,6 +19,8 @@ public class SNEngineHost : IDisposable
 
     public event Action? OnInitialized;
 
+    private bool _isDisposing = false;
+
     public SNEngineHost(string title = "SNEngine Test Window", int width = 1280, int height = 720)
     {
         var options = WindowOptions.Default;
@@ -25,21 +28,8 @@ public class SNEngineHost : IDisposable
         options.Size = new Silk.NET.Maths.Vector2D<int>(width, height);
         options.API = new GraphicsAPI(ContextAPI.OpenGL, ContextProfile.Core, ContextFlags.Default, new APIVersion(4, 6));
         options.VSync = true;
-        options.WindowState = WindowState.Normal;
 
         _window = Window.Create(options);
-
-        _window.Load += () =>
-        {
-            var monitor = _window.Monitor; 
-            if (monitor != null)
-            {
-                var centerX = monitor.Bounds.Origin.X + (monitor.Bounds.Size.X - width) / 2;
-                var centerY = monitor.Bounds.Origin.Y + (monitor.Bounds.Size.Y - height) / 2;
-
-                _window.Position = new Silk.NET.Maths.Vector2D<int>(centerX, centerY);
-            }
-        };
 
         _window.Load += OnLoad;
         _window.Update += OnUpdateFrame;
@@ -51,34 +41,108 @@ public class SNEngineHost : IDisposable
     {
         _gl = GL.GetApi(_window);
 
+        CenterWindow();
+
         AssetManager = new AssetManager(_gl);
-        Renderer = new Renderer();           // ← здесь передаём GL
+        Renderer = new Renderer();
+        Renderer.Initialize(_gl);
         SceneManager = new SceneManager();
 
-        Console.WriteLine("✅ SNEngineHost: All systems initialized with OpenGL.");
-        Renderer.Initialize(_gl);              // ← инициализируем Renderer с GL
+        Debug.Initialize();
 
+        Debug.Log("SNEngineHost: All systems initialized successfully.");
         OnInitialized?.Invoke();
     }
 
-    private void OnUpdateFrame(double deltaTime) => SceneManager?.Update(deltaTime);
+    private void CenterWindow()
+    {
+        if (_window?.Monitor == null) return;
+
+        var monitor = _window.Monitor;
+        var bounds = monitor.Bounds;
+
+        int centerX = bounds.Origin.X + (bounds.Size.X - _window.Size.X) / 2;
+        int centerY = bounds.Origin.Y + (bounds.Size.Y - _window.Size.Y) / 2;
+
+        _window.Position = new Silk.NET.Maths.Vector2D<int>(centerX, centerY);
+        Debug.Log($"Window centered at ({centerX}, {centerY})");
+    }
+
+    private void OnUpdateFrame(double deltaTime)
+    {
+        if (_isDisposing) return;
+        SceneManager?.Update(deltaTime);
+    }
 
     private void OnRenderFrame(double deltaTime)
     {
+        if (Renderer == null || _isDisposing) return;
+
         Renderer.Clear();
         Renderer.Begin();
-        SceneManager.Render(Renderer);
+        SceneManager?.Render(Renderer);
         Renderer.End();
     }
 
-    private void OnClosing() => Dispose();
+    private void OnClosing()
+    {
+        if (_isDisposing || _window == null) return;
+
+        _isDisposing = true;
+
+        // Отключаем все события
+        _window.Load -= OnLoad;
+        _window.Update -= OnUpdateFrame;
+        _window.Render -= OnRenderFrame;
+        _window.Closing -= OnClosing;
+
+        // Максимально отложенный Dispose
+        Task.Run(SafeDispose);
+    }
+
+    private void SafeDispose()
+    {
+        if (_window == null) return;
+
+        try
+        {
+            // Сначала отключаем рендерер без вызова OpenGL
+            if (Renderer != null)
+            {
+                try { Renderer.Dispose(); }
+                catch { /* Игнорируем, т.к. контекст может быть уже потерян */ }
+            }
+
+            if (AssetManager != null)
+            {
+                try { AssetManager.Dispose(); }
+                catch { }
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError($"Dispose resources error: {ex.Message}");
+        }
+
+        try
+        {
+            _window?.Dispose();
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError($"Window dispose error: {ex.Message}");
+        }
+        finally
+        {
+            _window = null;
+            _gl = null;
+            Renderer = null!;
+            AssetManager = null!;
+        }
+    }
+
 
     public void Run() => _window?.Run();
 
-    public void Dispose()
-    {
-        Renderer?.Dispose();
-        AssetManager?.Dispose();
-        _window?.Dispose();
-    }
+    public void Dispose() => SafeDispose();
 }

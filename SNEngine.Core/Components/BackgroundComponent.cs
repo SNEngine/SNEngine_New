@@ -21,6 +21,8 @@ public class BackgroundComponent : Component
         Console.WriteLine($"[Background] Loaded: {filePath}");
     }
 
+
+
     public override void Render(Renderer renderer)
     {
         if (Texture == null)

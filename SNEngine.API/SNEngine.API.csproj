@@ -6,4 +6,8 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\SNEngine.Core\SNEngine.Core.csproj" />
+  </ItemGroup>
+
 </Project>

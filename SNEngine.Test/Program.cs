@@ -1,31 +1,32 @@
-﻿using SNEngine.Core.Engine;
-using SNEngine.Core.Scenes;
+﻿using SNEngine.API;
 using System;
 
 namespace SNEngine.Test;
 
 class Program
 {
+  
     static void Main(string[] args)
     {
-        Console.WriteLine("=== SNEngine Host Test Started ===");
+        Console.WriteLine("=== SNEngine.API Test Started ===");
+        Console.WriteLine("Press ESC in the game window to close.\n");
 
-        using var host = new SNEngineHost("SNEngine Test Window", 1280, 720);
-
-        // Подписываемся на событие инициализации
-        host.OnInitialized += () =>
+        // Пример использования API (выполняется после инициализации движка)
+        SNEngine.API.SNEngine.OnInitialized += () =>
         {
-            Console.WriteLine("OpenGL ready! Loading scene...");
+            SNEngine.Core.Debug.Log("Engine initialized! Loading visual novel scene...");
 
-            var mainScene = new NovelScene(host.AssetManager);
-            host.SceneManager.LoadScene(mainScene);
+            SNEngine.API.SNEngine.LoadEmptyScene();
+            BackgroundAPI.Show("assets/bg/classroom_day.png");
 
-            Console.WriteLine("Scene loaded successfully.");
+            SNEngine.Core.Debug.Log("Scene loaded via SNEngine.API");
         };
 
-        Console.WriteLine("Starting engine... Press ESC to close.");
-        host.Run();
-
-        Console.WriteLine("SNEngine Host stopped.");
+        // Используем удобный публичный API
+        SNEngine.API.SNEngine.Run(
+            windowTitle: "SNEngine Test Window",
+            width: 1280,
+            height: 720
+        );
     }
 }

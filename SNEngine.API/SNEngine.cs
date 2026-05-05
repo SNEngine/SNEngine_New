@@ -2,6 +2,7 @@
 using SNEngine.Core.Scenes;
 using SNEngine.Core.Components;
 using System;
+using SNEngine.Core;
 
 namespace SNEngine.API;
 
@@ -55,6 +56,21 @@ public static class SNEngine
 
         var empty = new EmptyScene { Name = name };
         LoadScene(empty);
+    }
+
+    /// <summary>
+    /// Loads .snpk package before starting the game.
+    /// </summary>
+    public static void LoadPackage(string pakPath)
+    {
+        if (_host == null)
+        {
+            Debug.LogError("Cannot load package before Run()");
+            return;
+        }
+
+        _host.AssetManager.LoadPackage(pakPath);
+        Debug.Log($"[SNEngine.API] Package loaded: {pakPath}");
     }
 
     /// <summary>

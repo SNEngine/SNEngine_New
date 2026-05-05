@@ -15,7 +15,7 @@ class Program
         SNEngine.API.SNEngine.OnInitialized += () =>
         {
             SNEngine.Core.Debug.Log("Engine initialized! Loading visual novel scene...");
-
+            SNEngine.API.SNEngine.LoadPackage("game.snpk");
             SNEngine.API.SNEngine.LoadEmptyScene();
             BackgroundAPI.Show("assets/bg/classroom_day.png");
 

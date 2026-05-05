@@ -6,7 +6,7 @@ using System.IO.Compression;
 namespace SNEngine.Assets.Package;
 
 /// <summary>
-/// Smart Pak Builder with Brotli compression (much better ratio for PNG/JPG).
+/// Smart Pak Builder — создаёт отдельные пакеты с правильной структурой папок.
 /// </summary>
 public static class PakBuilder
 {
@@ -24,6 +24,7 @@ public static class PakBuilder
         {
             ("backgrounds.snpk", AssetType.Backgrounds, "bg"),
             ("sprites.snpk",     AssetType.Sprites,     "sprites"),
+            ("characters.snpk",  AssetType.Characters,  "characters"),   // ← важно
             ("ui.snpk",          AssetType.UI,          "ui"),
             ("audio.snpk",       AssetType.Audio,       "audio"),
             ("data.snpk",        AssetType.Data,        "data")
@@ -34,6 +35,7 @@ public static class PakBuilder
         foreach (var (pakName, assetType, subFolder) in rules)
         {
             string sourcePath = Path.Combine(inputRoot, subFolder);
+
             if (Directory.Exists(sourcePath))
             {
                 string outputPath = Path.Combine(outputDir, pakName);
@@ -42,12 +44,13 @@ public static class PakBuilder
             }
         }
 
+        // Остальные файлы в misc
         string miscPath = Path.Combine(outputDir, "misc.snpk");
-        int miscCount = PackRootAndUnknownWithBrotli(inputRoot, miscPath);
+        int miscCount = PackRootAndUnknown(inputRoot, miscPath);
         totalFiles += miscCount;
 
-        Debug.Log($"[PakBuilder] Smart Brotli pack completed. Total files: {totalFiles}");
-        Console.WriteLine($"\nSmart Brotli packing finished → {outputDir}");
+        Debug.Log($"[PakBuilder] Smart pack completed. Total files: {totalFiles}");
+        Console.WriteLine($"\nSmart packing finished → {outputDir}");
     }
 
     private static int PackFolder(string inputFolder, string outputPakPath, AssetType type, string baseSubFolder = "")
@@ -66,7 +69,7 @@ public static class PakBuilder
                 ? relative
                 : Path.Combine(baseSubFolder, relative).Replace('\\', '/');
 
-            var entry = zip.CreateEntry(finalPath, CompressionLevel.Optimal); // Optimal — лучший баланс
+            var entry = zip.CreateEntry(finalPath, CompressionLevel.Optimal);
 
             using var entryStream = entry.Open();
             using var fileStream = File.OpenRead(file);
@@ -84,7 +87,7 @@ public static class PakBuilder
         return count;
     }
 
-    private static int PackRootAndUnknownWithBrotli(string inputRoot, string outputPakPath)
+    private static int PackRootAndUnknown(string inputRoot, string outputPakPath)
     {
         int count = 0;
 
@@ -94,18 +97,17 @@ public static class PakBuilder
         foreach (var file in Directory.GetFiles(inputRoot, "*.*", SearchOption.TopDirectoryOnly))
         {
             string relative = Path.GetFileName(file);
-            var entry = zip.CreateEntry(relative, CompressionLevel.SmallestSize);
+            var entry = zip.CreateEntry(relative, CompressionLevel.Optimal);
 
             using var es = entry.Open();
-            using var brotli = new BrotliStream(es, CompressionLevel.SmallestSize);
             using var fsFile = File.OpenRead(file);
-            fsFile.CopyTo(brotli);
+            fsFile.CopyTo(es);
             count++;
         }
 
         if (count > 0)
         {
-            Debug.Log($"[PakBuilder] misc.snpk ← {count} root/unknown files [Brotli]");
+            Debug.Log($"[PakBuilder] misc.snpk ← {count} root/unknown files");
             Console.WriteLine($"  ✓ misc.snpk ({count} files)");
         }
 

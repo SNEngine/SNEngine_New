@@ -17,6 +17,7 @@ public class SNEngineHost : IDisposable
     public AssetManager AssetManager { get; private set; } = null!;
     public Renderer Renderer { get; private set; } = null!;
     public SceneManager SceneManager { get; private set; } = null!;
+    public FileManager FileManager { get; private set; } = null!;
 
     public event Action? OnInitialized;
 
@@ -46,6 +47,7 @@ public class SNEngineHost : IDisposable
         CenterWindow();
 
         AssetManager = new AssetManager(_gl);
+        FileManager = new FileManager(_gl);
         Renderer = new Renderer();
         Renderer.Initialize(_gl);
         SceneManager = new SceneManager();

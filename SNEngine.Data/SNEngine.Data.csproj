@@ -7,8 +7,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\SNEngine.Core\SNEngine.Core.csproj" />
-    <ProjectReference Include="..\SNEngine.Data\SNEngine.Data.csproj" />
+    <PackageReference Include="MessagePack" Version="3.1.4" />
   </ItemGroup>
 
 </Project>

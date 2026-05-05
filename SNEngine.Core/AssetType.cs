@@ -1,14 +1,15 @@
 ﻿namespace SNEngine.Assets.Package;
 
 /// <summary>
-/// Asset package types for better organization and loading.
+/// Asset package types
 /// </summary>
 public enum AssetType
 {
     Backgrounds,
     Sprites,
+    Characters,     // ← Новый тип
     UI,
     Audio,
-    Data,       // json, scripts, etc.
+    Data,
     Misc
 }

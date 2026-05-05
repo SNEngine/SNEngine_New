@@ -6,7 +6,7 @@ using System;
 namespace SNEngine.Core.Assets;
 
 /// <summary>
-/// Represents a GPU texture loaded from file or memory using ImageSharp.
+/// Texture. Создаётся ТОЛЬКО через AssetManager или FromMemory.
 /// </summary>
 public class Texture : IDisposable
 {
@@ -17,40 +17,29 @@ public class Texture : IDisposable
     public int Width { get; private set; }
     public int Height { get; private set; }
 
-    public Texture(GL gl, string filePath)
+    public Texture(GL gl, string path)
     {
         _gl = gl;
-        Path = filePath;
-        LoadFromFile(filePath);
+        Path = path;
     }
 
     /// <summary>
-    /// Creates texture from byte array (used for loading from .snpk packages).
+    /// Главный способ создания — из пакета
     /// </summary>
     public static Texture FromMemory(GL gl, byte[] imageData, string virtualPath)
     {
         if (imageData == null || imageData.Length == 0)
-            throw new ArgumentException("Image data is empty", nameof(imageData));
+            throw new ArgumentException($"Empty data for {virtualPath}");
 
-        var texture = new Texture(gl, virtualPath);
-        texture.LoadFromMemory(imageData, virtualPath);
-        return texture;
+        var tex = new Texture(gl, virtualPath);
+        tex.LoadImageData(imageData, virtualPath);
+        return tex;
     }
 
-    private void LoadFromFile(string filePath)
-    {
-        using var image = Image.Load<Rgba32>(filePath);
-        LoadImageData(image, filePath);
-    }
-
-    private void LoadFromMemory(byte[] imageData, string virtualPath)
+    private void LoadImageData(byte[] imageData, string logPath)
     {
         using var image = Image.Load<Rgba32>(imageData);
-        LoadImageData(image, virtualPath);
-    }
 
-    private void LoadImageData(Image<Rgba32> image, string pathForLog)
-    {
         Width = image.Width;
         Height = image.Height;
 
@@ -64,20 +53,11 @@ public class Texture : IDisposable
         {
             fixed (byte* p = pixels)
             {
-                _gl.TexImage2D(
-                    TextureTarget.Texture2D,
-                    0,
-                    InternalFormat.Rgba8,
-                    (uint)Width,
-                    (uint)Height,
-                    0,
-                    PixelFormat.Rgba,
-                    PixelType.UnsignedByte,
-                    p);
+                _gl.TexImage2D(TextureTarget.Texture2D, 0, InternalFormat.Rgba8,
+                    (uint)Width, (uint)Height, 0, PixelFormat.Rgba, PixelType.UnsignedByte, p);
             }
         }
 
-        // Texture settings
         _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.LinearMipmapLinear);
         _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)TextureMagFilter.Linear);
         _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, (int)TextureWrapMode.ClampToEdge);
@@ -86,12 +66,10 @@ public class Texture : IDisposable
         _gl.GenerateMipmap(TextureTarget.Texture2D);
         _gl.BindTexture(TextureTarget.Texture2D, 0);
 
-        Debug.Log($"[Texture] Loaded: {pathForLog} ({Width}x{Height})");
+        Debug.Log($"[Texture] Loaded from SNPK: {logPath} ({Width}x{Height})");
     }
 
     public void Bind() => _gl.BindTexture(TextureTarget.Texture2D, _handle);
-
-    public static void Unbind(GL gl) => gl.BindTexture(TextureTarget.Texture2D, 0);
 
     public void Dispose()
     {

@@ -75,7 +75,8 @@ public static class SNEngine
     }
 
     /// <summary>
-    /// Loads default .snpk packages including characters.
+    /// Loads default .snpk packages (backgrounds, sprites, ui, etc.)
+    /// Recommended to call after OnInitialized.
     /// </summary>
     public static void LoadDefaultPackages()
     {
@@ -91,7 +92,6 @@ public static class SNEngine
         {
         ("backgrounds.snpk", AssetType.Backgrounds),
         ("sprites.snpk",     AssetType.Sprites),
-        ("characters.snpk",  AssetType.Characters),   // ← Добавили
         ("ui.snpk",          AssetType.UI),
         ("audio.snpk",       AssetType.Audio),
         ("data.snpk",        AssetType.Data),
@@ -110,7 +110,6 @@ public static class SNEngine
                 {
                     _host.AssetManager.LoadPackage(pakPath, type);
                     loadedCount++;
-                    Debug.Log($"[SNEngine.API] Loaded package: {pakName}");
                 }
                 catch (Exception ex)
                 {
@@ -119,15 +118,9 @@ public static class SNEngine
             }
         }
 
-        if (loadedCount == 0)
-        {
-            Debug.LogWarning("[SNEngine.API] No .snpk packages found in /build/. Running in loose files mode.");
-        }
-        else
-        {
-            Debug.Log($"[SNEngine.API] Successfully loaded {loadedCount} default packages.");
-        }
+        Debug.Log($"[SNEngine.API] Loaded {loadedCount} default packages from /build/");
     }
+
     /// <summary>
     /// Returns the current host for advanced usage.
     /// </summary>

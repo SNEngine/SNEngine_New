@@ -45,16 +45,38 @@ public class SNPKPackage : IDisposable
 
     public byte[]? GetAsset(string virtualPath)
     {
+        if (string.IsNullOrEmpty(virtualPath)) return null;
+
         string key = virtualPath.Replace('\\', '/').TrimStart('/');
 
+        // Прямое совпадение
         if (_assets.TryGetValue(key, out var data))
             return data;
 
-        // Fallback without "assets/" prefix
-        if (key.StartsWith("assets/") && _assets.TryGetValue(key[7..], out data))
-            return data;
+        // Убираем возможные префиксы
+        string[] possiblePrefixes = { "characters/", "sprites/", "assets/" };
 
-        Debug.LogWarning($"[SNPK] Asset not found: {virtualPath}");
+        foreach (var prefix in possiblePrefixes)
+        {
+            if (key.StartsWith(prefix))
+            {
+                string shortKey = key.Substring(prefix.Length);
+                if (_assets.TryGetValue(shortKey, out data))
+                    return data;
+            }
+
+            // Пробуем добавить префикс
+            string longKey = prefix + key;
+            if (_assets.TryGetValue(longKey, out data))
+                return data;
+        }
+
+        // Логируем все ключи в пакете для отладки (один раз)
+        if (_assets.Count > 0)
+        {
+            Debug.LogWarning($"[SNPK] Asset not found: '{key}'. Available keys: {string.Join(", ", _assets.Keys.Take(10))}");
+        }
+
         return null;
     }
 

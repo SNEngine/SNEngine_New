@@ -63,7 +63,7 @@ public class Renderer : IDisposable
 
     public void DrawTexture(SNEngine.Core.Assets.Texture texture, float alpha = 1.0f)
     {
-        _quadRenderer.Draw(texture, alpha);
+        _quadRenderer.DrawFullscreen(texture, alpha);
     }
 
     public void Dispose()

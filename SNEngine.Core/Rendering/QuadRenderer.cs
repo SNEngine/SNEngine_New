@@ -5,13 +5,15 @@ using Texture = SNEngine.Core.Assets.Texture;
 
 namespace SNEngine.Core.Rendering;
 
+/// <summary>
+/// Quad renderer. Background is always fullscreen.
+/// </summary>
 public unsafe class QuadRenderer : IDisposable
 {
     private GL? _gl;
     private uint _vao, _vbo, _ebo;
     private uint _shaderProgram;
 
-    // Вызывается после того, как GL готов
     public void Initialize(GL gl)
     {
         _gl = gl;
@@ -22,8 +24,9 @@ public unsafe class QuadRenderer : IDisposable
 
     private void CreateQuad()
     {
-        if (_gl == null) throw new InvalidOperationException("GL not initialized in QuadRenderer");
+        if (_gl == null) throw new InvalidOperationException("GL not initialized");
 
+        // Простой fullscreen quad
         float[] vertices = {
             -1.0f,  1.0f,  0.0f, 0.0f,
              1.0f,  1.0f,  1.0f, 0.0f,
@@ -72,7 +75,11 @@ public unsafe class QuadRenderer : IDisposable
             layout (location = 0) in vec2 aPosition;
             layout (location = 1) in vec2 aTexCoord;
             out vec2 TexCoord;
-            void main() { gl_Position = vec4(aPosition, 0.0, 1.0); TexCoord = aTexCoord; }
+            void main()
+            {
+                gl_Position = vec4(aPosition, 0.0, 1.0);
+                TexCoord = aTexCoord;
+            }
             """;
 
         const string fragmentSrc = """
@@ -81,7 +88,10 @@ public unsafe class QuadRenderer : IDisposable
             in vec2 TexCoord;
             uniform sampler2D uTexture;
             uniform float uAlpha = 1.0;
-            void main() { FragColor = texture(uTexture, TexCoord) * vec4(1.0, 1.0, 1.0, uAlpha); }
+            void main()
+            {
+                FragColor = texture(uTexture, TexCoord) * vec4(1.0, 1.0, 1.0, uAlpha);
+            }
             """;
 
         uint vs = CompileShader(vertexSrc, ShaderType.VertexShader);
@@ -105,19 +115,34 @@ public unsafe class QuadRenderer : IDisposable
         return shader;
     }
 
+    /// <summary>
+    /// Обычный draw (для спрайтов)
+    /// </summary>
     public void Draw(Texture texture, float alpha = 1.0f)
+    {
+        DrawInternal(texture, alpha);
+    }
+
+    /// <summary>
+    /// Специально для Background — всегда на весь экран
+    /// </summary>
+    public void DrawFullscreen(Texture texture, float alpha = 1.0f)
     {
         if (_gl == null || texture == null) return;
 
         _gl.UseProgram(_shaderProgram);
         texture.Bind();
 
-        int loc = _gl.GetUniformLocation(_shaderProgram, "uAlpha");
-        if (loc != -1) _gl.Uniform1(loc, alpha);
+        int alphaLoc = _gl.GetUniformLocation(_shaderProgram, "uAlpha");
+        if (alphaLoc != -1) _gl.Uniform1(alphaLoc, alpha);
 
         _gl.BindVertexArray(_vao);
         _gl.DrawElements(PrimitiveType.Triangles, 6, DrawElementsType.UnsignedInt, (void*)0);
         _gl.BindVertexArray(0);
+    }
+    private void DrawInternal(Texture texture, float alpha)
+    {
+        DrawFullscreen(texture, alpha); // пока всё через fullscreen
     }
 
     public void Dispose()

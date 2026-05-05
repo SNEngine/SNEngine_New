@@ -1,36 +1,22 @@
-﻿using SNEngine.Core.Assets;
+﻿using Silk.NET.Maths;
+using SNEngine.Core.Assets;
 using SNEngine.Core.Rendering;
 
 namespace SNEngine.Core.Components;
 
-public class BackgroundComponent : Component
+/// <summary>
+/// Full-screen background.
+/// </summary>
+public class BackgroundComponent : VisualComponent
 {
-    public Texture? Texture { get; private set; }
-    public float Alpha { get; set; } = 1.0f;
-
-    private readonly AssetManager _assetManager;
-
-    public BackgroundComponent(AssetManager assetManager)
+    public BackgroundComponent(AssetManager assetManager) : base(assetManager)
     {
-        _assetManager = assetManager;
+        Scale = new Vector2D<float>(1f, 1f); // Fullscreen by default
     }
-
-    public void Load(string filePath)
-    {
-        Texture = _assetManager.LoadTexture(filePath);
-        Console.WriteLine($"[Background] Loaded: {filePath}");
-    }
-
-
 
     public override void Render(Renderer renderer)
     {
-        if (Texture == null)
-        {
-            Console.WriteLine("[Background] No texture to render");
-            return;
-        }
-
+        if (Texture == null) return;
         renderer.DrawTexture(Texture, Alpha);
     }
 }

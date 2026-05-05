@@ -1,37 +1,22 @@
-﻿using Silk.NET.Maths;
-using SNEngine.Core.Assets;
+﻿using SNEngine.Core.Assets;
 using SNEngine.Core.Rendering;
 
 namespace SNEngine.Core.Components;
 
 /// <summary>
-/// Sprite component for characters and UI elements.
+/// Character sprite or any positioned visual element.
 /// </summary>
-public class SpriteComponent : Component
+public class SpriteComponent : VisualComponent
 {
-    public Texture? Texture { get; private set; }
-
-    public Vector2D<float> Position { get; set; } = new(0f, 0f);
-    public Vector2D<float> Scale { get; set; } = new(1f, 1f);
-    public float Rotation { get; set; } = 0f;
-    public float Alpha { get; set; } = 1.0f;
-
-    private readonly AssetManager _assetManager;
-
-    public SpriteComponent(AssetManager assetManager)
+    public SpriteComponent(AssetManager assetManager) : base(assetManager)
     {
-        _assetManager = assetManager;
-    }
-
-    public void Load(string filePath)
-    {
-        Texture = _assetManager.LoadTexture(filePath);
     }
 
     public override void Render(Renderer renderer)
     {
         if (Texture == null) return;
-        // TODO: Add transformation matrix later (position, scale, rotation)
+
+        // TODO: Apply transformation (Position, Scale, Rotation)
         renderer.DrawTexture(Texture, Alpha);
     }
 }

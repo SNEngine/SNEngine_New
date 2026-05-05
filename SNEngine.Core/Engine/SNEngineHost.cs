@@ -1,5 +1,6 @@
-﻿using Silk.NET.Windowing;
+﻿using Silk.NET.Maths;
 using Silk.NET.OpenGL;
+using Silk.NET.Windowing;
 using SNEngine.Core.Assets;
 using SNEngine.Core.Rendering;
 
@@ -35,6 +36,7 @@ public class SNEngineHost : IDisposable
         _window.Update += OnUpdateFrame;
         _window.Render += OnRenderFrame;
         _window.Closing += OnClosing;
+        _window.Resize += OnResize;   // ← добавь эту строку
     }
 
     private void OnLoad()
@@ -95,9 +97,19 @@ public class SNEngineHost : IDisposable
         _window.Update -= OnUpdateFrame;
         _window.Render -= OnRenderFrame;
         _window.Closing -= OnClosing;
+        _window.Resize -= OnResize;   // ← добавь эту строку
+
 
         // Максимально отложенный Dispose
         Task.Run(SafeDispose);
+    }
+
+    private void OnResize(Vector2D<int> newSize)
+    {
+        if (_gl == null) return;
+
+        _gl.Viewport(0, 0, (uint)newSize.X, (uint)newSize.Y);
+        Debug.Log($"Window resized to {newSize.X}x{newSize.Y}");
     }
 
     private void SafeDispose()

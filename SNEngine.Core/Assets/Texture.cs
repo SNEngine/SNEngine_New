@@ -6,7 +6,7 @@ using System;
 namespace SNEngine.Core.Assets;
 
 /// <summary>
-/// Represents a GPU texture loaded from an image file or memory using ImageSharp.
+/// Represents a GPU texture loaded from file or memory using ImageSharp.
 /// </summary>
 public class Texture : IDisposable
 {
@@ -25,11 +25,14 @@ public class Texture : IDisposable
     }
 
     /// <summary>
-    /// Creates texture from byte array (used for .snpk packages).
+    /// Creates texture from byte array (used for loading from .snpk packages).
     /// </summary>
     public static Texture FromMemory(GL gl, byte[] imageData, string virtualPath)
     {
-        var texture = new Texture(gl, virtualPath); // temporary to set _gl
+        if (imageData == null || imageData.Length == 0)
+            throw new ArgumentException("Image data is empty", nameof(imageData));
+
+        var texture = new Texture(gl, virtualPath);
         texture.LoadFromMemory(imageData, virtualPath);
         return texture;
     }
@@ -74,7 +77,7 @@ public class Texture : IDisposable
             }
         }
 
-        // Texture parameters
+        // Texture settings
         _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.LinearMipmapLinear);
         _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)TextureMagFilter.Linear);
         _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureWrapS, (int)TextureWrapMode.ClampToEdge);

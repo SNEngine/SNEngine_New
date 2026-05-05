@@ -12,6 +12,7 @@ public class AssetManager : IDisposable
 {
     private readonly GL _gl;
     private SNPKPackage? _currentPackage;
+    private readonly Dictionary<AssetType, SNPKPackage> _packages = new();
 
     private readonly Dictionary<string, Texture> _textureCache = new(StringComparer.OrdinalIgnoreCase);
 
@@ -21,47 +22,36 @@ public class AssetManager : IDisposable
     }
 
     /// <summary>
-    /// Loads .snpk package (optional).
+    /// Loads specific asset package
     /// </summary>
-    public void LoadPackage(string pakPath)
+    public void LoadPackage(string pakPath, AssetType type = AssetType.Misc)
     {
-        _currentPackage?.Dispose();
-        _currentPackage = SNPKPackage.Load(pakPath);
-        Debug.Log($"[AssetManager] Loaded package: {pakPath}");
+        var package = SNPKPackage.Load(pakPath, type);
+        _packages[type] = package;
     }
 
-    /// <summary>
-    /// Main method to load texture. Works with both loose files and .snpk.
-    /// </summary>
-    public Texture LoadTexture(string path)
+    public Texture LoadTexture(string path, AssetType preferredPackage = AssetType.Backgrounds)
     {
         if (_textureCache.TryGetValue(path, out var existing))
             return existing;
 
-        Texture texture;
-
-        // Try load from .snpk first
-        if (_currentPackage != null)
+        // Try preferred package first
+        if (_packages.TryGetValue(preferredPackage, out var pkg))
         {
-            var data = _currentPackage.GetAsset(path);
+            var data = pkg.GetAsset(path);
             if (data != null)
             {
-                texture = Texture.FromMemory(_gl, data, path);
+                var texture = Texture.FromMemory(_gl, data, path);
                 _textureCache[path] = texture;
-                Debug.Log($"[AssetManager] Loaded from .snpk: {path}");
+                Debug.Log($"[AssetManager] Loaded from {preferredPackage}: {path}");
                 return texture;
             }
-            else
-            {
-                Debug.LogWarning($"[AssetManager] Asset not found in package: {path}");
-            }
         }
-        // Fallback to file system
-        texture = new Texture(_gl, path);
-        _textureCache[path] = texture;
-        Debug.Log($"[AssetManager] Loaded from file: {path}");
 
-        return texture;
+        // Fallback to file system
+        var textureFromFile = new Texture(_gl, path);
+        _textureCache[path] = textureFromFile;
+        return textureFromFile;
     }
 
     public Texture? GetTexture(string path)
@@ -81,6 +71,11 @@ public class AssetManager : IDisposable
     public void Dispose()
     {
         ClearCache();
-        _currentPackage?.Dispose();
+        foreach (var pkg in _packages.Values)
+            pkg.Dispose();
+        _packages.Clear();
+
+        
+    
     }
 }

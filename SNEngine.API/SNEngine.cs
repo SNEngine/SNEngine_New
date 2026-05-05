@@ -1,8 +1,9 @@
-﻿using SNEngine.Core.Engine;
-using SNEngine.Core.Scenes;
-using SNEngine.Core.Components;
-using System;
+﻿using SNEngine.Assets.Package;
 using SNEngine.Core;
+using SNEngine.Core.Components;
+using SNEngine.Core.Engine;
+using SNEngine.Core.Scenes;
+using System;
 
 namespace SNEngine.API;
 
@@ -71,6 +72,53 @@ public static class SNEngine
 
         _host.AssetManager.LoadPackage(pakPath);
         Debug.Log($"[SNEngine.API] Package loaded: {pakPath}");
+    }
+
+    /// <summary>
+    /// Loads default .snpk packages (backgrounds, sprites, ui, etc.)
+    /// Recommended to call after OnInitialized.
+    /// </summary>
+    public static void LoadDefaultPackages()
+    {
+        if (_host == null)
+        {
+            Debug.LogError("Cannot load packages before Run()");
+            return;
+        }
+
+        string buildDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory!, "build");
+
+        var defaultPackages = new[]
+        {
+        ("backgrounds.snpk", AssetType.Backgrounds),
+        ("sprites.snpk",     AssetType.Sprites),
+        ("ui.snpk",          AssetType.UI),
+        ("audio.snpk",       AssetType.Audio),
+        ("data.snpk",        AssetType.Data),
+        ("misc.snpk",        AssetType.Misc)
+    };
+
+        int loadedCount = 0;
+
+        foreach (var (pakName, type) in defaultPackages)
+        {
+            string pakPath = Path.Combine(buildDir, pakName);
+
+            if (File.Exists(pakPath))
+            {
+                try
+                {
+                    _host.AssetManager.LoadPackage(pakPath, type);
+                    loadedCount++;
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogError($"Failed to load {pakName}: {ex.Message}");
+                }
+            }
+        }
+
+        Debug.Log($"[SNEngine.API] Loaded {loadedCount} default packages from /build/");
     }
 
     /// <summary>

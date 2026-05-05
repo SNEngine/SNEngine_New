@@ -19,7 +19,7 @@ class Program
             SNEngine.API.SNEngine.LoadEmptyScene();
             BackgroundAPI.Show("assets/bg/classroom_day.png");
             CharacterAPI.AddExampleYuki();
-          //  CharacterAPI.Show("yuki", "happy");
+           CharacterAPI.Show("yuki", "happy");
 
             SNEngine.Core.Debug.Log("Scene loaded via SNEngine.API");
         };

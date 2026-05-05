@@ -25,8 +25,21 @@ public class SNEngineHost : IDisposable
         options.Size = new Silk.NET.Maths.Vector2D<int>(width, height);
         options.API = new GraphicsAPI(ContextAPI.OpenGL, ContextProfile.Core, ContextFlags.Default, new APIVersion(4, 6));
         options.VSync = true;
+        options.WindowState = WindowState.Normal;
 
         _window = Window.Create(options);
+
+        _window.Load += () =>
+        {
+            var monitor = _window.Monitor; 
+            if (monitor != null)
+            {
+                var centerX = monitor.Bounds.Origin.X + (monitor.Bounds.Size.X - width) / 2;
+                var centerY = monitor.Bounds.Origin.Y + (monitor.Bounds.Size.Y - height) / 2;
+
+                _window.Position = new Silk.NET.Maths.Vector2D<int>(centerX, centerY);
+            }
+        };
 
         _window.Load += OnLoad;
         _window.Update += OnUpdateFrame;

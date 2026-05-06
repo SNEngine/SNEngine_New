@@ -10,11 +10,8 @@ public class testScene : SNScript
     public override void Execute()
     {
         SNEngine.API.SNEngine.LoadEmptyScene();
-        BackgroundAPI.Show("beach");
-    }
-
-    private void hello()
-    {
-        CharacterAPI.Show("Nagatoro", "happy");
+        SetVar("myVar2", 15);
+        SetVar("MyVar25", GetVar("3.68"));
+        SetVar("myvar80", GetVar("myVar25"));
     }
 }

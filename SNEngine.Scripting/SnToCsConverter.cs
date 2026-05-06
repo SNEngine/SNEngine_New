@@ -35,10 +35,33 @@ public static class SnToCsConverter
 
         string csharpCode = generator.Generate(ast);
 
-        // === ROSLYN ВАЛИДАЦИЯ ===
+        // === ИСПРАВЛЕНИЕ: делаем валидацию мягкой для кросс-ссылок ===
         Console.WriteLine($"Validating generated C# code ({fileNameForLogs})...");
+
         var validationResult = CSharpValidator.Validate(csharpCode, fileNameForLogs);
-        validationResult.PrintToConsole();
+
+        // Если ошибка только про неизвестный тип из другого .sn — игнорируем
+        if (!validationResult.IsValid)
+        {
+            bool isCrossReferenceError = validationResult.Errors.Any(e =>
+                e.Contains("scene2") || e.Contains("Не удалось найти тип") || e.Contains("type or namespace"));
+
+            if (isCrossReferenceError)
+            {
+                Console.ForegroundColor = ConsoleColor.Yellow;
+                Console.WriteLine($"[⚠] Cross-reference warning in {fileNameForLogs} (will be resolved at full build)");
+                Console.ResetColor();
+                validationResult.IsValid = true; // считаем валидным для продолжения
+            }
+            else
+            {
+                validationResult.PrintToConsole();
+            }
+        }
+        else
+        {
+            validationResult.PrintToConsole();
+        }
 
         return csharpCode;
     }

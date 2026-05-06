@@ -25,16 +25,16 @@ public class GameAssemblyBuilder
             return false;
         }
 
-        // Создаем или очищаем папку для сгенерированного кода
+        // === УЛУЧШЕННОЕ СОЗДАНИЕ ПАПКИ ===
         string genDirectory = Path.Combine(inputDirectory, "script_gen");
-        if (Directory.Exists(genDirectory))
-            Directory.Delete(genDirectory, true);
-        Directory.CreateDirectory(genDirectory);
+        EnsureDirectoryClean(genDirectory);
 
         var allCsFiles = new List<string>();
 
-        // 1. Конвертируем .sn → .cs и сохраняем в script_gen
-        var snFiles = Directory.GetFiles(inputDirectory, "*.sn", SearchOption.AllDirectories);
+        // 1. Конвертируем .sn файлы
+        var snFiles = Directory.GetFiles(inputDirectory, "*.sn", SearchOption.AllDirectories)
+                               .OrderBy(f => f).ToArray(); // стабильный порядок
+
         Console.WriteLine($"Found {snFiles.Length} .sn files");
 
         foreach (var snPath in snFiles)
@@ -44,14 +44,15 @@ public class GameAssemblyBuilder
                 string source = File.ReadAllText(snPath);
                 string csCode = SnToCsConverter.ConvertToCSharp(source, Path.GetFileName(snPath));
 
-                // Сохраняем в папку script_gen с сохранением имени
                 string fileName = Path.GetFileNameWithoutExtension(snPath) + ".generated.cs";
                 string tempCsPath = Path.Combine(genDirectory, fileName);
 
+                // Явная проверка существования папки перед записью
+                Directory.CreateDirectory(genDirectory);
                 File.WriteAllText(tempCsPath, csCode);
                 allCsFiles.Add(tempCsPath);
 
-                Console.WriteLine($"[✓] Compiled {Path.GetFileName(snPath)} -> script_gen/{fileName}");
+                Console.WriteLine($"[✓] Compiled {Path.GetFileName(snPath)} → {fileName}");
             }
             catch (Exception ex)
             {
@@ -59,9 +60,10 @@ public class GameAssemblyBuilder
             }
         }
 
-        // 2. Добавляем обычные .cs файлы из исходной директории (исключая саму папку gen)
+        // 2. Добавляем ручные .cs файлы
         var manualCsFiles = Directory.GetFiles(inputDirectory, "*.cs", SearchOption.AllDirectories)
-            .Where(f => !f.Contains("script_gen") && !f.EndsWith(".generated.cs"));
+            .Where(f => !f.Contains("script_gen") && !f.EndsWith(".generated.cs"))
+            .ToList();
 
         allCsFiles.AddRange(manualCsFiles);
 
@@ -74,6 +76,33 @@ public class GameAssemblyBuilder
         }
 
         return CompileToDll(allCsFiles, outputDllPath);
+    }
+
+    /// <summary>
+    /// Надёжное создание/очистка папки script_gen
+    /// </summary>
+    private static void EnsureDirectoryClean(string path)
+    {
+        if (Directory.Exists(path))
+        {
+            try
+            {
+                Directory.Delete(path, true);
+                Console.WriteLine($"[Clean] Removed old script_gen folder");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[Warning] Could not delete script_gen: {ex.Message}");
+                // Пытаемся очистить содержимое
+                foreach (var file in Directory.GetFiles(path, "*", SearchOption.AllDirectories))
+                {
+                    try { File.Delete(file); } catch { }
+                }
+            }
+        }
+
+        Directory.CreateDirectory(path);
+        Console.WriteLine($"[Info] Created script_gen at: {path}");
     }
 
     private bool CompileToDll(List<string> csFiles, string outputDllPath)

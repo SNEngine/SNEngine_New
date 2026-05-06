@@ -11,6 +11,7 @@ namespace SNEngine.Scripting.CodeGen;
 
 /// <summary>
 /// Final clean orchestrator for code generation.
+/// Now works with ClassGenerator that returns full CompilationUnit.
 /// </summary>
 public sealed class ScriptCodeGenerator
 {
@@ -47,16 +48,9 @@ public sealed class ScriptCodeGenerator
     public string Generate(ScriptNode script)
     {
         var classGenerator = new ClassGenerator(_generators);
-        var classDeclaration = classGenerator.Generate(script);
 
-        // Формируем using директивы
-        var usingDirectives = _defaultUsings
-            .Select(u => SyntaxFactory.UsingDirective(SyntaxFactory.ParseName(u)))
-            .ToList();
-
-        var compilationUnit = SyntaxFactory.CompilationUnit()
-            .WithUsings(SyntaxFactory.List(usingDirectives))
-            .WithMembers(SyntaxFactory.SingletonList<MemberDeclarationSyntax>(classDeclaration));
+        // Теперь ClassGenerator возвращает полный CompilationUnitSyntax
+        var compilationUnit = classGenerator.Generate(script);
 
         return compilationUnit.NormalizeWhitespace().ToFullString();
     }

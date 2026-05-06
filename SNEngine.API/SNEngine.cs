@@ -4,6 +4,7 @@ using SNEngine.Core.Components;
 using SNEngine.Core.Engine;
 using SNEngine.Core.Scenes;
 using System;
+using System.IO;
 
 namespace SNEngine.API;
 
@@ -29,28 +30,25 @@ public static class SNEngine
 
         _host.OnInitialized += () =>
         {
-
             OnInitialized?.Invoke();
             Console.WriteLine("[SNEngine.API] Engine fully initialized and ready.");
         };
 
         _host.Run();
     }
-    /// <summary>
-    /// Changes current scene to a new one.
-    /// </summary>
+
+    // ================================================================
+    // ==================== SCENE MANAGEMENT ==========================
+    // ================================================================
+
     public static void LoadScene(Scene scene)
     {
         if (_host == null || scene == null) return;
 
         _host.SceneManager.LoadScene(scene);
-
         Console.WriteLine($"[SNEngine.API] Loaded scene: {scene.Name}");
     }
 
-    /// <summary>
-    /// Loads an empty scene (useful for menus or transitions).
-    /// </summary>
     public static void LoadEmptyScene(string name = "Empty Scene")
     {
         if (_host == null) return;
@@ -59,9 +57,34 @@ public static class SNEngine
         LoadScene(empty);
     }
 
+    // ================================================================
+    // ====================== GAME CONTROL ============================
+    // ================================================================
+
     /// <summary>
-    /// Loads .snpk package before starting the game.
+    /// Exit the game (Unity-like)
     /// </summary>
+    public static void Quit()
+    {
+        Console.WriteLine("[SNEngine.API] Quit requested.");
+        Environment.Exit(0);
+    }
+
+    /// <summary>
+    /// Restart the current game (reload main scene)
+    /// </summary>
+    public static void Restart()
+    {
+        Console.WriteLine("[SNEngine.API] Restarting game...");
+        // Можно реализовать через перезапуск Main скрипта или полный reload
+        LoadEmptyScene("Restarting...");
+        // TODO: в будущем — перезапуск Main
+    }
+
+    // ================================================================
+    // ====================== PACKAGES ================================
+    // ================================================================
+
     public static void LoadPackage(string pakPath)
     {
         if (_host == null)
@@ -74,9 +97,6 @@ public static class SNEngine
         Debug.Log($"[SNEngine.API] Package loaded: {pakPath}");
     }
 
-    /// <summary>
-    /// Loads default .snpk packages including characters.
-    /// </summary>
     public static void LoadDefaultPackages()
     {
         if (_host == null)
@@ -89,14 +109,14 @@ public static class SNEngine
 
         var defaultPackages = new[]
         {
-        ("backgrounds.snpk", AssetType.Backgrounds),
-        ("sprites.snpk",     AssetType.Sprites),
-        ("characters.snpk",  AssetType.Characters),   // ← Добавили
-        ("ui.snpk",          AssetType.UI),
-        ("audio.snpk",       AssetType.Audio),
-        ("data.snpk",        AssetType.Data),
-        ("misc.snpk",        AssetType.Misc)
-    };
+            ("backgrounds.snpk", AssetType.Backgrounds),
+            ("sprites.snpk",     AssetType.Sprites),
+            ("characters.snpk",  AssetType.Characters),
+            ("ui.snpk",          AssetType.UI),
+            ("audio.snpk",       AssetType.Audio),
+            ("data.snpk",        AssetType.Data),
+            ("misc.snpk",        AssetType.Misc)
+        };
 
         int loadedCount = 0;
 
@@ -120,17 +140,17 @@ public static class SNEngine
         }
 
         if (loadedCount == 0)
-        {
             Debug.LogWarning("[SNEngine.API] No .snpk packages found in /build/. Running in loose files mode.");
-        }
         else
-        {
             Debug.Log($"[SNEngine.API] Successfully loaded {loadedCount} default packages.");
-        }
     }
-    /// <summary>
-    /// Returns the current host for advanced usage.
-    /// </summary>
+
+    // ================================================================
+    // ====================== UTILITY =================================
+    // ================================================================
+
     public static SNEngineHost Host => _host!;
     public static Scene? CurrentScene => Host?.SceneManager?.CurrentScene;
+
+    public static bool IsRunning => _host != null;
 }

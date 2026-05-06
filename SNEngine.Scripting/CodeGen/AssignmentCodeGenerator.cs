@@ -5,9 +5,6 @@ using System.Text.RegularExpressions;
 
 namespace SNEngine.Scripting.CodeGen;
 
-/// <summary>
-/// Smart assignment generator with variable detection in expressions
-/// </summary>
 [SnCodeGenerator(typeof(AssignmentCommandNode))]
 public sealed class AssignmentCodeGenerator : ICommandCodeGenerator
 {
@@ -18,48 +15,28 @@ public sealed class AssignmentCodeGenerator : ICommandCodeGenerator
 
         string rightSide = ProcessRightSide(assign.ValueExpression);
 
-        return SyntaxFactory.ParseStatement(
-            $"SetVar(\"{assign.VariableName}\", {rightSide});");
+        return SyntaxFactory.ParseStatement($"SetVar(\"{assign.VariableName}\", {rightSide});");
     }
 
-    /// <summary>
-    /// Обрабатывает правую часть: оборачивает имена переменных в GetVar()
-    /// </summary>
-    private static string ProcessRightSide(string expression)
+    private static string ProcessRightSide(string expr)
     {
-        if (string.IsNullOrWhiteSpace(expression))
-            return "0";
+        if (string.IsNullOrWhiteSpace(expr)) return "0";
+        expr = expr.Trim();
 
-        expression = expression.Trim();
+        var regex = new Regex(@"""[^""]*""|(\b[a-zA-Z_][a-zA-Z0-9_]*\b)");
 
-        // Если это чистый литерал — возвращаем как есть
-        if (IsLiteral(expression))
-            return expression;
-
-        // Ищем имена переменных и оборачиваем их в GetVar("...")
-        // Имя переменной: буква + буквы/цифры/подчёркивания
-        var regex = new Regex(@"\b([a-zA-Z_][a-zA-Z0-9_]*)\b");
-
-        return regex.Replace(expression, match =>
+        return regex.Replace(expr, match =>
         {
+            if (match.Value.StartsWith("\"")) return match.Value;
+
             string word = match.Value;
 
-            // Если это литерал (число, true, false, null) — не трогаем
-            if (IsLiteral(word))
+            if (double.TryParse(word, out _) ||
+                word.Equals("true", StringComparison.OrdinalIgnoreCase) ||
+                word.Equals("false", StringComparison.OrdinalIgnoreCase))
                 return word;
 
-            // Иначе считаем это переменной
             return $"GetVar(\"{word}\")";
         });
-    }
-
-    private static bool IsLiteral(string value)
-    {
-        if (double.TryParse(value, out _)) return true;
-        if (value.Equals("true", StringComparison.OrdinalIgnoreCase)) return true;
-        if (value.Equals("false", StringComparison.OrdinalIgnoreCase)) return true;
-        if (value.Equals("null", StringComparison.OrdinalIgnoreCase)) return true;
-        if (value.StartsWith("\"") || value.StartsWith("'")) return true;
-        return false;
     }
 }

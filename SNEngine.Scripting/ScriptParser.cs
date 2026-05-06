@@ -8,7 +8,7 @@ using static Pidgin.Parser<char>;
 namespace SNEngine.Scripting;
 
 /// <summary>
-/// Parser with support for if-then-else-endif
+/// Parser with support for if-then-else-endif and else if chains
 /// </summary>
 public static class ScriptParser
 {
@@ -66,7 +66,6 @@ public static class ScriptParser
 
             if (line.StartsWith("if ", StringComparison.OrdinalIgnoreCase) && line.Contains("then"))
             {
-                // Парсим if-then-else-endif
                 var ifNode = ParseIfBlock(lines, ref i, commandParser);
                 if (ifNode != null) commands.Add(ifNode);
                 continue;
@@ -93,13 +92,14 @@ public static class ScriptParser
         var condition = line.Substring(3, thenPos - 3).Trim();
 
         var thenBody = new List<CommandNode>();
+        var elseIfClauses = new List<ElseIfClause>();
         var elseBody = new List<CommandNode>();
-        bool inElse = false;
+
         index++;
 
         while (index < lines.Count)
         {
-            var current = lines[index];
+            var current = lines[index].Trim();
 
             if (current.Equals("endif", StringComparison.OrdinalIgnoreCase))
             {
@@ -107,30 +107,48 @@ public static class ScriptParser
                 break;
             }
 
-            if (current.Equals("else", StringComparison.OrdinalIgnoreCase))
+            if (current.StartsWith("else if ", StringComparison.OrdinalIgnoreCase))
             {
-                inElse = true;
+                int elseThenPos = current.IndexOf("then", StringComparison.OrdinalIgnoreCase);
+                var elseIfCondition = current.Substring(7, elseThenPos - 7).Trim();
+
+                var elseIfBody = new List<CommandNode>();
                 index++;
+
+                while (index < lines.Count &&
+                       !lines[index].Equals("else", StringComparison.OrdinalIgnoreCase) &&
+                       !lines[index].StartsWith("else if ", StringComparison.OrdinalIgnoreCase) &&
+                       !lines[index].Equals("endif", StringComparison.OrdinalIgnoreCase))
+                {
+                    var parseResult = commandParser.Parse(lines[index]);   // ← переименовали
+                    if (parseResult.Success) elseIfBody.Add(parseResult.Value);
+                    index++;
+                }
+
+                elseIfClauses.Add(new ElseIfClause(elseIfCondition, elseIfBody));
                 continue;
             }
 
-            // Парсим команду
-            var result = commandParser.Parse(current);
-            if (result.Success)
+            if (current.Equals("else", StringComparison.OrdinalIgnoreCase))
             {
-                if (inElse)
-                    elseBody.Add(result.Value);
-                else
-                    thenBody.Add(result.Value);
+                index++;
+                while (index < lines.Count && !lines[index].Equals("endif", StringComparison.OrdinalIgnoreCase))
+                {
+                    var parseResult = commandParser.Parse(lines[index]);   // ← переименовали
+                    if (parseResult.Success) elseBody.Add(parseResult.Value);
+                    index++;
+                }
+                continue;
             }
-            else
-            {
-                // Если команда не распознана — пропускаем
-                Console.WriteLine($"[Parser Warning] Unknown command in if: {current}");
-            }
+
+            // Обычные команды в then
+            var parseResultMain = commandParser.Parse(current);   // ← переименовали
+            if (parseResultMain.Success)
+                thenBody.Add(parseResultMain.Value);
+
             index++;
         }
 
-        return new IfCommandNode(condition, thenBody, elseBody);
+        return new IfCommandNode(condition, thenBody, elseIfClauses, elseBody);
     }
 }

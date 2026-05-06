@@ -15,35 +15,32 @@ public class SNVariable
         Value = value ?? throw new ArgumentNullException(nameof(value));
     }
 
-    // Присваивание
     public void Set(object newValue) => Value = newValue;
 
-    // Получение типобезопасно
+    // === Типобезопасные конвертеры ===
     public int AsInt() => Convert.ToInt32(Value);
+    public long AsLong() => Convert.ToInt64(Value);
+    public float AsFloat() => Convert.ToSingle(Value);
     public double AsDouble() => Convert.ToDouble(Value);
-    public string AsString() => Value?.ToString() ?? "";
+    public decimal AsDecimal() => Convert.ToDecimal(Value);
     public bool AsBool() => Convert.ToBoolean(Value);
+    public string AsString() => Value?.ToString() ?? "";
 
-    // Арифметика
+    // === Операторы ===
     public static SNVariable operator +(SNVariable a, SNVariable b)
     {
         if (a.Value is string || b.Value is string)
             return new SNVariable(a.AsString() + b.AsString());
 
-        if (a.Value is double || b.Value is double)
+        if (a.Value is double || b.Value is double || a.Value is float || b.Value is float)
             return new SNVariable(a.AsDouble() + b.AsDouble());
 
         return new SNVariable(a.AsInt() + b.AsInt());
     }
 
-    public static SNVariable operator -(SNVariable a, SNVariable b)
-        => new SNVariable(a.AsDouble() - b.AsDouble());
-
-    public static SNVariable operator *(SNVariable a, SNVariable b)
-        => new SNVariable(a.AsDouble() * b.AsDouble());
-
-    public static SNVariable operator /(SNVariable a, SNVariable b)
-        => new SNVariable(a.AsDouble() / b.AsDouble());
+    public static SNVariable operator -(SNVariable a, SNVariable b) => new(a.AsDouble() - b.AsDouble());
+    public static SNVariable operator *(SNVariable a, SNVariable b) => new(a.AsDouble() * b.AsDouble());
+    public static SNVariable operator /(SNVariable a, SNVariable b) => new(a.AsDouble() / b.AsDouble());
 
     public static SNVariable operator +(SNVariable a, object b) => a + new SNVariable(b);
     public static SNVariable operator -(SNVariable a, object b) => a - new SNVariable(b);

@@ -21,4 +21,8 @@
     <Folder Include="Commands\" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\SNEngine.Scripting.Validation\SNEngine.Scripting.Validation.csproj" />
+  </ItemGroup>
+
 </Project>

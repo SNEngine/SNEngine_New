@@ -1,12 +1,14 @@
 ﻿using SNEngine.Scripting.Ast;
 using SNEngine.Scripting.CodeGen;
+using SNEngine.Scripting.Validation;
+using System;
 using System.IO;
-using System.Reflection;
+using System.Text;
 
 namespace SNEngine.Scripting;
 
 /// <summary>
-/// High-level converter: .sn → C# (with functions support)
+/// High-level converter: .sn → C# with Roslyn validation + safe file writing
 /// </summary>
 public static class SnToCsConverter
 {
@@ -16,7 +18,6 @@ public static class SnToCsConverter
     {
         if (_initialized) return;
 
-        // Parsers
         var parserFactory = new CommandParserFactory();
         parserFactory.RegisterAll(typeof(SnToCsConverter).Assembly);
         ScriptParser.Initialize(parserFactory);
@@ -24,7 +25,7 @@ public static class SnToCsConverter
         _initialized = true;
     }
 
-    public static string ConvertToCSharp(string snSource)
+    public static string ConvertToCSharp(string snSource, string fileNameForLogs = "Generated.cs")
     {
         Initialize();
 
@@ -32,19 +33,70 @@ public static class SnToCsConverter
         var generator = new ScriptCodeGenerator();
         generator.RegisterAll(typeof(SnToCsConverter).Assembly);
 
-        return generator.Generate(ast);
+        string csharpCode = generator.Generate(ast);
+
+        // === ROSLYN ВАЛИДАЦИЯ ===
+        Console.WriteLine($"Validating generated C# code ({fileNameForLogs})...");
+        var validationResult = CSharpValidator.Validate(csharpCode, fileNameForLogs);
+        validationResult.PrintToConsole();
+
+        return csharpCode;
     }
 
+    /// <summary>
+    /// Конвертирует .sn в .cs с валидацией. Записывает файл только если код валиден.
+    /// </summary>
     public static void ConvertFile(string inputPath, string? outputPath = null)
     {
         Initialize();
 
         string source = File.ReadAllText(inputPath);
-        string csCode = ConvertToCSharp(source);
+        string fileName = Path.GetFileName(inputPath);
 
-        string outPath = outputPath ?? Path.ChangeExtension(inputPath, ".cs");
-        File.WriteAllText(outPath, csCode);
+        string csCode = ConvertToCSharp(source, fileName);
 
-        Console.WriteLine($"[OK] Generated → {outPath}");
+        string finalOutputPath = outputPath ?? Path.ChangeExtension(inputPath, ".cs");
+
+        var validationResult = CSharpValidator.Validate(csCode, fileName);
+
+        if (validationResult.IsValid)
+        {
+            SafeWriteFile(finalOutputPath, csCode);
+            Console.ForegroundColor = ConsoleColor.Green;
+            Console.WriteLine($"[OK] Successfully generated and validated → {finalOutputPath}");
+        }
+        else
+        {
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine($"[ERROR] Validation failed for {fileName}. File was NOT saved.");
+            Console.WriteLine($"       Fix the errors shown above before using this script.");
+            Console.ResetColor();
+
+        }
+
+        Console.ResetColor();
+    }
+
+    /// <summary>
+    /// Безопасная запись файла (с использованием Stream + UTF-8 BOM)
+    /// </summary>
+    private static void SafeWriteFile(string path, string content)
+    {
+        try
+        {
+            var directory = Path.GetDirectoryName(path);
+            if (!string.IsNullOrEmpty(directory))
+                Directory.CreateDirectory(directory);
+
+            using var fs = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.None);
+            using var writer = new StreamWriter(fs, Encoding.UTF8);
+            writer.Write(content);
+        }
+        catch (Exception ex)
+        {
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine($"[CRITICAL] Failed to write file {path}: {ex.Message}");
+            Console.ResetColor();
+        }
     }
 }

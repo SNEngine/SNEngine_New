@@ -1,4 +1,10 @@
 using SNEngine.API;
+using SNEngine.Core;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
 
 public class testScene : SNScript
 {
@@ -21,6 +27,12 @@ public class testScene : SNScript
         SetVar("playerHealth", GetVar("enemyLevel"));
         BackgroundAPI.Show("classroom");
         CharacterAPI.Show("Nagatoro", "angry");
+        hello();
+        calculateDamage();
+        levelUp();
+        Debug.Log("Hello from .sn!");
+        Debug.Log(GetVar("myVar2"));
+        Debug.Log("GetVar(" Player "): " + GetVar("playerName") + " GetVar(" HP "): " + GetVar("playerHealth"));
     }
 
     private void calculateDamage()

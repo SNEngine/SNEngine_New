@@ -1,23 +1,28 @@
 ﻿using SNEngine.Scripting.Ast;
 using SNEngine.Scripting.CodeGen;
 using System.IO;
+using System.Reflection;
 
 namespace SNEngine.Scripting;
 
 /// <summary>
-/// Main service: .sn → .cs
+/// Main high-level service: .sn → .cs conversion
 /// </summary>
 public static class SnToCsConverter
 {
-    private static bool _initialized;
+    private static bool _initialized = false;
 
     private static void Initialize()
     {
         if (_initialized) return;
 
-        var factory = new CommandParserFactory();
-        factory.RegisterAll(typeof(SnToCsConverter).Assembly);
-        ScriptParser.Initialize(factory);
+        // Register parsers
+        var parserFactory = new CommandParserFactory();
+        parserFactory.RegisterAll(typeof(SnToCsConverter).Assembly);
+        ScriptParser.Initialize(parserFactory);
+
+        // Register code generators
+        var codeGenerator = new ScriptCodeGenerator();
 
         _initialized = true;
     }
@@ -25,19 +30,24 @@ public static class SnToCsConverter
     public static string ConvertToCSharp(string snSource)
     {
         Initialize();
+
         var ast = ScriptParser.Parse(snSource);
-        return new ScriptCodeGenerator().Generate(ast);
+        var generator = new ScriptCodeGenerator();
+        generator.RegisterAll(typeof(SnToCsConverter).Assembly); 
+
+        return generator.Generate(ast);
     }
 
     public static void ConvertFile(string inputPath, string? outputPath = null)
     {
         Initialize();
+
         string source = File.ReadAllText(inputPath);
         string csCode = ConvertToCSharp(source);
 
-        string outPath = outputPath ?? Path.ChangeExtension(inputPath, ".cs");
-        File.WriteAllText(outPath, csCode);
+        string finalOutput = outputPath ?? Path.ChangeExtension(inputPath, ".cs");
+        File.WriteAllText(finalOutput, csCode);
 
-        Console.WriteLine($"[OK] Generated → {outPath}");
+        Console.WriteLine($"[OK] Generated: {finalOutput}");
     }
 }

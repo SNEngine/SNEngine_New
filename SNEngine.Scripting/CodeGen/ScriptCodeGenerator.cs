@@ -3,59 +3,80 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using SNEngine.Scripting.Ast;
 using System.Collections.Generic;
+using System.Reflection;
 
 namespace SNEngine.Scripting.CodeGen;
 
 /// <summary>
-/// Генерирует C# код из AST
+/// Clean code generator using ICommandCodeGenerator. No switch statements.
 /// </summary>
 public sealed class ScriptCodeGenerator
 {
+    private readonly Dictionary<Type, ICommandCodeGenerator> _generators = new();
+
+    /// <summary>
+    /// Auto-register all generators marked with [SnCodeGenerator]
+    /// </summary>
+    public void RegisterAll(Assembly assembly)
+    {
+        foreach (var type in assembly.GetTypes())
+        {
+            var attr = type.GetCustomAttribute<SnCodeGeneratorAttribute>();
+            if (attr == null) continue;
+
+            if (Activator.CreateInstance(type) is ICommandCodeGenerator instance)
+            {
+                _generators[attr.TargetNodeType] = instance;
+            }
+        }
+    }
+
     public string Generate(ScriptNode script)
     {
         var sceneName = script.SceneName ?? "UnnamedScene";
 
         var statements = new List<StatementSyntax>
         {
-            SyntaxFactory.ParseStatement($"var scene = new {sceneName}Scene();"),
-            SyntaxFactory.ParseStatement("context.Engine.SceneManager.LoadScene(scene);")
+            SyntaxFactory.ParseStatement("SNEngine.API.SNEngine.LoadEmptyScene();")
         };
 
         foreach (var cmd in script.Commands)
         {
-            statements.Add(cmd switch
+            if (_generators.TryGetValue(cmd.GetType(), out var generator))
             {
-                ShowBackgroundCommandNode bg =>
-                    SyntaxFactory.ParseStatement($"BackgroundAPI.Show(\"{bg.BackgroundName}\");"),
-
-                ShowCharacterCommandNode ch =>
-                    SyntaxFactory.ParseStatement($"CharacterAPI.Show(\"{ch.CharacterName}\", \"{ch.Emotion}\");"),
-
-                _ => SyntaxFactory.ParseStatement($"// Unknown command: {cmd.GetType().Name}")
-            });
+                statements.Add(generator.Generate(cmd));
+            }
+            else
+            {
+                statements.Add(SyntaxFactory.ParseStatement($"// No code generator for {cmd.GetType().Name}"));
+            }
         }
 
-        var method = SyntaxFactory.MethodDeclaration(
+        var executeMethod = SyntaxFactory.MethodDeclaration(
             SyntaxFactory.PredefinedType(SyntaxFactory.Token(SyntaxKind.VoidKeyword)), "Execute")
             .WithModifiers(SyntaxFactory.TokenList(
                 SyntaxFactory.Token(SyntaxKind.PublicKeyword),
-                SyntaxFactory.Token(SyntaxKind.StaticKeyword)))
-            .WithParameterList(SyntaxFactory.ParameterList(SyntaxFactory.SingletonSeparatedList(
-                SyntaxFactory.Parameter(SyntaxFactory.Identifier("context"))
-                    .WithType(SyntaxFactory.ParseTypeName("SNEngine.Scripting.ScriptContext")))))
+                SyntaxFactory.Token(SyntaxKind.OverrideKeyword)))
             .WithBody(SyntaxFactory.Block(statements));
+
+        var classDeclaration = SyntaxFactory.ClassDeclaration(sceneName)
+            .WithModifiers(SyntaxFactory.TokenList(SyntaxFactory.Token(SyntaxKind.PublicKeyword)))
+            .WithBaseList(SyntaxFactory.BaseList(SyntaxFactory.SingletonSeparatedList<BaseTypeSyntax>(
+                SyntaxFactory.SimpleBaseType(SyntaxFactory.ParseTypeName("SNScript")))))
+            .AddMembers(
+                SyntaxFactory.ConstructorDeclaration(sceneName)
+                    .WithModifiers(SyntaxFactory.TokenList(SyntaxFactory.Token(SyntaxKind.PublicKeyword)))
+                    .WithBody(SyntaxFactory.Block(
+                        SyntaxFactory.ParseStatement($"SceneName = \"{sceneName}\";"))),
+                executeMethod
+            );
 
         var cu = SyntaxFactory.CompilationUnit()
             .WithUsings(SyntaxFactory.List(new[]
             {
                 SyntaxFactory.UsingDirective(SyntaxFactory.ParseName("SNEngine.API")),
-                SyntaxFactory.UsingDirective(SyntaxFactory.ParseName("SNEngine.Core.Scenes")),
-                SyntaxFactory.UsingDirective(SyntaxFactory.ParseName("SNEngine.Scripting")),
             }))
-            .WithMembers(SyntaxFactory.SingletonList<MemberDeclarationSyntax>(
-                SyntaxFactory.ClassDeclaration(sceneName + "Scene")
-                    .WithModifiers(SyntaxFactory.TokenList(SyntaxFactory.Token(SyntaxKind.PublicKeyword)))
-                    .AddMembers(method)));
+            .WithMembers(SyntaxFactory.SingletonList<MemberDeclarationSyntax>(classDeclaration));
 
         return cu.NormalizeWhitespace().ToFullString();
     }

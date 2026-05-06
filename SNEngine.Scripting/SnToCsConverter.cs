@@ -5,7 +5,7 @@ using System.IO;
 namespace SNEngine.Scripting;
 
 /// <summary>
-/// Главный сервис: .sn → .cs
+/// Main service: .sn → .cs
 /// </summary>
 public static class SnToCsConverter
 {

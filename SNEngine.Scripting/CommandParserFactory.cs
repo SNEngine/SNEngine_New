@@ -8,7 +8,7 @@ using static Pidgin.Parser;
 namespace SNEngine.Scripting;
 
 /// <summary>
-/// Автоматически находит и регистрирует все команды
+/// Automatically discovers and registers all commands
 /// </summary>
 public sealed class CommandParserFactory
 {
@@ -37,7 +37,7 @@ public sealed class CommandParserFactory
         if (_parsers.Count == 0)
             throw new InvalidOperationException("No commands registered.");
 
-        // Более длинные ключевые слова первыми (Show Background > Show Character)
+        // Longer keywords first (Show Background > Show Character)
         var sorted = _parsers
             .OrderByDescending(kv => kv.Key.Length)
             .Select(kv => Try(kv.Value))

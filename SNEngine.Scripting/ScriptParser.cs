@@ -8,7 +8,7 @@ using static Pidgin.Parser<char>;
 namespace SNEngine.Scripting;
 
 /// <summary>
-/// Рабочий парсер под твой формат .sn (построчный, но использует динамические команды)
+/// Working parser for .sn files (line-based but uses dynamic commands)
 /// </summary>
 public static class ScriptParser
 {
@@ -45,7 +45,7 @@ public static class ScriptParser
             if (line.Equals("end", StringComparison.OrdinalIgnoreCase))
                 break;
 
-            // Используем динамический парсер для каждой строки
+            // Use dynamic parser for each line
             var result = commandParser.Parse(line);
             if (result.Success)
             {

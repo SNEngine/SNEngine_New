@@ -6,45 +6,28 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-public class testScene : SNScript
+public class testIf : SNScript
 {
-    public testScene()
+    public testIf()
     {
-        SceneName = "testScene";
+        SceneName = "testIf";
     }
 
     public override void Execute()
     {
         SNEngine.API.SNEngine.LoadEmptyScene();
-        SetVar("myVar2", 15);
-        SetVar("MyVar25", 3.68);
-        SetVar("myvar80", "Hello World");
-        SetVar("playerHealth", 100);
-        SetVar("enemyLevel", 25);
-        SetVar("playerName", "Nagatoro");
-        SetVar("isAlive", true);
-        SetVar("myvar80", GetVar("myVar25"));
-        SetVar("playerHealth", GetVar("enemyLevel"));
-        BackgroundAPI.Show("classroom");
-        CharacterAPI.Show("Nagatoro", "angry");
-        hello();
-        calculateDamage();
-        levelUp();
-        Debug.Log("Hello from .sn!");
-        Debug.Log(GetVar("myVar2"));
-        Debug.Log("GetVar(" Player "): " + GetVar("playerName") + " GetVar(" HP "): " + GetVar("playerHealth"));
-    }
+        SetVar("playerHealth", 35);
+        SetVar("enemyLevel", 20);
+        if (GetVar("playerHealth").AsInt() < 50)
+        {
+            Debug.Log("You are injured!");
+            SetVar("enemyLevel", 30);
+        }
+        else
+        {
+            Debug.Log("You are strong!");
+        }
 
-    private void calculateDamage()
-    {
-        SetVar("tempDamage", 25);
-        SetVar("finalDamage", GetVar("tempDamage"));
-    }
-
-    private void levelUp()
-    {
-        SetVar("playerLevel", 10);
-        SetVar("playerHealth", GetVar("playerHealth") + 50);
-        SetVar("myvar80", "Level Up!");
+        Debug.Log("Current enemy level: " + GetVar("enemyLevel"));
     }
 }

@@ -8,7 +8,7 @@ using static Pidgin.Parser<char>;
 namespace SNEngine.Scripting;
 
 /// <summary>
-/// Parser that supports main body and user-defined functions: function name() ... endfunc
+/// Parser with support for if-then-else-endif
 /// </summary>
 public static class ScriptParser
 {
@@ -28,69 +28,109 @@ public static class ScriptParser
 
         var lines = source.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
                           .Select(l => l.Trim())
-                          .Where(l => !string.IsNullOrWhiteSpace(l));
+                          .Where(l => !string.IsNullOrWhiteSpace(l))
+                          .ToList();
 
         string? sceneName = null;
         var commands = new List<CommandNode>();
         var functions = new List<FunctionNode>();
 
-        FunctionNode? currentFunction = null;
-        var currentBody = new List<CommandNode>();
-
-        foreach (var line in lines)
+        int i = 0;
+        while (i < lines.Count)
         {
+            var line = lines[i];
+
             if (line.StartsWith("name:", StringComparison.OrdinalIgnoreCase))
             {
                 sceneName = line.Substring(5).Trim();
+                i++;
                 continue;
             }
 
             if (line.StartsWith("function ", StringComparison.OrdinalIgnoreCase))
             {
-                // Finish previous function if any
-                if (currentFunction != null)
+                var funcName = line.Substring(9).Trim().TrimEnd('(', ')').Trim();
+                var funcBody = new List<CommandNode>();
+                i++;
+
+                while (i < lines.Count && !lines[i].Equals("endfunc", StringComparison.OrdinalIgnoreCase))
                 {
-                    functions.Add(new FunctionNode(currentFunction.Name, currentBody));
-                    currentBody = new List<CommandNode>();
+                    var result = commandParser.Parse(lines[i]);
+                    if (result.Success) funcBody.Add(result.Value);
+                    i++;
                 }
-
-                var funcName = line.Substring(9)
-                    .Trim()
-                    .TrimEnd('(', ')')
-                    .Trim();
-
-                currentFunction = new FunctionNode(funcName, new List<CommandNode>());
+                functions.Add(new FunctionNode(funcName, funcBody));
+                i++;
                 continue;
             }
 
-            if (line.Equals("endfunc", StringComparison.OrdinalIgnoreCase))
+            if (line.StartsWith("if ", StringComparison.OrdinalIgnoreCase) && line.Contains("then"))
             {
-                if (currentFunction != null)
-                {
-                    functions.Add(new FunctionNode(currentFunction.Name, currentBody));
-                    currentFunction = null;
-                    currentBody = new List<CommandNode>();
-                }
+                // Парсим if-then-else-endif
+                var ifNode = ParseIfBlock(lines, ref i, commandParser);
+                if (ifNode != null) commands.Add(ifNode);
                 continue;
             }
 
-            // Parse command
-            var result = commandParser.Parse(line);
-            if (result.Success)
+            // Обычная команда
+            var cmdResult = commandParser.Parse(line);
+            if (cmdResult.Success)
             {
-                if (currentFunction != null)
-                    currentBody.Add(result.Value);
-                else
-                    commands.Add(result.Value);
+                commands.Add(cmdResult.Value);
             }
-        }
-
-        // Don't forget the last function if file ends without "endfunc"
-        if (currentFunction != null)
-        {
-            functions.Add(new FunctionNode(currentFunction.Name, currentBody));
+            i++;
         }
 
         return new ScriptNode(sceneName, commands, functions);
+    }
+
+    private static IfCommandNode? ParseIfBlock(List<string> lines, ref int index, Parser<char, CommandNode> commandParser)
+    {
+        var line = lines[index];
+        int thenPos = line.IndexOf("then", StringComparison.OrdinalIgnoreCase);
+        if (thenPos < 0) return null;
+
+        var condition = line.Substring(3, thenPos - 3).Trim();
+
+        var thenBody = new List<CommandNode>();
+        var elseBody = new List<CommandNode>();
+        bool inElse = false;
+        index++;
+
+        while (index < lines.Count)
+        {
+            var current = lines[index];
+
+            if (current.Equals("endif", StringComparison.OrdinalIgnoreCase))
+            {
+                index++;
+                break;
+            }
+
+            if (current.Equals("else", StringComparison.OrdinalIgnoreCase))
+            {
+                inElse = true;
+                index++;
+                continue;
+            }
+
+            // Парсим команду
+            var result = commandParser.Parse(current);
+            if (result.Success)
+            {
+                if (inElse)
+                    elseBody.Add(result.Value);
+                else
+                    thenBody.Add(result.Value);
+            }
+            else
+            {
+                // Если команда не распознана — пропускаем
+                Console.WriteLine($"[Parser Warning] Unknown command in if: {current}");
+            }
+            index++;
+        }
+
+        return new IfCommandNode(condition, thenBody, elseBody);
     }
 }

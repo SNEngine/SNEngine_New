@@ -6,7 +6,7 @@ using System.Reflection;
 namespace SNEngine.Scripting;
 
 /// <summary>
-/// Main high-level service: .sn → .cs conversion
+/// High-level converter: .sn → C# (with functions support)
 /// </summary>
 public static class SnToCsConverter
 {
@@ -16,13 +16,10 @@ public static class SnToCsConverter
     {
         if (_initialized) return;
 
-        // Register parsers
+        // Parsers
         var parserFactory = new CommandParserFactory();
         parserFactory.RegisterAll(typeof(SnToCsConverter).Assembly);
         ScriptParser.Initialize(parserFactory);
-
-        // Register code generators
-        var codeGenerator = new ScriptCodeGenerator();
 
         _initialized = true;
     }
@@ -33,7 +30,7 @@ public static class SnToCsConverter
 
         var ast = ScriptParser.Parse(snSource);
         var generator = new ScriptCodeGenerator();
-        generator.RegisterAll(typeof(SnToCsConverter).Assembly); 
+        generator.RegisterAll(typeof(SnToCsConverter).Assembly);
 
         return generator.Generate(ast);
     }
@@ -45,9 +42,9 @@ public static class SnToCsConverter
         string source = File.ReadAllText(inputPath);
         string csCode = ConvertToCSharp(source);
 
-        string finalOutput = outputPath ?? Path.ChangeExtension(inputPath, ".cs");
-        File.WriteAllText(finalOutput, csCode);
+        string outPath = outputPath ?? Path.ChangeExtension(inputPath, ".cs");
+        File.WriteAllText(outPath, csCode);
 
-        Console.WriteLine($"[OK] Generated: {finalOutput}");
+        Console.WriteLine($"[OK] Generated → {outPath}");
     }
 }

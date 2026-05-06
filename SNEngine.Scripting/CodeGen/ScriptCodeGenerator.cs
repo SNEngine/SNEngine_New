@@ -8,15 +8,12 @@ using System.Reflection;
 namespace SNEngine.Scripting.CodeGen;
 
 /// <summary>
-/// Clean code generator using ICommandCodeGenerator. No switch statements.
+/// Clean code generator. Supports functions + ICommandCodeGenerator
 /// </summary>
 public sealed class ScriptCodeGenerator
 {
     private readonly Dictionary<Type, ICommandCodeGenerator> _generators = new();
 
-    /// <summary>
-    /// Auto-register all generators marked with [SnCodeGenerator]
-    /// </summary>
     public void RegisterAll(Assembly assembly)
     {
         foreach (var type in assembly.GetTypes())
@@ -35,41 +32,52 @@ public sealed class ScriptCodeGenerator
     {
         var sceneName = script.SceneName ?? "UnnamedScene";
 
-        var statements = new List<StatementSyntax>
+        var members = new List<MemberDeclarationSyntax>();
+
+        // Constructor
+        members.Add(SyntaxFactory.ConstructorDeclaration(sceneName)
+            .WithModifiers(SyntaxFactory.TokenList(SyntaxFactory.Token(SyntaxKind.PublicKeyword)))
+            .WithBody(SyntaxFactory.Block(
+                SyntaxFactory.ParseStatement($"SceneName = \"{sceneName}\";"))));
+
+        // === Main Execute() ===
+        var mainStatements = new List<StatementSyntax>
         {
             SyntaxFactory.ParseStatement("SNEngine.API.SNEngine.LoadEmptyScene();")
         };
 
         foreach (var cmd in script.Commands)
         {
-            if (_generators.TryGetValue(cmd.GetType(), out var generator))
-            {
-                statements.Add(generator.Generate(cmd));
-            }
-            else
-            {
-                statements.Add(SyntaxFactory.ParseStatement($"// No code generator for {cmd.GetType().Name}"));
-            }
+            mainStatements.Add(GenerateCommand(cmd));
         }
 
-        var executeMethod = SyntaxFactory.MethodDeclaration(
+        members.Add(SyntaxFactory.MethodDeclaration(
             SyntaxFactory.PredefinedType(SyntaxFactory.Token(SyntaxKind.VoidKeyword)), "Execute")
             .WithModifiers(SyntaxFactory.TokenList(
                 SyntaxFactory.Token(SyntaxKind.PublicKeyword),
                 SyntaxFactory.Token(SyntaxKind.OverrideKeyword)))
-            .WithBody(SyntaxFactory.Block(statements));
+            .WithParameterList(SyntaxFactory.ParameterList())
+            .WithBody(SyntaxFactory.Block(mainStatements)));
 
+        // === User functions ===
+        foreach (var func in script.Functions)
+        {
+            var funcStatements = func.Body.Select(GenerateCommand).ToList();
+
+            members.Add(SyntaxFactory.MethodDeclaration(
+                SyntaxFactory.PredefinedType(SyntaxFactory.Token(SyntaxKind.VoidKeyword)),
+                func.Name)
+                .WithModifiers(SyntaxFactory.TokenList(SyntaxFactory.Token(SyntaxKind.PrivateKeyword)))
+                .WithParameterList(SyntaxFactory.ParameterList())
+                .WithBody(SyntaxFactory.Block(funcStatements)));
+        }
+
+        // Final class
         var classDeclaration = SyntaxFactory.ClassDeclaration(sceneName)
             .WithModifiers(SyntaxFactory.TokenList(SyntaxFactory.Token(SyntaxKind.PublicKeyword)))
             .WithBaseList(SyntaxFactory.BaseList(SyntaxFactory.SingletonSeparatedList<BaseTypeSyntax>(
                 SyntaxFactory.SimpleBaseType(SyntaxFactory.ParseTypeName("SNScript")))))
-            .AddMembers(
-                SyntaxFactory.ConstructorDeclaration(sceneName)
-                    .WithModifiers(SyntaxFactory.TokenList(SyntaxFactory.Token(SyntaxKind.PublicKeyword)))
-                    .WithBody(SyntaxFactory.Block(
-                        SyntaxFactory.ParseStatement($"SceneName = \"{sceneName}\";"))),
-                executeMethod
-            );
+            .AddMembers(members.ToArray());
 
         var cu = SyntaxFactory.CompilationUnit()
             .WithUsings(SyntaxFactory.List(new[]
@@ -79,5 +87,14 @@ public sealed class ScriptCodeGenerator
             .WithMembers(SyntaxFactory.SingletonList<MemberDeclarationSyntax>(classDeclaration));
 
         return cu.NormalizeWhitespace().ToFullString();
+    }
+
+    private StatementSyntax GenerateCommand(CommandNode cmd)
+    {
+        if (_generators.TryGetValue(cmd.GetType(), out var generator))
+        {
+            return generator.Generate(cmd);
+        }
+        return SyntaxFactory.ParseStatement($"// No generator for {cmd.GetType().Name}");
     }
 }

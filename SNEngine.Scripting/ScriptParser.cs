@@ -8,7 +8,7 @@ using static Pidgin.Parser<char>;
 namespace SNEngine.Scripting;
 
 /// <summary>
-/// Working parser for .sn files (line-based but uses dynamic commands)
+/// Parser that supports main body and user-defined functions: function name() ... endfunc
 /// </summary>
 public static class ScriptParser
 {
@@ -26,13 +26,16 @@ public static class ScriptParser
 
         var commandParser = _factory.CreateCommandParser();
 
-        var lines = source
-            .Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
-            .Select(l => l.Trim())
-            .Where(l => !string.IsNullOrWhiteSpace(l));
+        var lines = source.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
+                          .Select(l => l.Trim())
+                          .Where(l => !string.IsNullOrWhiteSpace(l));
 
         string? sceneName = null;
         var commands = new List<CommandNode>();
+        var functions = new List<FunctionNode>();
+
+        FunctionNode? currentFunction = null;
+        var currentBody = new List<CommandNode>();
 
         foreach (var line in lines)
         {
@@ -42,17 +45,52 @@ public static class ScriptParser
                 continue;
             }
 
-            if (line.Equals("end", StringComparison.OrdinalIgnoreCase))
-                break;
+            if (line.StartsWith("function ", StringComparison.OrdinalIgnoreCase))
+            {
+                // Finish previous function if any
+                if (currentFunction != null)
+                {
+                    functions.Add(new FunctionNode(currentFunction.Name, currentBody));
+                    currentBody = new List<CommandNode>();
+                }
 
-            // Use dynamic parser for each line
+                var funcName = line.Substring(9)
+                    .Trim()
+                    .TrimEnd('(', ')')
+                    .Trim();
+
+                currentFunction = new FunctionNode(funcName, new List<CommandNode>());
+                continue;
+            }
+
+            if (line.Equals("endfunc", StringComparison.OrdinalIgnoreCase))
+            {
+                if (currentFunction != null)
+                {
+                    functions.Add(new FunctionNode(currentFunction.Name, currentBody));
+                    currentFunction = null;
+                    currentBody = new List<CommandNode>();
+                }
+                continue;
+            }
+
+            // Parse command
             var result = commandParser.Parse(line);
             if (result.Success)
             {
-                commands.Add(result.Value);
+                if (currentFunction != null)
+                    currentBody.Add(result.Value);
+                else
+                    commands.Add(result.Value);
             }
         }
 
-        return new ScriptNode(sceneName, commands);
+        // Don't forget the last function if file ends without "endfunc"
+        if (currentFunction != null)
+        {
+            functions.Add(new FunctionNode(currentFunction.Name, currentBody));
+        }
+
+        return new ScriptNode(sceneName, commands, functions);
     }
 }

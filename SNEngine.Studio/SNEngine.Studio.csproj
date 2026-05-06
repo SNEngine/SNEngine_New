@@ -30,4 +30,8 @@
     <ProjectReference Include="..\SNEngine.Core\SNEngine.Core.csproj" />
     <ProjectReference Include="..\SNEngine.Data\SNEngine.Data.csproj" />
   </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="StartsScripts\" />
+  </ItemGroup>
 </Project>

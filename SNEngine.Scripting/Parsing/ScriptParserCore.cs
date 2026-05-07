@@ -15,7 +15,7 @@ namespace SNEngine.Scripting.Parsing
             if (commandParser == null)
                 throw new ArgumentNullException(nameof(commandParser));
 
-            var ifBlockParser = new IfBlockParser(commandParser);
+            var ifBlockParser = new IfBlockParser();
             _statementParser = new StatementParser(commandParser, ifBlockParser);
             ifBlockParser.Initialize(_statementParser);
 

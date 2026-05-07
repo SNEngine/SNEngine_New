@@ -21,6 +21,7 @@ namespace SNEngine.Scripting.Parsing
             var ifBlockParser = new IfBlockParser(commandParser);
             _statementParser = new StatementParser(commandParser, ifBlockParser);
             ifBlockParser.Initialize(_statementParser);
+            ScriptLexer.AutoRegisterAllCommands();
 
             _functionParser = new FunctionParser(_statementParser);
         }

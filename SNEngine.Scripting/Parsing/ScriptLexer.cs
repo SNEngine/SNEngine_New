@@ -1,15 +1,45 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
+using System.Reflection;
 
 namespace SNEngine.Scripting.Parsing
 {
     /// <summary>
-    /// Lexer that returns full original lines (maximum compatibility with current parsers).
-    /// Already skips comments and preserves line numbers + column positions.
-    /// Ready for future full tokenization (keywords, strings, operators, etc.).
+    /// Lexer with automatic keyword registration from [SnCommand] attributes.
+    /// Only core language syntax is hardcoded.
     /// </summary>
     public sealed class ScriptLexer
     {
+        // === Только базовый синтаксис языка (не команды) ===
+        private static readonly HashSet<string> _registeredKeywords = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "if", "then", "else", "endif", "else if",
+            "function", "endfunc",
+            "name"
+            // print, SetVar, Quit, Jump и остальные — регистрируются автоматически
+        };
+
+        /// <summary>
+        /// Автоматически регистрирует все команды из [SnCommand] атрибутов.
+        /// </summary>
+        public static void AutoRegisterAllCommands()
+        {
+            var assembly = Assembly.GetExecutingAssembly(); // или Assembly.GetEntryAssembly()
+
+            var commandTypes = assembly.GetTypes()
+                .Where(t => t.GetCustomAttribute<SnCommandAttribute>() != null);
+
+            foreach (var type in commandTypes)
+            {
+                var attr = type.GetCustomAttribute<SnCommandAttribute>();
+                if (attr != null && !string.IsNullOrWhiteSpace(attr.Keyword))
+                {
+                    _registeredKeywords.Add(attr.Keyword.Trim());
+                }
+            }
+        }
+
         public List<ScriptToken> Tokenize(string source)
         {
             if (string.IsNullOrWhiteSpace(source))
@@ -26,13 +56,22 @@ namespace SNEngine.Scripting.Parsing
                 if (string.IsNullOrWhiteSpace(trimmed))
                     continue;
 
-                // Skip full-line comments (// and #)
                 if (trimmed.StartsWith("//") || trimmed.StartsWith("#"))
                     continue;
 
+                TokenType type = TokenType.Line;
+
+                int firstSpace = trimmed.IndexOf(' ');
+                string firstWord = (firstSpace > 0) ? trimmed.Substring(0, firstSpace) : trimmed;
+
+                if (_registeredKeywords.Contains(firstWord))
+                {
+                    type = TokenType.Keyword;
+                }
+
                 tokens.Add(new ScriptToken
                 {
-                    Type = TokenType.Line,
+                    Type = type,
                     Value = trimmed,
                     OriginalLine = i + 1,
                     Column = raw.Length - raw.TrimStart().Length + 1
@@ -45,13 +84,13 @@ namespace SNEngine.Scripting.Parsing
 
     public enum TokenType
     {
-        Line,           // Current mode — full line (backward compatible)
-        Keyword,        // Future: if, function, print, while, etc.
-        Identifier,     // Future: variable names, function names
-        String,         // Future: "text"
-        Number,         // Future: 42, 3.14
-        Operator,       // Future: =, <, >, +, -, etc.
-        Punctuation,    // Future: (, ), ,, :, etc.
+        Line,
+        Keyword,
+        Identifier,
+        String,
+        Number,
+        Operator,
+        Punctuation,
         Unknown
     }
 

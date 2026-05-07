@@ -9,6 +9,7 @@ namespace SNEngine.Scripting.Parsing
     {
         private readonly StatementParser _statementParser;
         private readonly FunctionParser _functionParser;
+        private readonly ForBlockParser _forBlockParser;
 
         public ScriptParserCore(Parser<char, CommandNode> commandParser)
         {
@@ -16,10 +17,15 @@ namespace SNEngine.Scripting.Parsing
                 throw new ArgumentNullException(nameof(commandParser));
 
             var ifBlockParser = new IfBlockParser();
-            _statementParser = new StatementParser(commandParser, ifBlockParser);
-            ifBlockParser.Initialize(_statementParser);
+            var forBlockParser = new ForBlockParser();
+            var statementParser = new StatementParser(commandParser, ifBlockParser, forBlockParser);
 
-            _functionParser = new FunctionParser(_statementParser);
+            ifBlockParser.Initialize(statementParser);
+            forBlockParser.Initialize(statementParser);
+
+            _statementParser = statementParser;
+            _forBlockParser = forBlockParser;
+            _functionParser = new FunctionParser(statementParser);
         }
 
         public ScriptNode Parse(IReadOnlyList<ScriptToken> tokens)

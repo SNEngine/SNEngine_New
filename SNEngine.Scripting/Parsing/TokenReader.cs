@@ -24,6 +24,7 @@ namespace SNEngine.Scripting.Parsing
 
         public void Consume() => _position++;
 
+        /// <summary>Потребляет все токены текущей строки</summary>
         public string ConsumeFullCommandLine()
         {
             if (Eof || Current == null) return string.Empty;
@@ -41,6 +42,16 @@ namespace SNEngine.Scripting.Parsing
             return sb.ToString().Trim();
         }
 
+        /// <summary>Просто пропускает всю текущую строку (для неизвестных команд)</summary>
+        public void ConsumeCurrentLine()
+        {
+            if (Eof || Current == null) return;
+            int startLine = Current.OriginalLine;
+            while (!Eof && Current != null && Current.OriginalLine == startLine)
+                Consume();
+        }
+
+        /// <summary>Возвращает полное содержимое строки без потребления</summary>
         public string PeekLineContent()
         {
             if (Eof || Current == null) return string.Empty;

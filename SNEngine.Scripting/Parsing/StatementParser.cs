@@ -8,18 +8,22 @@ namespace SNEngine.Scripting.Parsing
     {
         private readonly Parser<char, CommandNode> _commandParser;
         private readonly IfBlockParser _ifBlockParser;
+        private readonly ForBlockParser _forBlockParser;
 
-        public StatementParser(Parser<char, CommandNode> commandParser, IfBlockParser ifBlockParser)
+        public StatementParser(Parser<char, CommandNode> commandParser,
+                               IfBlockParser ifBlockParser,
+                               ForBlockParser forBlockParser)
         {
             _commandParser = commandParser ?? throw new ArgumentNullException(nameof(commandParser));
             _ifBlockParser = ifBlockParser ?? throw new ArgumentNullException(nameof(ifBlockParser));
+            _forBlockParser = forBlockParser ?? throw new ArgumentNullException(nameof(forBlockParser));
         }
 
         public CommandNode? ParseNext(TokenReader reader)
         {
             if (reader.Eof || reader.Current == null) return null;
 
-            string lineContent = reader.PeekLineContent();
+            string lineContent = reader.PeekLineContent().Trim();
 
             if (lineContent.StartsWith("if ", StringComparison.OrdinalIgnoreCase) &&
                 lineContent.Contains("then", StringComparison.OrdinalIgnoreCase))
@@ -27,10 +31,17 @@ namespace SNEngine.Scripting.Parsing
                 return _ifBlockParser.Parse(reader);
             }
 
+            if (lineContent.StartsWith("for ", StringComparison.OrdinalIgnoreCase))
+            {
+                return _forBlockParser.Parse(reader);
+            }
+
             string fullCommand = reader.ConsumeFullCommandLine();
             var result = _commandParser.Parse(fullCommand);
             if (result.Success) return result.Value;
 
+            // Неизвестная команда — просто пропускаем строку, чтобы не зациклиться
+            reader.ConsumeCurrentLine();
             return null;
         }
     }

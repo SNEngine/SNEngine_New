@@ -1,5 +1,4 @@
-﻿using Pidgin;
-using SNEngine.Scripting.Ast;
+﻿using SNEngine.Scripting.Ast;
 using System;
 using System.Collections.Generic;
 
@@ -20,29 +19,27 @@ namespace SNEngine.Scripting.Parsing
         {
             if (reader.Eof || reader.Current == null) return null;
 
-            string lineContent = reader.PeekLineContent();
+            string lineContent = reader.PeekLineContent().Trim();
 
-            // Проверяем наличие " then" (с пробелом)
             if (!lineContent.StartsWith("if ", StringComparison.OrdinalIgnoreCase) ||
-                !lineContent.Contains(" then", StringComparison.OrdinalIgnoreCase))
+                !lineContent.Contains("then", StringComparison.OrdinalIgnoreCase))
                 return null;
 
             // Потребляем всю строку if ... then
-            reader.ConsumeFullCommandLine();
+            string ifLine = reader.ConsumeFullCommandLine();
 
-            // Извлекаем условие ЧИСТО (до " then")
-            int thenPos = lineContent.IndexOf(" then", StringComparison.OrdinalIgnoreCase);
-            string condition = lineContent.Substring(3, thenPos - 3).Trim();
+            // Извлекаем условие
+            int thenPos = ifLine.IndexOf("then", StringComparison.OrdinalIgnoreCase);
+            string condition = ifLine.Substring(3, thenPos - 3).Trim();
 
             var thenBody = new List<CommandNode>();
             var elseBody = new List<CommandNode>();
 
             while (!reader.Eof && reader.Current != null)
             {
-                string current = reader.Current.Value.Trim();
-
-                if (current.Equals("else", StringComparison.OrdinalIgnoreCase) ||
-                    current.Equals("endif", StringComparison.OrdinalIgnoreCase))
+                string currentLine = reader.PeekLineContent().Trim();
+                if (currentLine.Equals("else", StringComparison.OrdinalIgnoreCase) ||
+                    currentLine.Equals("endif", StringComparison.OrdinalIgnoreCase))
                     break;
 
                 var stmt = _statementParser?.ParseNext(reader);
@@ -50,19 +47,26 @@ namespace SNEngine.Scripting.Parsing
             }
 
             if (!reader.Eof && reader.Current != null &&
-                reader.Current.Value.Trim().Equals("else", StringComparison.OrdinalIgnoreCase))
+                reader.PeekLineContent().Trim().Equals("else", StringComparison.OrdinalIgnoreCase))
             {
-                reader.Consume();
+                reader.ConsumeFullCommandLine(); // else
 
-                while (!reader.Eof && reader.Current != null && !reader.Match("endif"))
+                while (!reader.Eof && reader.Current != null)
                 {
+                    string next = reader.PeekLineContent().Trim();
+                    if (next.Equals("endif", StringComparison.OrdinalIgnoreCase))
+                        break;
+
                     var stmt = _statementParser?.ParseNext(reader);
                     if (stmt != null) elseBody.Add(stmt);
                 }
             }
 
-            if (!reader.Eof && reader.Current != null && reader.Match("endif"))
-                reader.Consume();
+            if (!reader.Eof && reader.Current != null &&
+                reader.PeekLineContent().Trim().Equals("endif", StringComparison.OrdinalIgnoreCase))
+            {
+                reader.ConsumeFullCommandLine();
+            }
 
             return new IfCommandNode(condition, thenBody, new List<ElseIfClause>(), elseBody);
         }

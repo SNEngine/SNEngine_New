@@ -4,8 +4,8 @@ using System.Collections.Generic;
 namespace SNEngine.Scripting.Parsing
 {
     /// <summary>
-    /// Простой и стабильный Lexer (одна строка = один токен).
-    /// Используется до тех пор, пока вся система не будет полностью готова к много-токенному режиму.
+    /// Мульти-токенный Lexer. Одна строка = несколько токенов (слова + строковые литералы).
+    /// Полностью поддерживает кавычки с пробелами внутри строк.
     /// </summary>
     public sealed class ScriptLexer
     {
@@ -28,13 +28,64 @@ namespace SNEngine.Scripting.Parsing
                 if (trimmed.StartsWith("//") || trimmed.StartsWith("#"))
                     continue;
 
-                tokens.Add(new ScriptToken
+                var lineTokens = TokenizeLine(raw, i + 1);
+                tokens.AddRange(lineTokens);
+            }
+
+            return tokens;
+        }
+
+        private List<ScriptToken> TokenizeLine(string line, int originalLine)
+        {
+            var tokens = new List<ScriptToken>();
+            int pos = 0;
+
+            while (pos < line.Length)
+            {
+                // Пропускаем whitespace
+                while (pos < line.Length && char.IsWhiteSpace(line[pos]))
+                    pos++;
+
+                if (pos >= line.Length) break;
+
+                int tokenStart = pos;
+                int column = tokenStart + 1;
+
+                if (line[pos] == '"')
                 {
-                    Type = TokenType.Line,
-                    Value = trimmed,
-                    OriginalLine = i + 1,
-                    Column = raw.Length - raw.TrimStart().Length + 1
-                });
+                    // Полный строковый литерал (включая кавычки) — чтобы реконструкция была точной
+                    pos++; // opening "
+                    while (pos < line.Length && line[pos] != '"')
+                        pos++;
+                    if (pos < line.Length && line[pos] == '"')
+                        pos++; // closing "
+
+                    string value = line.Substring(tokenStart, pos - tokenStart);
+
+                    tokens.Add(new ScriptToken
+                    {
+                        Type = TokenType.StringLiteral,
+                        Value = value,
+                        OriginalLine = originalLine,
+                        Column = column
+                    });
+                }
+                else
+                {
+                    // Обычное слово (включая "name:", "MyFunc()", etc.)
+                    while (pos < line.Length && !char.IsWhiteSpace(line[pos]))
+                        pos++;
+
+                    string value = line.Substring(tokenStart, pos - tokenStart);
+
+                    tokens.Add(new ScriptToken
+                    {
+                        Type = TokenType.Word,
+                        Value = value,
+                        OriginalLine = originalLine,
+                        Column = column
+                    });
+                }
             }
 
             return tokens;
@@ -43,7 +94,8 @@ namespace SNEngine.Scripting.Parsing
 
     public enum TokenType
     {
-        Line
+        Word,
+        StringLiteral
     }
 
     public sealed class ScriptToken

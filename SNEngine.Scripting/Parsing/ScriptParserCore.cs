@@ -31,9 +31,9 @@ namespace SNEngine.Scripting.Parsing
 
             while (!reader.Eof && reader.Current != null)
             {
-                string line = reader.Current.Value;
+                string lineContent = reader.PeekLineContent();
 
-                if (line.StartsWith("name:", StringComparison.OrdinalIgnoreCase))
+                if (lineContent.StartsWith("name:", StringComparison.OrdinalIgnoreCase))
                 {
                     sceneName = reader.ConsumeFullCommandLine()
                                       .Replace("name:", "", StringComparison.OrdinalIgnoreCase)
@@ -41,7 +41,7 @@ namespace SNEngine.Scripting.Parsing
                     continue;
                 }
 
-                if (line.StartsWith("function ", StringComparison.OrdinalIgnoreCase))
+                if (lineContent.StartsWith("function ", StringComparison.OrdinalIgnoreCase))
                 {
                     functions.Add(_functionParser.Parse(reader));
                     continue;

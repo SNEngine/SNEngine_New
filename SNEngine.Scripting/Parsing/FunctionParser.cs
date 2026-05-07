@@ -16,11 +16,16 @@ namespace SNEngine.Scripting.Parsing
         {
             if (reader.Eof || reader.Current == null) return new FunctionNode("", new List<CommandNode>());
 
-            string line = reader.Current.Value;
-            string funcName = line.Substring(9).Trim().TrimEnd('(', ')').Trim();
-            var body = new List<CommandNode>();
+            // Полностью потребляем строку объявления функции
+            string fullLine = reader.ConsumeFullCommandLine();
+            string funcName = "";
 
-            reader.Consume();
+            if (fullLine.StartsWith("function ", StringComparison.OrdinalIgnoreCase))
+            {
+                funcName = fullLine.Substring(9).Trim().TrimEnd('(', ')').Trim();
+            }
+
+            var body = new List<CommandNode>();
 
             while (!reader.Eof && reader.Current != null && !reader.Match("endfunc"))
             {

@@ -24,18 +24,17 @@ namespace SNEngine.Scripting.Parsing
         {
             if (reader.Eof || reader.Current == null) return null;
 
-            string line = reader.Current.Value;
+            string lineContent = reader.PeekLineContent();
 
-            if (!line.StartsWith("if ", StringComparison.OrdinalIgnoreCase) ||
-                !line.Contains("then", StringComparison.OrdinalIgnoreCase))
-            {
+            if (!lineContent.StartsWith("if ", StringComparison.OrdinalIgnoreCase) ||
+                !lineContent.Contains("then", StringComparison.OrdinalIgnoreCase))
                 return null;
-            }
 
-            int thenPos = line.IndexOf("then", StringComparison.OrdinalIgnoreCase);
-            string condition = line.Substring(3, thenPos - 3).Trim();
+            // Потребляем строку if ... then
+            reader.ConsumeFullCommandLine();
 
-            reader.Consume();
+            int thenPos = lineContent.IndexOf("then", StringComparison.OrdinalIgnoreCase);
+            string condition = lineContent.Substring(3, thenPos - 3).Trim();
 
             var thenBody = new List<CommandNode>();
             var elseBody = new List<CommandNode>();
@@ -43,14 +42,16 @@ namespace SNEngine.Scripting.Parsing
             while (!reader.Eof && reader.Current != null)
             {
                 string current = reader.Current.Value.Trim();
-                if (current.Equals("else", StringComparison.OrdinalIgnoreCase) || current.Equals("endif", StringComparison.OrdinalIgnoreCase))
+                if (current.Equals("else", StringComparison.OrdinalIgnoreCase) ||
+                    current.Equals("endif", StringComparison.OrdinalIgnoreCase))
                     break;
 
                 var stmt = _statementParser?.ParseNext(reader);
                 if (stmt != null) thenBody.Add(stmt);
             }
 
-            if (!reader.Eof && reader.Current != null && reader.Current.Value.Trim().Equals("else", StringComparison.OrdinalIgnoreCase))
+            if (!reader.Eof && reader.Current != null &&
+                reader.Current.Value.Trim().Equals("else", StringComparison.OrdinalIgnoreCase))
             {
                 reader.Consume();
                 while (!reader.Eof && reader.Current != null && !reader.Match("endif"))

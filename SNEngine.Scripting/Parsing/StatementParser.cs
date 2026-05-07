@@ -19,10 +19,10 @@ namespace SNEngine.Scripting.Parsing
         {
             if (reader.Eof || reader.Current == null) return null;
 
-            string line = reader.Current.Value;
+            string lineContent = reader.PeekLineContent();
 
-            if (line.StartsWith("if ", StringComparison.OrdinalIgnoreCase) &&
-                line.Contains("then", StringComparison.OrdinalIgnoreCase))
+            if (lineContent.StartsWith("if ", StringComparison.OrdinalIgnoreCase) &&
+                lineContent.Contains("then", StringComparison.OrdinalIgnoreCase))
             {
                 return _ifBlockParser.Parse(reader);
             }

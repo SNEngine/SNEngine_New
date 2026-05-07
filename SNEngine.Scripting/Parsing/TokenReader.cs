@@ -22,10 +22,7 @@ namespace SNEngine.Scripting.Parsing
             return Current != null && Current.Value.StartsWith(prefix, comparison);
         }
 
-        public void Consume()
-        {
-            if (!Eof) _position++;
-        }
+        public void Consume() => _position++;
 
         public string ConsumeFullCommandLine()
         {
@@ -36,11 +33,29 @@ namespace SNEngine.Scripting.Parsing
 
             while (!Eof && Current != null && Current.OriginalLine == startLine)
             {
-                sb.Append(Current.Value).Append(" ");
+                if (sb.Length > 0) sb.Append(" ");
+                sb.Append(Current.Value);
                 Consume();
             }
 
             return sb.ToString().Trim();
+        }
+
+        public string PeekLineContent()
+        {
+            if (Eof || Current == null) return string.Empty;
+
+            int lineNum = Current.OriginalLine;
+            var sb = new StringBuilder();
+
+            for (int i = _position; i < _tokens.Count; i++)
+            {
+                if (_tokens[i].OriginalLine != lineNum) break;
+                if (sb.Length > 0) sb.Append(" ");
+                sb.Append(_tokens[i].Value);
+            }
+
+            return sb.ToString();
         }
     }
 }

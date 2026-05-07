@@ -10,99 +10,132 @@ Write scenes in a simple `.sn` format and automatically generate clean, producti
 
 `SNEngine.Scripting` is a **code generation system** that lets you write game scenes using a lightweight, human-readable scripting language instead of writing C# manually.
 
-### Example `.sn` file:
+### Example `scene2.sn`
 
 ```sn
-name: testScene
-Show Background class_bg
-Show Character Nagatoro angry
-Nagatoro says "Hello, Senpai~!"
-end
+name: scene2
+
+playerHealth = 35
+enemyLevel = 20
+
+if playerHealth < 50 then
+    Quit
+else
+    print "You are strong!"
+endif
+
+call ah()
+
+function ah()
+    if playerHealth < 50 then
+        Quit
+    else
+        print "You are strong!"
+    endif
+endfunc
 ```
 
-### Generated C# (automatically):
+### Generated C# (automatically)
 
 ```csharp
-using SNEngine.API;
-using SNEngine.Core.Scenes;
-
-public class testScene : EmptyScene
+public class scene2 : SNScript
 {
-    public override void OnLoad()
+    public override void Execute()
     {
-        BackgroundAPI.Show("class_bg");
-        CharacterAPI.Show("Nagatoro", "angry");
-        CharacterAPI.Say("Nagatoro", "Hello, Senpai~!");
+        SetVar("playerHealth", 35);
+        SetVar("enemyLevel", 20);
+
+        if (GetVar("playerHealth").AsInt() < 50)
+        {
+            SNEngine.API.SNEngine.Quit();
+        }
+        else
+        {
+            Debug.Log("You are strong!");
+        }
+
+        ah();
+    }
+
+    private void ah()
+    {
+        if (GetVar("playerHealth").AsInt() < 50)
+        {
+            SNEngine.API.SNEngine.Quit();
+        }
+        else
+        {
+            Debug.Log("You are strong!");
+        }
     }
 }
 ```
 
 ---
 
-## Why use it?
+## Features
 
-- **Fast prototyping** — write scenes in minutes, not hours
-- **Clean architecture** — generated code inherits from `SNScript` / `EmptyScene`
-- **Extensible** — easily add new commands (`Show Background`, `Show Character`, `says`, etc.)
-- **No runtime interpretation** — everything compiles into `game.dll`
-- **Perfect for visual novels** and story-driven games
+- ✅ `if ... then ... else ... endif` (including nested)
+- ✅ `function ... endfunc` + `call`
+- ✅ `name: SceneName`
+- ✅ Comments (`//` and `#`)
+- ✅ Automatic command registration via `[SnCommand]` attribute
+- ✅ Clean architecture with `StatementParser` as the single point of extension
+- ✅ Multi-token Lexer (ready for expressions and better error reporting)
 
 ---
 
 ## Architecture
 
-| Layer              | Purpose                              | Key Classes                          |
-|--------------------|--------------------------------------|--------------------------------------|
-| **Parser**         | `.sn` → AST                          | `ScriptParser`, `CommandParserFactory` |
-| **CodeGen**        | AST → C# source code                 | `ScriptCodeGenerator`, `ICommandCodeGenerator` |
-| **Base Classes**   | Shared behavior for all scripts      | `SNScript`, `EmptyScene`             |
-| **High-level API** | Easy conversion from files/strings   | `SnToCsConverter`                    |
+| Layer                   | Key Classes                          | Responsibility |
+|-------------------------|--------------------------------------|----------------|
+| **Lexer**               | `ScriptLexer`, `ScriptToken`         | Text → Tokens |
+| **Reader**              | `TokenReader`                        | Navigation & reconstruction |
+| **Core Parser**         | `ScriptParserCore`, `StatementParser`| Orchestration |
+| **Special Parsers**     | `IfBlockParser`, `FunctionParser`    | Complex constructs |
+| **Command Parser**      | Pidgin + `[SnCommand]`               | Simple commands |
+| **Code Generation**     | `SnToCsConverter`                    | AST → C# |
 
 ---
 
-## How to use
+## How to Use
 
-### From command line
+### CLI
 
 ```bash
-SNEngine.Scripting.Utils.exe "path/to/scene.sn"
+SNEngine.Scripting.Utils build "path/to/project" "output/game.dll"
 ```
 
-Generates `scene.cs` next to the original file.
-
-### As a library
+### As Library
 
 ```csharp
-string csharpCode = SnToCsConverter.ConvertToCSharp(snSource);
+var lexer = new ScriptLexer();
+var tokens = lexer.Tokenize(snSource);
 
-SnToCsConverter.ConvertFile("intro.sn", "IntroScene.cs");
+var parser = new ScriptParserCore(commandParser);
+var ast = parser.Parse(tokens);
+
+string csharpCode = new SnToCsConverter().Convert(ast);
 ```
 
 ---
 
-## Adding a new command
+## Adding a New Command
 
-1. Create `Ast/MyNewCommandNode.cs`
-2. Implement `IParsableCommand` with a static `Parser`
-3. Create `CodeGen/MyNewCommandCodeGenerator.cs` (implement `ICommandCodeGenerator`)
-4. Add `[SnCommand("...")]` and `[SnCodeGenerator(...)]` attributes
-5. Done — everything works automatically
-
----
-
-## Current Status
-
-- ✅ Basic commands (`Show Background`, `Show Character`, `says`)
-- ✅ Clean code generation (inherits from `SNScript`)
-- ✅ Automatic parser & generator registration
-- ✅ CLI tool + library usage
-- 🔄 Full scene system integration (in progress)
-- 🔄 `OnLoad` / `OnUpdate` support
+1. Create a class with `[SnCommand("mycommand")]`
+2. Add parser logic (via `CommandParserFactory`)
+3. Create a code generator
+4. Done — it registers automatically
 
 ---
 
-## Philosophy
+## Current Status (commit 2bf763ee...)
 
-> Write stories like a writer.  
-> Generate code like a programmer.  
-> Keep everything clean, typed, and fast.
+- ✅ Full support for `if/else`, `function`, `call`
+- ✅ Stable multi-token Lexer
+- ✅ Clean, extensible architecture
+- ✅ Automatic keyword registration
+- 🔄 Planning: `while`, `for`, full expressions in conditions, better error reporting
+
+**SNEngine.Scripting** — the bridge between creative writing and professional C# development.
+```

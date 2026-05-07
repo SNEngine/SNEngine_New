@@ -4,8 +4,8 @@ using System.Collections.Generic;
 namespace SNEngine.Scripting.Parsing
 {
     /// <summary>
-    /// Converts raw script text into tokens while preserving original line numbers.
-    /// First step toward proper lexing (easy to extend later).
+    /// Lexer that keeps full original lines (compatible with existing parsers) 
+    /// but already skips comments and preserves positions.
     /// </summary>
     public sealed class ScriptLexer
     {
@@ -25,10 +25,14 @@ namespace SNEngine.Scripting.Parsing
                 if (string.IsNullOrWhiteSpace(trimmed))
                     continue;
 
+                // Skip full line comments
+                if (trimmed.StartsWith("//") || trimmed.StartsWith("#"))
+                    continue;
+
                 tokens.Add(new ScriptToken
                 {
                     Type = TokenType.Line,
-                    Value = trimmed,
+                    Value = trimmed,                    // ← Полная строка, как было раньше
                     OriginalLine = i + 1,
                     Column = raw.Length - raw.TrimStart().Length + 1
                 });

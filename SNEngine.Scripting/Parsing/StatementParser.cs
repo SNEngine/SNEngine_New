@@ -4,10 +4,6 @@ using System;
 
 namespace SNEngine.Scripting.Parsing
 {
-    /// <summary>
-    /// Single point of truth for all statements.
-    /// This is where we will register while, for, switch, etc. in the future.
-    /// </summary>
     public sealed class StatementParser
     {
         private readonly Parser<char, CommandNode> _commandParser;
@@ -25,22 +21,16 @@ namespace SNEngine.Scripting.Parsing
 
             string line = reader.Current.Value;
 
-            // if-block has highest priority
             if (line.StartsWith("if ", StringComparison.OrdinalIgnoreCase) &&
                 line.Contains("then", StringComparison.OrdinalIgnoreCase))
             {
                 return _ifBlockParser.Parse(reader);
             }
 
-            // Regular commands (print, SetVar, Jump To, Quit, etc.)
-            var result = _commandParser.Parse(line);
-            if (result.Success)
-            {
-                reader.Consume();
-                return result.Value;
-            }
+            string fullCommand = reader.ConsumeFullCommandLine();
+            var result = _commandParser.Parse(fullCommand);
+            if (result.Success) return result.Value;
 
-            reader.Consume();
             return null;
         }
     }

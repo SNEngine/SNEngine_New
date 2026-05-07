@@ -1,11 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Text;
 
 namespace SNEngine.Scripting.Parsing
 {
-    /// <summary>
-    /// Safe cursor for navigating tokens.
-    /// </summary>
     public sealed class TokenReader
     {
         private readonly IReadOnlyList<ScriptToken> _tokens;
@@ -29,12 +27,24 @@ namespace SNEngine.Scripting.Parsing
             if (!Eof) _position++;
         }
 
-        public string ConsumeValueAfter(string prefix, StringComparison comparison = StringComparison.OrdinalIgnoreCase)
+        /// <summary>
+        /// Собирает полную строку команды из всех токенов текущей строки.
+        /// Это ключевой метод для совместимости со старым Pidgin-парсером.
+        /// </summary>
+        public string ConsumeFullCommandLine()
         {
-            if (!Match(prefix, comparison)) return string.Empty;
-            string value = Current!.Value.Substring(prefix.Length).Trim();
-            Consume();
-            return value;
+            if (Eof || Current == null) return string.Empty;
+
+            int startLine = Current.OriginalLine;
+            var sb = new StringBuilder();
+
+            while (!Eof && Current != null && Current.OriginalLine == startLine)
+            {
+                sb.Append(Current.Value).Append(" ");
+                Consume();
+            }
+
+            return sb.ToString().Trim();
         }
     }
 }

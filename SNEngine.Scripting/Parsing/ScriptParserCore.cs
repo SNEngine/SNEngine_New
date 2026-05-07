@@ -5,9 +5,6 @@ using System.Collections.Generic;
 
 namespace SNEngine.Scripting.Parsing
 {
-    /// <summary>
-    /// Lightweight orchestrator with safe two-phase initialization.
-    /// </summary>
     public sealed class ScriptParserCore
     {
         private readonly StatementParser _statementParser;
@@ -21,7 +18,6 @@ namespace SNEngine.Scripting.Parsing
             var ifBlockParser = new IfBlockParser(commandParser);
             _statementParser = new StatementParser(commandParser, ifBlockParser);
             ifBlockParser.Initialize(_statementParser);
-            ScriptLexer.AutoRegisterAllCommands();
 
             _functionParser = new FunctionParser(_statementParser);
         }
@@ -35,21 +31,24 @@ namespace SNEngine.Scripting.Parsing
 
             while (!reader.Eof && reader.Current != null)
             {
-                if (reader.Match("name:"))
+                string line = reader.Current.Value;
+
+                if (line.StartsWith("name:", StringComparison.OrdinalIgnoreCase))
                 {
-                    sceneName = reader.ConsumeValueAfter("name:");
+                    sceneName = reader.ConsumeFullCommandLine()
+                                      .Replace("name:", "", StringComparison.OrdinalIgnoreCase)
+                                      .Trim();
                     continue;
                 }
 
-                if (reader.Match("function "))
+                if (line.StartsWith("function ", StringComparison.OrdinalIgnoreCase))
                 {
                     functions.Add(_functionParser.Parse(reader));
                     continue;
                 }
 
                 var statement = _statementParser.ParseNext(reader);
-                if (statement != null)
-                    commands.Add(statement);
+                if (statement != null) commands.Add(statement);
             }
 
             return new ScriptNode(sceneName, commands, functions);

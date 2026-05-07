@@ -1,45 +1,14 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Reflection;
 
 namespace SNEngine.Scripting.Parsing
 {
     /// <summary>
-    /// Lexer with automatic keyword registration from [SnCommand] attributes.
-    /// Only core language syntax is hardcoded.
+    /// Простой и стабильный Lexer (одна строка = один токен).
+    /// Используется до тех пор, пока вся система не будет полностью готова к много-токенному режиму.
     /// </summary>
     public sealed class ScriptLexer
     {
-        // === Только базовый синтаксис языка (не команды) ===
-        private static readonly HashSet<string> _registeredKeywords = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-        {
-            "if", "then", "else", "endif", "else if",
-            "function", "endfunc",
-            "name"
-            // print, SetVar, Quit, Jump и остальные — регистрируются автоматически
-        };
-
-        /// <summary>
-        /// Автоматически регистрирует все команды из [SnCommand] атрибутов.
-        /// </summary>
-        public static void AutoRegisterAllCommands()
-        {
-            var assembly = Assembly.GetExecutingAssembly(); // или Assembly.GetEntryAssembly()
-
-            var commandTypes = assembly.GetTypes()
-                .Where(t => t.GetCustomAttribute<SnCommandAttribute>() != null);
-
-            foreach (var type in commandTypes)
-            {
-                var attr = type.GetCustomAttribute<SnCommandAttribute>();
-                if (attr != null && !string.IsNullOrWhiteSpace(attr.Keyword))
-                {
-                    _registeredKeywords.Add(attr.Keyword.Trim());
-                }
-            }
-        }
-
         public List<ScriptToken> Tokenize(string source)
         {
             if (string.IsNullOrWhiteSpace(source))
@@ -59,19 +28,9 @@ namespace SNEngine.Scripting.Parsing
                 if (trimmed.StartsWith("//") || trimmed.StartsWith("#"))
                     continue;
 
-                TokenType type = TokenType.Line;
-
-                int firstSpace = trimmed.IndexOf(' ');
-                string firstWord = (firstSpace > 0) ? trimmed.Substring(0, firstSpace) : trimmed;
-
-                if (_registeredKeywords.Contains(firstWord))
-                {
-                    type = TokenType.Keyword;
-                }
-
                 tokens.Add(new ScriptToken
                 {
-                    Type = type,
+                    Type = TokenType.Line,
                     Value = trimmed,
                     OriginalLine = i + 1,
                     Column = raw.Length - raw.TrimStart().Length + 1
@@ -84,14 +43,7 @@ namespace SNEngine.Scripting.Parsing
 
     public enum TokenType
     {
-        Line,
-        Keyword,
-        Identifier,
-        String,
-        Number,
-        Operator,
-        Punctuation,
-        Unknown
+        Line
     }
 
     public sealed class ScriptToken
@@ -100,7 +52,5 @@ namespace SNEngine.Scripting.Parsing
         public string Value { get; set; } = string.Empty;
         public int OriginalLine { get; set; }
         public int Column { get; set; }
-
-        public override string ToString() => $"{Type}('{Value}') @ {OriginalLine}:{Column}";
     }
 }

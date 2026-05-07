@@ -26,7 +26,6 @@ namespace SNEngine.Scripting.Parsing
 
             string line = reader.Current.Value;
 
-            // Простая проверка
             if (!line.StartsWith("if ", StringComparison.OrdinalIgnoreCase) ||
                 !line.Contains("then", StringComparison.OrdinalIgnoreCase))
             {
@@ -36,50 +35,33 @@ namespace SNEngine.Scripting.Parsing
             int thenPos = line.IndexOf("then", StringComparison.OrdinalIgnoreCase);
             string condition = line.Substring(3, thenPos - 3).Trim();
 
-            // Пропускаем строку с if
             reader.Consume();
 
             var thenBody = new List<CommandNode>();
             var elseBody = new List<CommandNode>();
 
-            // Читаем тело then до else или endif
             while (!reader.Eof && reader.Current != null)
             {
                 string current = reader.Current.Value.Trim();
-
-                if (current.Equals("else", StringComparison.OrdinalIgnoreCase) ||
-                    current.Equals("endif", StringComparison.OrdinalIgnoreCase))
-                {
+                if (current.Equals("else", StringComparison.OrdinalIgnoreCase) || current.Equals("endif", StringComparison.OrdinalIgnoreCase))
                     break;
-                }
 
                 var stmt = _statementParser?.ParseNext(reader);
                 if (stmt != null) thenBody.Add(stmt);
             }
 
-            // Если есть else
             if (!reader.Eof && reader.Current != null && reader.Current.Value.Trim().Equals("else", StringComparison.OrdinalIgnoreCase))
             {
-                reader.Consume(); // пропускаем else
-
-                while (!reader.Eof && reader.Current != null)
+                reader.Consume();
+                while (!reader.Eof && reader.Current != null && !reader.Match("endif"))
                 {
-                    string current = reader.Current.Value.Trim();
-
-                    if (current.Equals("endif", StringComparison.OrdinalIgnoreCase))
-                    {
-                        reader.Consume();
-                        break;
-                    }
-
                     var stmt = _statementParser?.ParseNext(reader);
                     if (stmt != null) elseBody.Add(stmt);
                 }
             }
-            else if (!reader.Eof && reader.Current != null && reader.Current.Value.Trim().Equals("endif", StringComparison.OrdinalIgnoreCase))
-            {
+
+            if (!reader.Eof && reader.Current != null && reader.Match("endif"))
                 reader.Consume();
-            }
 
             return new IfCommandNode(condition, thenBody, new List<ElseIfClause>(), elseBody);
         }

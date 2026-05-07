@@ -27,10 +27,6 @@ namespace SNEngine.Scripting.Parsing
             if (!Eof) _position++;
         }
 
-        /// <summary>
-        /// Собирает полную строку команды из всех токенов текущей строки.
-        /// Это ключевой метод для совместимости со старым Pidgin-парсером.
-        /// </summary>
         public string ConsumeFullCommandLine()
         {
             if (Eof || Current == null) return string.Empty;

@@ -25,6 +25,14 @@ namespace SNEngine.Scripting.Parsing
 
             string lineContent = reader.PeekLineContent().Trim();
 
+            if (lineContent.Equals("endif", StringComparison.OrdinalIgnoreCase) ||
+                lineContent.Equals("else", StringComparison.OrdinalIgnoreCase) ||
+                lineContent.Equals("endfor", StringComparison.OrdinalIgnoreCase) ||
+                lineContent.Equals("endfunc", StringComparison.OrdinalIgnoreCase))
+            {
+                return null;
+            }
+
             if (lineContent.StartsWith("if ", StringComparison.OrdinalIgnoreCase) &&
                 lineContent.Contains("then", StringComparison.OrdinalIgnoreCase))
             {
@@ -38,10 +46,9 @@ namespace SNEngine.Scripting.Parsing
 
             string fullCommand = reader.ConsumeFullCommandLine();
             var result = _commandParser.Parse(fullCommand);
+
             if (result.Success) return result.Value;
 
-            // Неизвестная команда — просто пропускаем строку, чтобы не зациклиться
-            reader.ConsumeCurrentLine();
             return null;
         }
     }

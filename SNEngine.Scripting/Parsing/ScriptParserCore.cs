@@ -9,7 +9,6 @@ namespace SNEngine.Scripting.Parsing
     {
         private readonly StatementParser _statementParser;
         private readonly FunctionParser _functionParser;
-        private readonly ForBlockParser _forBlockParser;
 
         public ScriptParserCore(Parser<char, CommandNode> commandParser)
         {
@@ -24,7 +23,6 @@ namespace SNEngine.Scripting.Parsing
             forBlockParser.Initialize(statementParser);
 
             _statementParser = statementParser;
-            _forBlockParser = forBlockParser;
             _functionParser = new FunctionParser(statementParser);
         }
 
@@ -37,6 +35,7 @@ namespace SNEngine.Scripting.Parsing
 
             while (!reader.Eof && reader.Current != null)
             {
+                var currentToken = reader.Current;
                 string lineContent = reader.PeekLineContent();
 
                 if (lineContent.StartsWith("name:", StringComparison.OrdinalIgnoreCase))
@@ -54,7 +53,14 @@ namespace SNEngine.Scripting.Parsing
                 }
 
                 var statement = _statementParser.ParseNext(reader);
-                if (statement != null) commands.Add(statement);
+                if (statement != null)
+                {
+                    commands.Add(statement);
+                }
+                else if (ReferenceEquals(currentToken, reader.Current))
+                {
+                    reader.ConsumeCurrentLine();
+                }
             }
 
             return new ScriptNode(sceneName, commands, functions);

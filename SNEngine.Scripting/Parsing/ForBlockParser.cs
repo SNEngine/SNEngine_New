@@ -1,7 +1,7 @@
-﻿using Pidgin;
-using SNEngine.Scripting.Ast;
+﻿using SNEngine.Scripting.Ast;
 using System;
 using System.Collections.Generic;
+using System.Text.RegularExpressions;
 
 namespace SNEngine.Scripting.Parsing
 {
@@ -21,34 +21,59 @@ namespace SNEngine.Scripting.Parsing
             if (reader.Eof || reader.Current == null) return null;
 
             string fullLine = reader.ConsumeFullCommandLine();
-
             if (!fullLine.StartsWith("for ", StringComparison.OrdinalIgnoreCase))
                 return null;
 
             string content = fullLine.Substring(4).Trim();
+            var commaMatch = Regex.Match(content, @"^(?<var>\w+)\s*=\s*(?<init>.+?)\s*,\s*(?<cond>.+?)\s*,\s*(?<inc>.+)$");
 
-            // Разбор: for i = 0 i < 5 i++
+            if (commaMatch.Success)
+            {
+                string varName = commaMatch.Groups["var"].Value;
+                return CreateForNode(varName, $"{varName} = {commaMatch.Groups["init"].Value}", commaMatch.Groups["cond"].Value, commaMatch.Groups["inc"].Value, reader);
+            }
+
             var parts = content.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
-            if (parts.Length < 4) return null;
+            if (parts.Length >= 3)
+            {
+                string variable = parts[0].Contains('=') ? parts[0].Split('=')[0] : parts[0];
+                string init = parts[0].Contains('=') ? parts[0] : $"{parts[0]} {parts[1]} {parts[2]}";
+                string increment = parts[^1];
+                int conditionStart = parts[0].Contains('=') ? 1 : 3;
+                string condition = string.Join(" ", parts[conditionStart..^1]);
 
-            string variable = parts[0];
-            string init = string.Join(" ", parts[0..3]);           // i = 0
-            string condition = parts[2] + " " + parts[3];          // i < 5
-            string increment = parts.Length > 4 ? string.Join(" ", parts[4..]) : parts[3];
+                return CreateForNode(variable, init, condition, increment, reader);
+            }
 
+            return null;
+        }
+
+        private ForCommandNode CreateForNode(string variable, string init, string condition, string increment, TokenReader reader)
+        {
             var body = new List<CommandNode>();
 
             while (!reader.Eof && reader.Current != null)
             {
-                string current = reader.Current.Value.Trim();
-                if (current.Equals("endfor", StringComparison.OrdinalIgnoreCase))
+                string currentLine = reader.PeekLineContent().Trim();
+
+                if (currentLine.Equals("endfor", StringComparison.OrdinalIgnoreCase))
                 {
-                    reader.Consume();
+                    reader.ConsumeCurrentLine();
                     break;
                 }
 
                 var stmt = _statementParser?.ParseNext(reader);
-                if (stmt != null) body.Add(stmt);
+                if (stmt != null)
+                {
+                    body.Add(stmt);
+                }
+                else
+                {
+                    if (!reader.Eof && !currentLine.Equals("endfor", StringComparison.OrdinalIgnoreCase))
+                    {
+                        reader.ConsumeCurrentLine();
+                    }
+                }
             }
 
             return new ForCommandNode(variable, init, condition, increment, body);

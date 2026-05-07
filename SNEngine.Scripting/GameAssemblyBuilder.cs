@@ -25,15 +25,13 @@ public class GameAssemblyBuilder
             return false;
         }
 
-        // === УЛУЧШЕННОЕ СОЗДАНИЕ ПАПКИ ===
         string genDirectory = Path.Combine(inputDirectory, "script_gen");
         EnsureDirectoryClean(genDirectory);
 
         var allCsFiles = new List<string>();
 
-        // 1. Конвертируем .sn файлы
         var snFiles = Directory.GetFiles(inputDirectory, "*.sn", SearchOption.AllDirectories)
-                               .OrderBy(f => f).ToArray(); // стабильный порядок
+                               .OrderBy(f => f).ToArray();
 
         Console.WriteLine($"Found {snFiles.Length} .sn files");
 
@@ -42,21 +40,47 @@ public class GameAssemblyBuilder
             try
             {
                 string source = File.ReadAllText(snPath);
-                string csCode = SnToCsConverter.ConvertToCSharp(source, Path.GetFileName(snPath));
+                string fileName = Path.GetFileName(snPath);
 
-                string fileName = Path.GetFileNameWithoutExtension(snPath) + ".generated.cs";
-                string tempCsPath = Path.Combine(genDirectory, fileName);
+                string csCode;
+                try
+                {
+                    // === ДЕТАЛЬНЫЙ ВЫВОД ОШИБОК ПАРСИНГА ===
+                    csCode = SnToCsConverter.ConvertToCSharp(source, fileName);
+                }
+                catch (Exception ex)
+                {
+                    Console.ForegroundColor = ConsoleColor.Red;
+                    Console.WriteLine($"[✗] Failed to parse {fileName}");
+                    Console.WriteLine($"    Error: {ex.Message}");
 
-                // Явная проверка существования папки перед записью
+                    if (ex is ArgumentNullException argEx)
+                    {
+                        Console.WriteLine($"    Parameter: {argEx.ParamName}");
+                    }
+
+                    if (ex.InnerException != null)
+                    {
+                        Console.WriteLine($"    Inner: {ex.InnerException.Message}");
+                    }
+
+                    Console.WriteLine($"    Stack Trace: {ex.StackTrace?.Split('\n').FirstOrDefault() ?? "N/A"}");
+                    Console.ResetColor();
+                    continue;
+                }
+
+                string tempCsPath = Path.Combine(genDirectory, Path.GetFileNameWithoutExtension(snPath) + ".generated.cs");
                 Directory.CreateDirectory(genDirectory);
                 File.WriteAllText(tempCsPath, csCode);
                 allCsFiles.Add(tempCsPath);
 
-                Console.WriteLine($"[✓] Compiled {Path.GetFileName(snPath)} → {fileName}");
+                Console.WriteLine($"[✓] Compiled {fileName}");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[✗] Failed {Path.GetFileName(snPath)}: {ex.Message}");
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine($"[✗] Unexpected error with {Path.GetFileName(snPath)}: {ex.Message}");
+                Console.ResetColor();
             }
         }
 
@@ -78,9 +102,6 @@ public class GameAssemblyBuilder
         return CompileToDll(allCsFiles, outputDllPath);
     }
 
-    /// <summary>
-    /// Надёжное создание/очистка папки script_gen
-    /// </summary>
     private static void EnsureDirectoryClean(string path)
     {
         if (Directory.Exists(path))
@@ -93,7 +114,6 @@ public class GameAssemblyBuilder
             catch (Exception ex)
             {
                 Console.WriteLine($"[Warning] Could not delete script_gen: {ex.Message}");
-                // Пытаемся очистить содержимое
                 foreach (var file in Directory.GetFiles(path, "*", SearchOption.AllDirectories))
                 {
                     try { File.Delete(file); } catch { }
@@ -107,6 +127,7 @@ public class GameAssemblyBuilder
 
     private bool CompileToDll(List<string> csFiles, string outputDllPath)
     {
+        // ... (весь метод CompileToDll остаётся как у тебя был) ...
         var syntaxTrees = csFiles.Select(path =>
             CSharpSyntaxTree.ParseText(File.ReadAllText(path), path: path)).ToList();
 
@@ -118,7 +139,6 @@ public class GameAssemblyBuilder
                 .WithOptimizationLevel(OptimizationLevel.Release)
                 .WithPlatform(Platform.AnyCpu));
 
-        // Гарантируем перезапись файла и корректное закрытие потока
         using (var dllStream = File.Create(outputDllPath))
         {
             var result = compilation.Emit(dllStream);
@@ -141,10 +161,8 @@ public class GameAssemblyBuilder
                 }
                 Console.ResetColor();
 
-                // Удаляем невалидный dll, если он создался пустым
                 dllStream.Close();
                 if (File.Exists(outputDllPath)) File.Delete(outputDllPath);
-
                 return false;
             }
         }
@@ -152,20 +170,14 @@ public class GameAssemblyBuilder
 
     private List<MetadataReference> GetFullReferences()
     {
+        // ... (твой оригинальный код GetFullReferences) ...
         var refs = new List<MetadataReference>();
         var trustedAssembliesPaths = ((string)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")).Split(Path.PathSeparator);
 
         var neededAssemblies = new[]
         {
-            "System.Runtime",
-            "System.Collections",
-            "System.Console",
-            "System.Linq",
-            "System.Private.CoreLib",
-            "System.Runtime.InteropServices",
-            "System.Reflection",
-            "mscorlib",
-            "netstandard"
+            "System.Runtime", "System.Collections", "System.Console", "System.Linq",
+            "System.Private.CoreLib", "System.Runtime.InteropServices", "System.Reflection", "mscorlib", "netstandard"
         };
 
         foreach (var path in trustedAssembliesPaths)

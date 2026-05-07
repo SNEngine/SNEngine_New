@@ -1,23 +1,32 @@
 ﻿using Pidgin;
 using SNEngine.Scripting.Ast;
+using System;
 using System.Collections.Generic;
 
 namespace SNEngine.Scripting.Parsing
 {
     /// <summary>
-    /// Lightweight orchestrator that delegates parsing to specialized parsers.
+    /// Lightweight orchestrator with proper dependency initialization.
     /// </summary>
     public sealed class ScriptParserCore
     {
-        private readonly Parser<char, CommandNode> _commandParser;
+        private readonly StatementParser _statementParser;
         private readonly FunctionParser _functionParser;
-        private readonly IfBlockParser _ifBlockParser;
 
         public ScriptParserCore(Parser<char, CommandNode> commandParser)
         {
-            _commandParser = commandParser ?? throw new ArgumentNullException(nameof(commandParser));
-            _functionParser = new FunctionParser(commandParser);
-            _ifBlockParser = new IfBlockParser(commandParser);
+            if (commandParser == null)
+                throw new ArgumentNullException(nameof(commandParser));
+
+            // Step-by-step initialization to avoid nulls and circular issues
+            var ifBlockParser = new IfBlockParser(commandParser, null!);   // temporary
+            var statementParser = new StatementParser(commandParser, ifBlockParser);
+
+            // Re-create IfBlockParser with real StatementParser
+            ifBlockParser = new IfBlockParser(commandParser, statementParser);
+
+            _statementParser = statementParser;
+            _functionParser = new FunctionParser(statementParser);
         }
 
         public ScriptNode Parse(IReadOnlyList<ScriptToken> tokens)
@@ -41,20 +50,9 @@ namespace SNEngine.Scripting.Parsing
                     continue;
                 }
 
-                if (reader.Match("if ") && reader.Current.Value.Contains("then", StringComparison.OrdinalIgnoreCase))
-                {
-                    var ifNode = _ifBlockParser.Parse(reader);
-                    if (ifNode != null)
-                        commands.Add(ifNode);
-                    continue;
-                }
-
-                // Regular command
-                var result = _commandParser.Parse(reader.Current.Value);
-                if (result.Success)
-                    commands.Add(result.Value);
-
-                reader.Consume();
+                var statement = _statementParser.ParseNext(reader);
+                if (statement != null)
+                    commands.Add(statement);
             }
 
             return new ScriptNode(sceneName, commands, functions);

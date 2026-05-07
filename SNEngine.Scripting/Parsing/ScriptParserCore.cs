@@ -6,7 +6,7 @@ using System.Collections.Generic;
 namespace SNEngine.Scripting.Parsing
 {
     /// <summary>
-    /// Lightweight orchestrator with proper dependency initialization.
+    /// Lightweight orchestrator with safe two-phase initialization.
     /// </summary>
     public sealed class ScriptParserCore
     {
@@ -18,15 +18,11 @@ namespace SNEngine.Scripting.Parsing
             if (commandParser == null)
                 throw new ArgumentNullException(nameof(commandParser));
 
-            // Step-by-step initialization to avoid nulls and circular issues
-            var ifBlockParser = new IfBlockParser(commandParser, null!);   // temporary
-            var statementParser = new StatementParser(commandParser, ifBlockParser);
+            var ifBlockParser = new IfBlockParser(commandParser);
+            _statementParser = new StatementParser(commandParser, ifBlockParser);
+            ifBlockParser.Initialize(_statementParser);
 
-            // Re-create IfBlockParser with real StatementParser
-            ifBlockParser = new IfBlockParser(commandParser, statementParser);
-
-            _statementParser = statementParser;
-            _functionParser = new FunctionParser(statementParser);
+            _functionParser = new FunctionParser(_statementParser);
         }
 
         public ScriptNode Parse(IReadOnlyList<ScriptToken> tokens)
@@ -36,7 +32,7 @@ namespace SNEngine.Scripting.Parsing
             var commands = new List<CommandNode>();
             var functions = new List<FunctionNode>();
 
-            while (!reader.Eof)
+            while (!reader.Eof && reader.Current != null)
             {
                 if (reader.Match("name:"))
                 {

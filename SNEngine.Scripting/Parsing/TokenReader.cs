@@ -4,7 +4,7 @@ using System.Collections.Generic;
 namespace SNEngine.Scripting.Parsing
 {
     /// <summary>
-    /// Safe cursor for navigating tokens with lookahead and consumption.
+    /// Safe cursor for navigating tokens.
     /// </summary>
     public sealed class TokenReader
     {
@@ -17,20 +17,22 @@ namespace SNEngine.Scripting.Parsing
         }
 
         public bool Eof => _position >= _tokens.Count;
-        public ScriptToken Current => Eof ? throw new InvalidOperationException("Reader is at end") : _tokens[_position];
+        public ScriptToken? Current => Eof ? null : _tokens[_position];
 
         public bool Match(string prefix, StringComparison comparison = StringComparison.OrdinalIgnoreCase)
         {
-            if (Eof) return false;
-            return Current.Value.StartsWith(prefix, comparison);
+            return Current != null && Current.Value.StartsWith(prefix, comparison);
         }
 
-        public void Consume() => _position++;
+        public void Consume()
+        {
+            if (!Eof) _position++;
+        }
 
         public string ConsumeValueAfter(string prefix, StringComparison comparison = StringComparison.OrdinalIgnoreCase)
         {
             if (!Match(prefix, comparison)) return string.Empty;
-            string value = Current.Value.Substring(prefix.Length).Trim();
+            string value = Current!.Value.Substring(prefix.Length).Trim();
             Consume();
             return value;
         }

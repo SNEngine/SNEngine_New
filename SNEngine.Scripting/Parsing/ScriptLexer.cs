@@ -4,8 +4,9 @@ using System.Collections.Generic;
 namespace SNEngine.Scripting.Parsing
 {
     /// <summary>
-    /// Lexer that keeps full original lines (compatible with existing parsers) 
-    /// but already skips comments and preserves positions.
+    /// Lexer that returns full original lines (maximum compatibility with current parsers).
+    /// Already skips comments and preserves line numbers + column positions.
+    /// Ready for future full tokenization (keywords, strings, operators, etc.).
     /// </summary>
     public sealed class ScriptLexer
     {
@@ -25,14 +26,14 @@ namespace SNEngine.Scripting.Parsing
                 if (string.IsNullOrWhiteSpace(trimmed))
                     continue;
 
-                // Skip full line comments
+                // Skip full-line comments (// and #)
                 if (trimmed.StartsWith("//") || trimmed.StartsWith("#"))
                     continue;
 
                 tokens.Add(new ScriptToken
                 {
                     Type = TokenType.Line,
-                    Value = trimmed,                    // ← Полная строка, как было раньше
+                    Value = trimmed,
                     OriginalLine = i + 1,
                     Column = raw.Length - raw.TrimStart().Length + 1
                 });
@@ -44,7 +45,14 @@ namespace SNEngine.Scripting.Parsing
 
     public enum TokenType
     {
-        Line
+        Line,           // Current mode — full line (backward compatible)
+        Keyword,        // Future: if, function, print, while, etc.
+        Identifier,     // Future: variable names, function names
+        String,         // Future: "text"
+        Number,         // Future: 42, 3.14
+        Operator,       // Future: =, <, >, +, -, etc.
+        Punctuation,    // Future: (, ), ,, :, etc.
+        Unknown
     }
 
     public sealed class ScriptToken
@@ -53,5 +61,7 @@ namespace SNEngine.Scripting.Parsing
         public string Value { get; set; } = string.Empty;
         public int OriginalLine { get; set; }
         public int Column { get; set; }
+
+        public override string ToString() => $"{Type}('{Value}') @ {OriginalLine}:{Column}";
     }
 }

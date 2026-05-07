@@ -5,9 +5,8 @@ using System;
 namespace SNEngine.Scripting.Parsing
 {
     /// <summary>
-    /// Single point of truth for deciding what kind of statement we are looking at.
-    /// This is where all high-level constructs (if, while, for, etc.) will be registered in the future.
-    /// Keeps FunctionParser and ScriptParserCore clean and extensible.
+    /// Single point of truth for all statements.
+    /// This is where we will register while, for, switch, etc. in the future.
     /// </summary>
     public sealed class StatementParser
     {
@@ -20,35 +19,29 @@ namespace SNEngine.Scripting.Parsing
             _ifBlockParser = ifBlockParser ?? throw new ArgumentNullException(nameof(ifBlockParser));
         }
 
-        /// <summary>
-        /// Main entry point — tries to parse the next statement at current position.
-        /// </summary>
         public CommandNode? ParseNext(TokenReader reader)
         {
-            if (reader.Eof) return null;
+            if (reader.Eof || reader.Current == null) return null;
 
-            int safety = 0;
-            while (!reader.Eof && safety++ < 1000)
+            string line = reader.Current.Value;
+
+            // if-block has highest priority
+            if (line.StartsWith("if ", StringComparison.OrdinalIgnoreCase) &&
+                line.Contains("then", StringComparison.OrdinalIgnoreCase))
             {
-                if (reader.Match("if ") && reader.Current.Value.Contains("then", StringComparison.OrdinalIgnoreCase))
-                {
-                    return _ifBlockParser.Parse(reader);
-                }
-
-                var result = _commandParser.Parse(reader.Current.Value);
-                if (result.Success)
-                {
-                    reader.Consume();
-                    return result.Value;
-                }
-
-                reader.Consume(); // ← обязательно потребляем токен, даже если не распознали
-                return null;
+                return _ifBlockParser.Parse(reader);
             }
 
-            Console.WriteLine("[Warning] StatementParser safety limit reached");
+            // Regular commands (print, SetVar, Jump To, Quit, etc.)
+            var result = _commandParser.Parse(line);
+            if (result.Success)
+            {
+                reader.Consume();
+                return result.Value;
+            }
+
+            reader.Consume();
             return null;
         }
     }
-
 }

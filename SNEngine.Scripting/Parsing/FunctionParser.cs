@@ -5,8 +5,8 @@ namespace SNEngine.Scripting.Parsing
 {
     /// <summary>
     /// Responsible ONLY for function ... endfunc syntax.
-    /// Does NOT know anything about if/while/for — delegates to StatementParser.
-    /// This keeps it small and stable even when we add many new constructs.
+    /// Does NOT know anything about if/while/for — delegates everything to StatementParser.
+    /// This keeps it small and stable even when we add many new constructs later.
     /// </summary>
     public sealed class FunctionParser
     {
@@ -19,20 +19,23 @@ namespace SNEngine.Scripting.Parsing
 
         public FunctionNode Parse(TokenReader reader)
         {
+            if (reader.Eof || reader.Current == null)
+                return new FunctionNode("", new List<CommandNode>());
+
             string line = reader.Current.Value;
             string funcName = line.Substring(9).Trim().TrimEnd('(', ')').Trim();
             var body = new List<CommandNode>();
 
-            reader.Consume(); // consume function declaration line
+            reader.Consume(); // consume "function ..." line
 
-            while (!reader.Eof && !reader.Match("endfunc"))
+            while (!reader.Eof && reader.Current != null && !reader.Match("endfunc"))
             {
                 var statement = _statementParser.ParseNext(reader);
                 if (statement != null)
                     body.Add(statement);
             }
 
-            if (!reader.Eof)
+            if (!reader.Eof && reader.Current != null && reader.Match("endfunc"))
                 reader.Consume(); // consume "endfunc"
 
             return new FunctionNode(funcName, body);

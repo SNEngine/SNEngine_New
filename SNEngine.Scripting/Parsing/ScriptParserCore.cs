@@ -24,6 +24,7 @@ namespace SNEngine.Scripting.Parsing
 
             _statementParser = statementParser;
             _functionParser = new FunctionParser();
+            _functionParser.Initialize(statementParser);
         }
 
         public ScriptNode Parse(IReadOnlyList<ScriptToken> tokens)

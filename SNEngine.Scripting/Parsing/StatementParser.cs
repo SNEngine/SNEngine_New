@@ -24,13 +24,15 @@ namespace SNEngine.Scripting.Parsing
             if (reader.Eof || reader.Current == null) return null;
 
             string lineContent = reader.PeekLineContent().Trim();
+            string firstWord = lineContent.Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries)
+                                          .FirstOrDefault() ?? string.Empty;
 
-            if (lineContent.Equals("endif", StringComparison.OrdinalIgnoreCase) ||
-                lineContent.Equals("else", StringComparison.OrdinalIgnoreCase) ||
-                lineContent.Equals("endfor", StringComparison.OrdinalIgnoreCase) ||
-                lineContent.Equals("endfunc", StringComparison.OrdinalIgnoreCase))
+            if (firstWord.Equals("endif", StringComparison.OrdinalIgnoreCase) ||
+                firstWord.Equals("else", StringComparison.OrdinalIgnoreCase) ||
+                firstWord.Equals("endfor", StringComparison.OrdinalIgnoreCase) ||
+                firstWord.Equals("endfunc", StringComparison.OrdinalIgnoreCase))
             {
-                return null;
+                return null; // не парсим, пусть блок-парсеры сами обработают
             }
 
             if (lineContent.StartsWith("if ", StringComparison.OrdinalIgnoreCase) &&
@@ -47,9 +49,7 @@ namespace SNEngine.Scripting.Parsing
             string fullCommand = reader.ConsumeFullCommandLine();
             var result = _commandParser.Parse(fullCommand);
 
-            if (result.Success) return result.Value;
-
-            return null;
+            return result.Success ? result.Value : null;
         }
     }
 }

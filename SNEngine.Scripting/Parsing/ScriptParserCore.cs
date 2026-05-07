@@ -23,7 +23,7 @@ namespace SNEngine.Scripting.Parsing
             forBlockParser.Initialize(statementParser);
 
             _statementParser = statementParser;
-            _functionParser = new FunctionParser(statementParser);
+            _functionParser = new FunctionParser();
         }
 
         public ScriptNode Parse(IReadOnlyList<ScriptToken> tokens)

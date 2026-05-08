@@ -1,15 +1,15 @@
-﻿using System;
-using System.Globalization;
-using Microsoft.CodeAnalysis.CSharp;
+﻿using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using SNEngine.API;
 using SNEngine.Scripting.Ast;
+using System;
+using System.Globalization;
 
 namespace SNEngine.Scripting.CodeGen;
 
 /// <summary>
 /// Central orchestrator for all variable and expression processing.
-/// Single source of truth. No GetGlobal anymore.
+/// Uses SpecialExpressionRegistry for special commands (Get String from, etc.)
 /// </summary>
 public static class VariableExpressionOrchestrator
 {
@@ -23,23 +23,30 @@ public static class VariableExpressionOrchestrator
 
         string expr = rawExpr.Trim();
 
-        // Простые литералы
+        // === Автоматический поиск через реестр (без хардкода) ===
+        foreach (var kvp in SpecialExpressionRegistry.Handlers)
+        {
+            if (expr.StartsWith(kvp.Key, StringComparison.OrdinalIgnoreCase))
+            {
+                string inner = expr.Substring(kvp.Key.Length).Trim();
+                return kvp.Value.GenerateExpression(inner);   // вызываем генератор
+            }
+        }
+
+        // Вызовы функций, литералы, переменные и т.д.
+        if (expr.Contains("(") && expr.Contains(")"))
+            return SyntaxFactory.ParseExpression(expr);
+
         if (TryParseLiteral(expr, out var literal))
             return literal;
 
-        // Простая переменная
         if (IsSimpleIdentifier(expr))
         {
-            string name = expr;
-
-            if (scope.IsLocal(name))
-                return SyntaxFactory.IdentifierName(name);
-
-            // Поле класса (создано в ClassGenerator)
-            return SyntaxFactory.IdentifierName(name);
+            if (scope.IsLocal(expr))
+                return SyntaxFactory.IdentifierName(expr);
+            return SyntaxFactory.IdentifierName(expr);
         }
 
-        // Сложные выражения ("text " + var, playerHealth < 50 и т.д.)
         return SyntaxFactory.ParseExpression(expr);
     }
 

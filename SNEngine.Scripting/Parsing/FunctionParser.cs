@@ -10,16 +10,25 @@ public sealed class FunctionParser : BlockParserBase
     public FunctionNode Parse(TokenReader reader)
     {
         if (reader.Eof || reader.Current == null)
-            return new FunctionNode("", Array.Empty<FunctionParameter>(), Array.Empty<CommandNode>());
+            return new FunctionNode("", Array.Empty<FunctionParameter>(), "void", Array.Empty<CommandNode>());
 
         string fullLine = reader.ConsumeFullCommandLine().Trim();
 
         string name = "";
         var parameters = new List<FunctionParameter>();
+        string returnType = "void";
 
         if (fullLine.StartsWith("function ", StringComparison.OrdinalIgnoreCase))
         {
             string signature = fullLine.Substring(9).Trim();
+
+            // Ищем "returned"
+            int returnedIndex = signature.IndexOf("returned", StringComparison.OrdinalIgnoreCase);
+            if (returnedIndex > 0)
+            {
+                returnType = signature.Substring(returnedIndex + 8).Trim();
+                signature = signature.Substring(0, returnedIndex).Trim();
+            }
 
             int openParen = signature.IndexOf('(');
             if (openParen > 0)
@@ -29,23 +38,17 @@ public sealed class FunctionParser : BlockParserBase
 
                 if (!string.IsNullOrEmpty(paramPart))
                 {
-                    var paramList = paramPart.Split(',').Select(p => p.Trim());
-                    foreach (var p in paramList)
+                    foreach (var p in paramPart.Split(',').Select(x => x.Trim()))
                     {
-                        // Поддержка: int a = 10
-                        var eqIndex = p.IndexOf('=');
-                        string paramDecl = eqIndex > 0 ? p.Substring(0, eqIndex).Trim() : p;
-                        string? defaultValue = eqIndex > 0 ? p.Substring(eqIndex + 1).Trim() : null;
+                        var eq = p.IndexOf('=');
+                        string decl = eq > 0 ? p.Substring(0, eq).Trim() : p;
+                        string? def = eq > 0 ? p.Substring(eq + 1).Trim() : null;
 
-                        var parts = paramDecl.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+                        var parts = decl.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
                         if (parts.Length >= 2)
-                        {
-                            parameters.Add(new FunctionParameter(parts[0], parts[1], defaultValue));
-                        }
+                            parameters.Add(new FunctionParameter(parts[0], parts[1], def));
                         else if (parts.Length == 1)
-                        {
-                            parameters.Add(new FunctionParameter("var", parts[0], defaultValue));
-                        }
+                            parameters.Add(new FunctionParameter("var", parts[0], def));
                     }
                 }
             }
@@ -63,6 +66,6 @@ public sealed class FunctionParser : BlockParserBase
             reader.ConsumeFullCommandLine();
         }
 
-        return new FunctionNode(name, parameters, body);
+        return new FunctionNode(name, parameters, returnType, body);
     }
 }

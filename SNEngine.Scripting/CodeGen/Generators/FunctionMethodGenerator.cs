@@ -26,8 +26,7 @@ public class FunctionMethodGenerator : BaseCodeGenerator
                 if (!string.IsNullOrEmpty(p.DefaultValue))
                 {
                     param = param.WithDefault(
-                        SyntaxFactory.EqualsValueClause(
-                            SyntaxFactory.ParseExpression(p.DefaultValue)));
+                        SyntaxFactory.EqualsValueClause(SyntaxFactory.ParseExpression(p.DefaultValue)));
                 }
 
                 ScopeManager.Current.Declare(p.Name, SymbolKind.Parameter);
@@ -37,7 +36,7 @@ public class FunctionMethodGenerator : BaseCodeGenerator
             var statements = func.Body.Select(GenerateCommand).ToList();
 
             return SyntaxFactory.MethodDeclaration(
-                SyntaxFactory.PredefinedType(SyntaxFactory.Token(SyntaxKind.VoidKeyword)), func.Name)
+                SyntaxFactory.ParseTypeName(func.ReturnType), func.Name)
                 .WithModifiers(SyntaxFactory.TokenList(SyntaxFactory.Token(SyntaxKind.PrivateKeyword)))
                 .WithParameterList(SyntaxFactory.ParameterList(SyntaxFactory.SeparatedList(parameters)))
                 .WithBody(SyntaxFactory.Block(statements));

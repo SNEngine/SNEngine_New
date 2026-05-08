@@ -12,14 +12,17 @@ public sealed class StatementParser
     private readonly Parser<char, CommandNode> _commandParser;
     private readonly IfBlockParser _ifBlockParser;
     private readonly ForBlockParser _forBlockParser;
+    private readonly SwitchBlockParser _switchBlockParser;   // ← НОВОЕ
 
     public StatementParser(Parser<char, CommandNode> commandParser,
                            IfBlockParser ifBlockParser,
-                           ForBlockParser forBlockParser)
+                           ForBlockParser forBlockParser,
+                           SwitchBlockParser switchBlockParser)   // ← НОВОЕ
     {
         _commandParser = commandParser ?? throw new ArgumentNullException(nameof(commandParser));
         _ifBlockParser = ifBlockParser ?? throw new ArgumentNullException(nameof(ifBlockParser));
         _forBlockParser = forBlockParser ?? throw new ArgumentNullException(nameof(forBlockParser));
+        _switchBlockParser = switchBlockParser ?? throw new ArgumentNullException(nameof(switchBlockParser)); // ← НОВОЕ
     }
 
     public CommandNode? ParseNext(TokenReader reader)
@@ -36,6 +39,8 @@ public sealed class StatementParser
         if (firstWord.Equals("endif", StringComparison.OrdinalIgnoreCase) ||
             firstWord.Equals("else", StringComparison.OrdinalIgnoreCase) ||
             firstWord.Equals("endfor", StringComparison.OrdinalIgnoreCase) ||
+            firstWord.Equals("endcase", StringComparison.OrdinalIgnoreCase) ||
+            firstWord.Equals("endswitch", StringComparison.OrdinalIgnoreCase) ||
             firstWord.Equals("endfunc", StringComparison.OrdinalIgnoreCase))
         {
             return null;
@@ -52,6 +57,12 @@ public sealed class StatementParser
         if (lineContent.StartsWith("for ", StringComparison.OrdinalIgnoreCase))
         {
             return _forBlockParser.Parse(reader);
+        }
+
+        // Switch блок ← НОВОЕ
+        if (lineContent.StartsWith("switch ", StringComparison.OrdinalIgnoreCase))
+        {
+            return _switchBlockParser.Parse(reader);
         }
 
         // Все остальные команды

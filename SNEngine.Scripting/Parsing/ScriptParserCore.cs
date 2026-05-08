@@ -17,14 +17,17 @@ namespace SNEngine.Scripting.Parsing
 
             var ifBlockParser = new IfBlockParser();
             var forBlockParser = new ForBlockParser();
-            var statementParser = new StatementParser(commandParser, ifBlockParser, forBlockParser);
+            var switchBlockParser = new SwitchBlockParser();           // ← НОВОЕ
+
+            var statementParser = new StatementParser(commandParser, ifBlockParser, forBlockParser, switchBlockParser);
 
             ifBlockParser.Initialize(statementParser);
             forBlockParser.Initialize(statementParser);
+            switchBlockParser.Initialize(statementParser);             // ← НОВОЕ
 
             _statementParser = statementParser;
             _functionParser = new FunctionParser();
-            _functionParser.Initialize(statementParser);   // ← только одна строка, без перезаписи!
+            _functionParser.Initialize(statementParser);
         }
 
         public ScriptNode Parse(IReadOnlyList<ScriptToken> tokens)

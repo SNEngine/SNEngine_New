@@ -1,5 +1,5 @@
 ﻿using System;
-using System.Text.RegularExpressions;
+using System.Globalization;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using SNEngine.API;
@@ -9,14 +9,10 @@ namespace SNEngine.Scripting.CodeGen;
 
 /// <summary>
 /// Central orchestrator for all variable and expression processing.
-/// Uses SNVariable.GetTypeForCompile() for accurate type inference.
-/// No more GetGlobal.
+/// Single source of truth. No GetGlobal anymore.
 /// </summary>
 public static class VariableExpressionOrchestrator
 {
-    private static readonly Regex IdentifierRegex = new(
-        @"(""[^""]*"")|(\b[a-zA-Z_][a-zA-Z0-9_]*\b)", RegexOptions.Compiled);
-
     /// <summary>
     /// Главный метод: превращает строку из .sn в Roslyn ExpressionSyntax
     /// </summary>
@@ -25,37 +21,69 @@ public static class VariableExpressionOrchestrator
         if (string.IsNullOrWhiteSpace(rawExpr))
             return SyntaxFactory.LiteralExpression(SyntaxKind.NullLiteralExpression);
 
-        rawExpr = rawExpr.Trim();
+        string expr = rawExpr.Trim();
 
         // Простые литералы
-        if (TryParseLiteral(rawExpr, out var literal))
+        if (TryParseLiteral(expr, out var literal))
             return literal;
 
         // Простая переменная
-        if (IsSimpleIdentifier(rawExpr))
+        if (IsSimpleIdentifier(expr))
         {
-            string name = rawExpr.Trim();
+            string name = expr;
 
             if (scope.IsLocal(name))
                 return SyntaxFactory.IdentifierName(name);
 
-            // Это поле класса — просто имя
+            // Поле класса (создано в ClassGenerator)
             return SyntaxFactory.IdentifierName(name);
         }
 
-        // Сложные выражения (конкатенация, условия и т.д.)
-        return SyntaxFactory.ParseExpression(rawExpr);
+        // Сложные выражения ("text " + var, playerHealth < 50 и т.д.)
+        return SyntaxFactory.ParseExpression(expr);
     }
 
     /// <summary>
-    /// Для Assignment — используем SNVariable для определения типа (передаём в ClassGenerator)
+    /// Для обычного присваивания (x = 10) — поле класса
     /// </summary>
     public static StatementSyntax CreateAssignment(AssignmentCommandNode node, ScopeManager scope)
     {
         string varName = node.VariableName.Trim();
         ExpressionSyntax right = GetExpression(node.ValueExpression, scope);
 
-        // Просто присваивание — поле уже создано в ClassGenerator
+        return SyntaxFactory.ExpressionStatement(
+            SyntaxFactory.AssignmentExpression(
+                SyntaxKind.SimpleAssignmentExpression,
+                SyntaxFactory.IdentifierName(varName),
+                right));
+    }
+
+    /// <summary>
+    /// Для local переменных внутри функций/циклов
+    /// </summary>
+    public static StatementSyntax CreateLocalAssignment(LocalAssignmentCommandNode node, ScopeManager scope)
+    {
+        string varName = node.VariableName.Trim();
+        ExpressionSyntax right = GetExpression(node.ValueExpression, scope);
+
+        if (!scope.IsLocal(varName))
+        {
+            scope.Declare(varName, SymbolKind.Variable);
+
+            string typeName = GetTypeForValue(node.ValueExpression);
+
+            var declaration = SyntaxFactory.VariableDeclaration(
+                SyntaxFactory.ParseTypeName(typeName),
+                SyntaxFactory.SingletonSeparatedList(
+                    SyntaxFactory.VariableDeclarator(
+                        SyntaxFactory.Identifier(varName),
+                        null,
+                        SyntaxFactory.EqualsValueClause(right))));
+
+            return SyntaxFactory.LocalDeclarationStatement(declaration);
+        }
+
+        // Если уже объявлена — обычное присваивание
         return SyntaxFactory.ExpressionStatement(
             SyntaxFactory.AssignmentExpression(
                 SyntaxKind.SimpleAssignmentExpression,
@@ -73,7 +101,7 @@ public static class VariableExpressionOrchestrator
             return true;
         }
 
-        if (double.TryParse(expr, out double d))
+        if (double.TryParse(expr, NumberStyles.Any, CultureInfo.InvariantCulture, out double d))
         {
             syntax = SyntaxFactory.LiteralExpression(SyntaxKind.NumericLiteralExpression, SyntaxFactory.Literal(d));
             return true;
@@ -102,10 +130,12 @@ public static class VariableExpressionOrchestrator
         !expr.Contains("+") &&
         !expr.Contains("<") &&
         !expr.Contains(">") &&
-        !expr.Contains("=");
+        !expr.Contains("=") &&
+        !expr.Contains("*") &&
+        !expr.Contains("/");
 
     /// <summary>
-    /// Вспомогательный метод — создаёт SNVariable и возвращает тип (можно использовать в ClassGenerator)
+    /// Возвращает C# тип для значения (используется ClassGenerator и LocalAssignment)
     /// </summary>
     public static string GetTypeForValue(string valueExpression)
     {
@@ -114,9 +144,8 @@ public static class VariableExpressionOrchestrator
 
         string expr = valueExpression.Trim();
 
-        // Сначала пробуем double (важно для 3.16)
-        if (double.TryParse(expr, System.Globalization.NumberStyles.Any,
-            System.Globalization.CultureInfo.InvariantCulture, out _))
+        // Сначала double (важно для 3.16, 0.5 и т.д.)
+        if (double.TryParse(expr, NumberStyles.Any, CultureInfo.InvariantCulture, out _))
             return "double";
 
         object? sample = TryParseValue(expr);
@@ -126,13 +155,13 @@ public static class VariableExpressionOrchestrator
 
     private static object? TryParseValue(string expr)
     {
-        expr = expr?.Trim() ?? "";
+        expr = expr.Trim();
 
         if (int.TryParse(expr, out int i)) return i;
-        if (double.TryParse(expr, out double d)) return d;
+        if (double.TryParse(expr, NumberStyles.Any, CultureInfo.InvariantCulture, out double d)) return d;
         if (bool.TryParse(expr, out bool b)) return b;
         if (expr.StartsWith("\"") && expr.EndsWith("\"")) return expr.Trim('"');
 
-        return expr; // fallback
+        return expr;
     }
 }

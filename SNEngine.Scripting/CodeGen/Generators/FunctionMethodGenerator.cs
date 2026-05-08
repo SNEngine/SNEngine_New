@@ -2,12 +2,11 @@
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using SNEngine.Scripting.Ast;
 using System;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace SNEngine.Scripting.CodeGen.Generators;
 
-/// <summary>
-/// Generates private void FunctionName() { ... } with logging
-/// </summary>
 public class FunctionMethodGenerator : BaseCodeGenerator
 {
     public FunctionMethodGenerator(IReadOnlyDictionary<Type, ICommandCodeGenerator> generators)
@@ -15,22 +14,37 @@ public class FunctionMethodGenerator : BaseCodeGenerator
 
     public MemberDeclarationSyntax Generate(FunctionNode func)
     {
-        Console.WriteLine($"[FunctionMethodGenerator] Generating function: {func.Name}() with {func.Body.Count} commands");
+        ScopeManager.Current.PushScope();
 
-        var statements = func.Body.Select(cmd =>
+        try
         {
-            var stmt = GenerateCommand(cmd);
-            Console.WriteLine($"[FunctionMethodGenerator]   → {cmd.GetType().Name}");
-            return stmt;
-        }).ToList();
+            var parameters = func.Parameters.Select(p =>
+            {
+                var param = SyntaxFactory.Parameter(SyntaxFactory.Identifier(p.Name))
+                    .WithType(SyntaxFactory.ParseTypeName(p.Type));
 
-        var method = SyntaxFactory.MethodDeclaration(
-            SyntaxFactory.PredefinedType(SyntaxFactory.Token(SyntaxKind.VoidKeyword)), func.Name)
-            .WithModifiers(SyntaxFactory.TokenList(SyntaxFactory.Token(SyntaxKind.PrivateKeyword)))
-            .WithParameterList(SyntaxFactory.ParameterList())
-            .WithBody(SyntaxFactory.Block(statements));
+                if (!string.IsNullOrEmpty(p.DefaultValue))
+                {
+                    param = param.WithDefault(
+                        SyntaxFactory.EqualsValueClause(
+                            SyntaxFactory.ParseExpression(p.DefaultValue)));
+                }
 
-        Console.WriteLine($"[FunctionMethodGenerator] Finished function {func.Name}()\n");
-        return method;
+                ScopeManager.Current.Declare(p.Name, SymbolKind.Parameter);
+                return param;
+            }).ToList();
+
+            var statements = func.Body.Select(GenerateCommand).ToList();
+
+            return SyntaxFactory.MethodDeclaration(
+                SyntaxFactory.PredefinedType(SyntaxFactory.Token(SyntaxKind.VoidKeyword)), func.Name)
+                .WithModifiers(SyntaxFactory.TokenList(SyntaxFactory.Token(SyntaxKind.PrivateKeyword)))
+                .WithParameterList(SyntaxFactory.ParameterList(SyntaxFactory.SeparatedList(parameters)))
+                .WithBody(SyntaxFactory.Block(statements));
+        }
+        finally
+        {
+            ScopeManager.Current.PopScope();
+        }
     }
 }

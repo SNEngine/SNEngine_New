@@ -5,7 +5,7 @@ using System;
 namespace SNEngine.Scripting.Parsing;
 
 /// <summary>
-/// Главный парсер отдельных строк/команд с подробным логированием
+/// Главный парсер. local обрабатывается через общий механизм [SnCommand]
 /// </summary>
 public sealed class StatementParser
 {
@@ -25,24 +25,19 @@ public sealed class StatementParser
     public CommandNode? ParseNext(TokenReader reader)
     {
         if (reader.Eof || reader.Current == null)
-        {
-            Console.WriteLine("[StatementParser] End of file reached");
             return null;
-        }
 
         string lineContent = reader.PeekLineContent().Trim();
-        Console.WriteLine($"[StatementParser] Parsing line: \"{lineContent}\"");
 
+        // Закрывающие блоки
         string firstWord = lineContent.Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries)
                                       .FirstOrDefault() ?? string.Empty;
 
-        // Закрывающие блоки
         if (firstWord.Equals("endif", StringComparison.OrdinalIgnoreCase) ||
             firstWord.Equals("else", StringComparison.OrdinalIgnoreCase) ||
             firstWord.Equals("endfor", StringComparison.OrdinalIgnoreCase) ||
             firstWord.Equals("endfunc", StringComparison.OrdinalIgnoreCase))
         {
-            Console.WriteLine($"[StatementParser] → Closing block keyword: {firstWord}");
             return null;
         }
 
@@ -50,36 +45,19 @@ public sealed class StatementParser
         if (lineContent.StartsWith("if ", StringComparison.OrdinalIgnoreCase) &&
             lineContent.Contains("then", StringComparison.OrdinalIgnoreCase))
         {
-            Console.WriteLine("[StatementParser] → Detected IF block");
-            var result1 = _ifBlockParser.Parse(reader);
-            Console.WriteLine($"[StatementParser] ← IF block parsed successfully");
-            return result1;
+            return _ifBlockParser.Parse(reader);
         }
 
         // For блок
         if (lineContent.StartsWith("for ", StringComparison.OrdinalIgnoreCase))
         {
-            Console.WriteLine("[StatementParser] → Detected FOR block");
-            var result2 = _forBlockParser.Parse(reader);
-            Console.WriteLine($"[StatementParser] ← FOR block parsed successfully");
-            return result2;
+            return _forBlockParser.Parse(reader);
         }
 
-        // Обычная команда
+        // Все остальные команды
         string fullCommand = reader.ConsumeFullCommandLine();
-        Console.WriteLine($"[StatementParser] → Regular command: {fullCommand}");
+        var result2 = _commandParser.Parse(fullCommand);
 
-        var result = _commandParser.Parse(fullCommand);
-
-        if (result.Success)
-        {
-            Console.WriteLine($"[StatementParser] ← Parsed as: {result.Value.GetType().Name}");
-            return result.Value;
-        }
-        else
-        {
-            Console.WriteLine($"[StatementParser] ⚠ Failed to parse command: {fullCommand}");
-            return null;
-        }
+        return result2.Success ? result2.Value : null;
     }
 }

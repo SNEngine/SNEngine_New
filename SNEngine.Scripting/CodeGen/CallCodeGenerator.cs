@@ -5,7 +5,7 @@ using SNEngine.Scripting.Ast;
 namespace SNEngine.Scripting.CodeGen;
 
 /// <summary>
-/// Generates: hello();
+/// Генерирует вызов функции с аргументами
 /// </summary>
 [SnCodeGenerator(typeof(CallCommandNode))]
 public sealed class CallCodeGenerator : ICommandCodeGenerator
@@ -15,6 +15,7 @@ public sealed class CallCodeGenerator : ICommandCodeGenerator
         if (node is not CallCommandNode call)
             return SyntaxFactory.ParseStatement("// Invalid CallCommandNode");
 
-        return SyntaxFactory.ParseStatement($"{call.FunctionName}();");
+        string args = string.Join(", ", call.Arguments);
+        return SyntaxFactory.ParseStatement($"{call.FunctionName}({args});");
     }
 }

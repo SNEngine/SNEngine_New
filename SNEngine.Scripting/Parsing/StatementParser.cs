@@ -34,6 +34,7 @@ public sealed class StatementParser
         string firstWord = lineContent.Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries)
                                       .FirstOrDefault() ?? string.Empty;
 
+        // Закрывающие блоки
         if (firstWord.Equals("endif", StringComparison.OrdinalIgnoreCase) ||
             firstWord.Equals("else", StringComparison.OrdinalIgnoreCase) ||
             firstWord.Equals("endfor", StringComparison.OrdinalIgnoreCase) ||
@@ -45,6 +46,35 @@ public sealed class StatementParser
             return null;
         }
 
+        // === Специальные команды (высокий приоритет) ===
+        if (firstWord.Equals("break", StringComparison.OrdinalIgnoreCase))
+        {
+            reader.ConsumeFullCommandLine();
+            return new BreakCommandNode();
+        }
+
+        if (firstWord.Equals("continue", StringComparison.OrdinalIgnoreCase))
+        {
+            reader.ConsumeFullCommandLine();
+            return new ContinueCommandNode();
+        }
+
+        if (firstWord.Equals("return", StringComparison.OrdinalIgnoreCase))
+        {
+            string fullLine = reader.ConsumeFullCommandLine();
+            string value = fullLine.Length > 6 ? fullLine.Substring(6).Trim() : null;
+            return new ReturnCommandNode(string.IsNullOrWhiteSpace(value) ? null : value);
+        }
+
+        if (firstWord.Equals("local", StringComparison.OrdinalIgnoreCase))
+        {
+            string fullLine = reader.ConsumeFullCommandLine();
+            // Используем твой LocalAssignmentParser
+            var localParser = new LocalAssignmentParser(_commandParser);
+            return localParser.Parse(reader);   // ← передаём текущий reader
+        }
+
+        // === Блочные конструкции ===
         if (lineContent.StartsWith("if ", StringComparison.OrdinalIgnoreCase) &&
             lineContent.Contains("then", StringComparison.OrdinalIgnoreCase))
         {
@@ -66,6 +96,7 @@ public sealed class StatementParser
             return _whileBlockParser.Parse(reader);
         }
 
+        // === Все остальные команды ===
         string fullCommand = reader.ConsumeFullCommandLine();
         var result2 = _commandParser.Parse(fullCommand);
 

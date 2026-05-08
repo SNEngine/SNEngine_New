@@ -1,13 +1,12 @@
-﻿using SNEngine.Scripting;
-using SNEngine.Scripting.CodeGen;
+﻿using SNEngine.Scripting.CodeGen;
 using System;
-using System.IO;
+using System.Threading.Tasks;
 
 namespace SNEngine.Scripting;
 
 internal class Program
 {
-    static void Main(string[] args)
+    static async Task Main(string[] args)
     {
         if (args.Length == 0)
         {
@@ -21,14 +20,14 @@ internal class Program
         {
             switch (command)
             {
+                case "build":
+                case "b":
+                    await HandleBuildCommandAsync(args);
+                    break;
+
                 case "convert":
                 case "c":
                     HandleConvertCommand(args);
-                    break;
-
-                case "build":
-                case "b":
-                    HandleBuildCommand(args);
                     break;
 
                 default:
@@ -40,6 +39,29 @@ internal class Program
         {
             PrintError(ex);
         }
+    }
+
+    private static async Task HandleBuildCommandAsync(string[] args)
+    {
+        string inputDir = args.Length > 1 ? args[1] : "Scenes";
+        string outputDll = args.Length > 2 ? args[2] : "game.dll";
+
+        Console.WriteLine("[Info] Starting async build...");
+
+        using var builder = new GameAssemblyBuilder();
+        var result = await builder.BuildAsync(inputDir, outputDll);
+
+        if (result.Success)
+        {
+            Console.ForegroundColor = ConsoleColor.Green;
+            Console.WriteLine($"[✓] BUILD SUCCESSFUL in {result.Seconds} seconds");
+        }
+        else
+        {
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine($"[✗] BUILD FAILED after {result.Seconds} seconds");
+        }
+        Console.ResetColor();
     }
 
     private static void HandleConvertCommand(string[] args)
@@ -57,55 +79,20 @@ internal class Program
         Console.WriteLine($"[✓] Converted {Path.GetFileName(input)}");
     }
 
-    private static void HandleBuildCommand(string[] args)
-    {
-        string inputDir = args.Length > 1 ? args[1] : "Scenes";
-        string outputDll = args.Length > 2 ? args[2] : "game.dll";
-
-        Console.WriteLine("[Info] Starting build...");
-        var builder = new GameAssemblyBuilder();
-        builder.Build(inputDir, outputDll);
-
-        Console.WriteLine($"[✓] Build completed successfully → {outputDll}");
-    }
-
-    /// <summary>
-    /// Beautiful and informative error output
-    /// </summary>
     private static void PrintError(Exception ex)
     {
         Console.ForegroundColor = ConsoleColor.Red;
-        Console.WriteLine($"[✗] Build failed!");
-
-        Console.WriteLine($"    Message: {ex.Message}");
-
-        if (ex is ArgumentNullException argEx)
-        {
-            Console.WriteLine($"    Parameter: {argEx.ParamName}");
-        }
-
-        // Show inner exception if exists
+        Console.WriteLine($"[✗] Error: {ex.Message}");
         if (ex.InnerException != null)
-        {
             Console.WriteLine($"    Inner: {ex.InnerException.Message}");
-        }
-
-        Console.WriteLine();
-        Console.WriteLine("Stack Trace:");
-        Console.WriteLine(ex.StackTrace);
-
         Console.ResetColor();
     }
 
     private static void ShowHelp()
     {
-        Console.WriteLine("SNEngine Scripting Tool");
+        Console.WriteLine("SNEngine Scripting Tool (Async Edition)");
         Console.WriteLine("Usage:");
-        Console.WriteLine("  convert <file.sn> [output.cs]     - Convert single .sn file to .cs");
-        Console.WriteLine("  build [scenesFolder] [output.dll] - Build all .sn + .cs into game.dll");
-        Console.WriteLine();
-        Console.WriteLine("Examples:");
-        Console.WriteLine("  SNEngine.Scripting.Utils build");
-        Console.WriteLine("  SNEngine.Scripting.Utils build MyScenes game.dll");
+        Console.WriteLine("  build [scenesFolder] [output.dll]   - Build all .sn files into game.dll");
+        Console.WriteLine("  convert <file.sn> [output.cs]       - Convert single .sn to .cs");
     }
 }

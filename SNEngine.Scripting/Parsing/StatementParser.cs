@@ -69,9 +69,13 @@ public sealed class StatementParser
         if (firstWord.Equals("local", StringComparison.OrdinalIgnoreCase))
         {
             string fullLine = reader.ConsumeFullCommandLine();
-            // Используем твой LocalAssignmentParser
-            var localParser = new LocalAssignmentParser(_commandParser);
-            return localParser.Parse(reader);   // ← передаём текущий reader
+            string content = fullLine.Length > 5 ? fullLine.Substring(6).Trim() : "";
+
+            int eqIndex = content.IndexOf('=');
+            string varName = eqIndex > 0 ? content.Substring(0, eqIndex).Trim() : content.Trim();
+            string value = eqIndex > 0 ? content.Substring(eqIndex + 1).Trim() : "0";
+
+            return new LocalAssignmentCommandNode(varName, value);
         }
 
         // === Блочные конструкции ===

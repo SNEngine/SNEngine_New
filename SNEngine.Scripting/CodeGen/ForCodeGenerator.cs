@@ -2,6 +2,7 @@
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using SNEngine.Scripting.Ast;
+using SNEngine.Scripting.CodeGen;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -14,7 +15,7 @@ public sealed class ForCodeGenerator : ICommandCodeGenerator
 {
     private readonly IReadOnlyDictionary<Type, ICommandCodeGenerator>? _generators;
 
-    public ForCodeGenerator() { _generators = null; }
+    public ForCodeGenerator() { }
 
     public ForCodeGenerator(IReadOnlyDictionary<Type, ICommandCodeGenerator> generators)
     {
@@ -24,35 +25,44 @@ public sealed class ForCodeGenerator : ICommandCodeGenerator
     public StatementSyntax Generate(CommandNode node)
     {
         if (node is not ForCommandNode forNode)
-            return SyntaxFactory.ParseStatement("// ERROR: Invalid ForCommandNode");
+            return SyntaxFactory.ParseStatement("// Invalid ForCommandNode");
 
-        // Генерируем тело for
-        var bodyBlock = GenerateBlock(forNode.Body);
+        // === Scope management for loop variable ===
+        ScopeManager.Current.PushScope();
+        ScopeManager.Current.Declare(forNode.Variable, SymbolKind.LoopVariable);
 
-        var forStatement = SyntaxFactory.ForStatement(bodyBlock)
-            .WithDeclaration(
-                SyntaxFactory.VariableDeclaration(
-                        SyntaxFactory.PredefinedType(SyntaxFactory.Token(SyntaxKind.IntKeyword)))
-                    .WithVariables(
-                        SyntaxFactory.SingletonSeparatedList(
-                            SyntaxFactory.VariableDeclarator(
-                                    SyntaxFactory.Identifier(forNode.Variable))
-                                .WithInitializer(
-                                    SyntaxFactory.EqualsValueClause(
-                                        SyntaxFactory.ParseExpression(forNode.Init.Split('=')[1].Trim()))))))
-            .WithCondition(
-                SyntaxFactory.ParseExpression(forNode.Condition.Trim()))
-            .WithIncrementors(
-                SyntaxFactory.SingletonSeparatedList(
-                    SyntaxFactory.ParseExpression(forNode.Increment.Trim()) as ExpressionSyntax));
+        try
+        {
+            var bodyBlock = GenerateBlock(forNode.Body);
 
-        return forStatement.NormalizeWhitespace();
+            var forStatement = SyntaxFactory.ForStatement(bodyBlock)
+                .WithDeclaration(
+                    SyntaxFactory.VariableDeclaration(
+                            SyntaxFactory.PredefinedType(SyntaxFactory.Token(SyntaxKind.IntKeyword)))
+                        .WithVariables(
+                            SyntaxFactory.SingletonSeparatedList(
+                                SyntaxFactory.VariableDeclarator(
+                                        SyntaxFactory.Identifier(forNode.Variable))
+                                    .WithInitializer(
+                                        SyntaxFactory.EqualsValueClause(
+                                            SyntaxFactory.ParseExpression(forNode.Init.Split('=')[1].Trim()))))))
+                .WithCondition(SyntaxFactory.ParseExpression(forNode.Condition.Trim()))
+                .WithIncrementors(
+                    SyntaxFactory.SingletonSeparatedList(
+                        SyntaxFactory.ParseExpression(forNode.Increment.Trim()) as ExpressionSyntax));
+
+            return forStatement.NormalizeWhitespace();
+        }
+        finally
+        {
+            ScopeManager.Current.PopScope(); // Always clean up scope
+        }
     }
 
     private BlockSyntax GenerateBlock(IEnumerable<CommandNode> commands)
     {
         var statements = commands
-            .Select(cmd => GenerateSingleCommand(cmd))
+            .Select(GenerateSingleCommand)
             .ToArray();
 
         return SyntaxFactory.Block(statements);
@@ -61,15 +71,15 @@ public sealed class ForCodeGenerator : ICommandCodeGenerator
     private StatementSyntax GenerateSingleCommand(CommandNode cmd)
     {
         if (cmd == null)
-            return SyntaxFactory.ParseStatement("// Null command inside For");
+            return SyntaxFactory.ParseStatement("// Null command in For");
 
-        // 1. Попытка через переданный словарь
-        if (_generators != null && _generators.TryGetValue(cmd.GetType(), out var generator))
+        // 1. Preferred way - through injected generators dictionary
+        if (_generators?.TryGetValue(cmd.GetType(), out var generator) == true)
         {
             return SafeGenerate(generator, cmd);
         }
 
-        // 2. Fallback через рефлексию
+        // 2. Fallback via reflection
         var fallbackGenerator = FindGeneratorByReflection(cmd.GetType());
         if (fallbackGenerator != null)
         {

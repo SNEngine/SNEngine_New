@@ -6,30 +6,18 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
-using System.Text.RegularExpressions;
 
 namespace SNEngine.Scripting.CodeGen;
 
 /// <summary>
-/// Full-featured If / ElseIf / Else generator.
-/// Supports ANY nested commands using the global generator system + reflection fallback.
+/// Full-featured If / ElseIf / Else generator with new orchestrator support.
 /// </summary>
 [SnCodeGenerator(typeof(IfCommandNode))]
 public sealed class IfCodeGenerator : ICommandCodeGenerator
 {
     private readonly IReadOnlyDictionary<Type, ICommandCodeGenerator>? _generators;
 
-    /// <summary>
-    /// Default constructor for Activator.CreateInstance
-    /// </summary>
-    public IfCodeGenerator()
-    {
-        _generators = null;
-    }
-
-    /// <summary>
-    /// Constructor with generators dictionary (preferred)
-    /// </summary>
+    public IfCodeGenerator() { }
     public IfCodeGenerator(IReadOnlyDictionary<Type, ICommandCodeGenerator> generators)
     {
         _generators = generators;
@@ -69,38 +57,26 @@ public sealed class IfCodeGenerator : ICommandCodeGenerator
         return lastIf.NormalizeWhitespace();
     }
 
-    /// <summary>
-    /// Генерирует Block из списка команд с использованием всех зарегистрированных генераторов
-    /// </summary>
     private BlockSyntax GenerateBlock(IEnumerable<CommandNode> commands)
     {
         var statements = commands
-            .Select(cmd => GenerateSingleCommand(cmd))
+            .Select(GenerateSingleCommand)
             .ToArray();
 
         return SyntaxFactory.Block(statements);
     }
 
-    /// <summary>
-    /// Главная логика: пытается использовать переданный словарь, потом рефлексию
-    /// </summary>
     private StatementSyntax GenerateSingleCommand(CommandNode cmd)
     {
         if (cmd == null)
             return SyntaxFactory.ParseStatement("// Null command inside If");
 
-        // 1. Попытка через переданный словарь
-        if (_generators != null && _generators.TryGetValue(cmd.GetType(), out var generator))
-        {
+        if (_generators?.TryGetValue(cmd.GetType(), out var generator) == true)
             return SafeGenerate(generator, cmd);
-        }
 
-        // 2. Fallback через рефлексию
         var fallbackGenerator = FindGeneratorByReflection(cmd.GetType());
         if (fallbackGenerator != null)
-        {
             return SafeGenerate(fallbackGenerator, cmd);
-        }
 
         return SyntaxFactory.ParseStatement($"// TODO: Unsupported command inside If: {cmd.GetType().Name}");
     }
@@ -117,9 +93,6 @@ public sealed class IfCodeGenerator : ICommandCodeGenerator
         }
     }
 
-    /// <summary>
-    /// Поиск генератора через рефлексию (запасной вариант)
-    /// </summary>
     private static ICommandCodeGenerator? FindGeneratorByReflection(Type commandType)
     {
         try
@@ -149,44 +122,8 @@ public sealed class IfCodeGenerator : ICommandCodeGenerator
 
     private string ProcessCondition(string condition)
     {
-        condition = condition.Trim();
-
-        var regex = new Regex(@"""[^""]*""|(\b[a-zA-Z_][a-zA-Z0-9_]*\b)");
-
-        return regex.Replace(condition, match =>
-        {
-            if (match.Value.StartsWith("\""))
-                return match.Value;
-
-            string word = match.Value;
-
-            if (double.TryParse(word, out _) ||
-                word.Equals("true", StringComparison.OrdinalIgnoreCase) ||
-                word.Equals("false", StringComparison.OrdinalIgnoreCase))
-                return word;
-
-            if (IsBooleanVariable(word))
-                return $"GetVar(\"{word}\").AsBool()";
-
-            if (IsStringVariable(word))
-                return $"GetVar(\"{word}\").AsString()";
-
-            return $"GetVar(\"{word}\").AsInt()";
-        });
-    }
-
-    private static bool IsBooleanVariable(string name)
-    {
-        if (string.IsNullOrEmpty(name)) return false;
-        var lower = name.ToLowerInvariant();
-        return lower.StartsWith("is") || lower.StartsWith("has") || lower.StartsWith("can") ||
-               lower == "enabled" || lower == "visible" || lower == "alive";
-    }
-
-    private static bool IsStringVariable(string name)
-    {
-        if (string.IsNullOrEmpty(name)) return false;
-        var lower = name.ToLowerInvariant();
-        return lower.Contains("name") || lower.Contains("text") || lower == "character";
+        // Используем новый оркестратор
+        ExpressionSyntax expr = VariableExpressionOrchestrator.GetExpression(condition, ScopeManager.Current);
+        return expr.ToFullString();   // временно (в будущем перейдём на полноценный ExpressionSyntax)
     }
 }

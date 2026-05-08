@@ -25,6 +25,9 @@ public static class SnToCsConverter
         _initialized = true;
     }
 
+    /// <summary>
+    /// Основной метод конвертации с правильной работой ScopeManager
+    /// </summary>
     public static string ConvertToCSharp(string snSource, string fileNameForLogs = "Generated.cs")
     {
         Initialize();
@@ -33,37 +36,48 @@ public static class SnToCsConverter
         var generator = new ScriptCodeGenerator();
         generator.RegisterAll(typeof(SnToCsConverter).Assembly);
 
-        string csharpCode = generator.Generate(ast);
+        // === КРИТИЧНО: Инициализируем ScopeManager перед генерацией ===
+        ScopeManager.BeginGeneration();
 
-        // === ИСПРАВЛЕНИЕ: делаем валидацию мягкой для кросс-ссылок ===
-        Console.WriteLine($"Validating generated C# code ({fileNameForLogs})...");
-
-        var validationResult = CSharpValidator.Validate(csharpCode, fileNameForLogs);
-
-        // Если ошибка только про неизвестный тип из другого .sn — игнорируем
-        if (!validationResult.IsValid)
+        try
         {
-            bool isCrossReferenceError = validationResult.Errors.Any(e =>
-                e.Contains("scene2") || e.Contains("Не удалось найти тип") || e.Contains("type or namespace"));
+            string csharpCode = generator.Generate(ast);
 
-            if (isCrossReferenceError)
+            // === ИСПРАВЛЕНИЕ: делаем валидацию мягкой для кросс-ссылок ===
+            Console.WriteLine($"Validating generated C# code ({fileNameForLogs})...");
+
+            var validationResult = CSharpValidator.Validate(csharpCode, fileNameForLogs);
+
+            if (!validationResult.IsValid)
             {
-                Console.ForegroundColor = ConsoleColor.Yellow;
-                Console.WriteLine($"[⚠] Cross-reference warning in {fileNameForLogs} (will be resolved at full build)");
-                Console.ResetColor();
-                validationResult.IsValid = true; // считаем валидным для продолжения
+                bool isCrossReferenceError = validationResult.Errors.Any(e =>
+                    e.Contains("scene2") || e.Contains("Не удалось найти тип") ||
+                    e.Contains("type or namespace"));
+
+                if (isCrossReferenceError)
+                {
+                    Console.ForegroundColor = ConsoleColor.Yellow;
+                    Console.WriteLine($"[⚠] Cross-reference warning in {fileNameForLogs} (will be resolved at full build)");
+                    Console.ResetColor();
+                    validationResult.IsValid = true;
+                }
+                else
+                {
+                    validationResult.PrintToConsole();
+                }
             }
             else
             {
                 validationResult.PrintToConsole();
             }
-        }
-        else
-        {
-            validationResult.PrintToConsole();
-        }
 
-        return csharpCode;
+            return csharpCode;
+        }
+        finally
+        {
+            // ОБЯЗАТЕЛЬНО освобождаем ScopeManager
+            ScopeManager.EndGeneration();
+        }
     }
 
     /// <summary>
@@ -92,9 +106,7 @@ public static class SnToCsConverter
         {
             Console.ForegroundColor = ConsoleColor.Red;
             Console.WriteLine($"[ERROR] Validation failed for {fileName}. File was NOT saved.");
-            Console.WriteLine($"       Fix the errors shown above before using this script.");
             Console.ResetColor();
-
         }
 
         Console.ResetColor();

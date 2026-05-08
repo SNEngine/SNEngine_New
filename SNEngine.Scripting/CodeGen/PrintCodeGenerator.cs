@@ -1,7 +1,8 @@
 ﻿using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using SNEngine.Scripting.Ast;
-using System.Text.RegularExpressions;
+using SNEngine.Scripting.CodeGen;
+using System.Linq;                    // ← Добавлено
 
 namespace SNEngine.Scripting.CodeGen;
 
@@ -15,38 +16,21 @@ public sealed class PrintCodeGenerator : ICommandCodeGenerator
 
         string msg = print.Message.Trim();
 
-        if (msg.StartsWith("\"") && msg.EndsWith("\"") && msg.Count(f => f == '\"') == 2)
+        // Простая строка в кавычках
+        if (msg.StartsWith("\"") && msg.EndsWith("\"") && msg.Count(f => f == '"') == 2)
         {
             string inner = msg.Substring(1, msg.Length - 2);
             return SyntaxFactory.ParseStatement($"Debug.Log(\"{inner}\");");
         }
 
-        string processed = ProcessExpression(msg);
+        // Всё остальное — через новый оркестратор
+        ExpressionSyntax expr = VariableExpressionOrchestrator.GetExpression(msg, ScopeManager.Current);
 
-        return SyntaxFactory.ParseStatement($"Debug.Log({processed});");
-    }
-
-    private static string ProcessExpression(string expr)
-    {
-        var regex = new Regex(@"""[^""]*""|(\b[a-zA-Z_][a-zA-Z0-9_]*\b)");
-
-        return regex.Replace(expr, match =>
-        {
-            if (match.Value.StartsWith("\""))
-            {
-                return match.Value;
-            }
-
-            string word = match.Value;
-
-            if (double.TryParse(word, out _) ||
-                word.Equals("true", StringComparison.OrdinalIgnoreCase) ||
-                word.Equals("false", StringComparison.OrdinalIgnoreCase))
-            {
-                return word;
-            }
-
-            return $"GetVar(\"{word}\")";
-        });
+        return SyntaxFactory.ExpressionStatement(
+            SyntaxFactory.InvocationExpression(
+                SyntaxFactory.IdentifierName("Debug.Log"),
+                SyntaxFactory.ArgumentList(
+                    SyntaxFactory.SingletonSeparatedList(
+                        SyntaxFactory.Argument(expr)))));
     }
 }

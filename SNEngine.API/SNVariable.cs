@@ -17,6 +17,22 @@ public class SNVariable
 
     public void Set(object newValue) => Value = newValue;
 
+    /// <summary>
+    /// Returns C# type name for code generation (used by AssignmentCodeGenerator)
+    /// </summary>
+    public string GetTypeForCompile()
+    {
+        return Value switch
+        {
+            int or uint or byte or sbyte or short or ushort or long or ulong => "int",
+            float or double or decimal => "double",
+            bool => "bool",
+            string => "string",
+            char => "char",
+            _ => "var"   // fallback
+        };
+    }
+
     // === Типобезопасные конвертеры ===
     public int AsInt() => Convert.ToInt32(Value);
     public long AsLong() => Convert.ToInt64(Value);

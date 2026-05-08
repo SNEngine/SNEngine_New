@@ -17,13 +17,20 @@ namespace SNEngine.Scripting.Parsing
 
             var ifBlockParser = new IfBlockParser();
             var forBlockParser = new ForBlockParser();
-            var switchBlockParser = new SwitchBlockParser();           // ← НОВОЕ
+            var switchBlockParser = new SwitchBlockParser();
+            var whileBlockParser = new WhileBlockParser();
 
-            var statementParser = new StatementParser(commandParser, ifBlockParser, forBlockParser, switchBlockParser);
+            var statementParser = new StatementParser(
+                commandParser,
+                ifBlockParser,
+                forBlockParser,
+                switchBlockParser,
+                whileBlockParser);
 
             ifBlockParser.Initialize(statementParser);
             forBlockParser.Initialize(statementParser);
-            switchBlockParser.Initialize(statementParser);             // ← НОВОЕ
+            switchBlockParser.Initialize(statementParser);
+            whileBlockParser.Initialize(statementParser);
 
             _statementParser = statementParser;
             _functionParser = new FunctionParser();

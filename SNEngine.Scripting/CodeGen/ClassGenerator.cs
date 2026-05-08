@@ -9,10 +9,6 @@ using System.Linq;
 
 namespace SNEngine.Scripting.CodeGen;
 
-/// <summary>
-/// Orchestrates the full class generation.
-/// Automatically creates private fields with correct types using SNVariable.GetTypeForCompile().
-/// </summary>
 public class ClassGenerator : BaseCodeGenerator
 {
     private readonly ExecuteMethodGenerator _executeGen;
@@ -29,22 +25,25 @@ public class ClassGenerator : BaseCodeGenerator
     {
         var sceneName = script.SceneName ?? "UnnamedScene";
 
-        // Собираем уникальные переменные из всех Assignment
-        var variableAssignments = script.Commands
+        Console.WriteLine($"[ClassGenerator] Generating class: {sceneName}");
+
+        // Группируем присваивания
+        var variableGroups = script.Commands
             .OfType<AssignmentCommandNode>()
             .GroupBy(a => a.VariableName.Trim())
-            .Select(g => g.First()) // первое присваивание определяет тип
-            .ToList();
+            .ToDictionary(g => g.Key, g => g.ToList());
+
+        Console.WriteLine($"[ClassGenerator] Found {variableGroups.Count} unique variables");
 
         var members = new List<MemberDeclarationSyntax>();
 
-        // 1. Генерируем private поля с правильным типом
-        foreach (var assign in variableAssignments)
+        // Создаём поля
+        foreach (var group in variableGroups)
         {
-            members.Add(CreateTypedField(assign));
+            var field = CreateTypedField(group.Key, group.Value);
+            members.Add(field);
         }
 
-        // 2. Конструктор + Execute + Functions
         members.Add(ConstructorGenerator.Create(sceneName));
         members.Add(_executeGen.Generate(script.Commands));
 
@@ -63,7 +62,7 @@ public class ClassGenerator : BaseCodeGenerator
                 SyntaxFactory.ParseName("SNEngine.Game.Scripts"))
             .AddMembers(classDeclaration);
 
-        return SyntaxFactory.CompilationUnit()
+        var unit = SyntaxFactory.CompilationUnit()
             .WithUsings(SyntaxFactory.List(new[]
             {
                 SyntaxFactory.UsingDirective(SyntaxFactory.ParseName("SNEngine.API")),
@@ -71,38 +70,49 @@ public class ClassGenerator : BaseCodeGenerator
             }))
             .AddMembers(namespaceDeclaration)
             .NormalizeWhitespace();
+
+        Console.WriteLine($"[ClassGenerator] Finished generating {sceneName} ({members.Count} members)\n");
+        return unit;
     }
 
-    /// <summary>
-    /// Создаёт private поле, используя SNVariable для вывода типа
-    /// </summary>
-    private static FieldDeclarationSyntax CreateTypedField(AssignmentCommandNode assign)
+    private static FieldDeclarationSyntax CreateTypedField(string varName, List<AssignmentCommandNode> assignments)
     {
-        string varName = assign.VariableName.Trim();
+        string bestType = "var";
 
-        // Создаём временный SNVariable для определения типа
-        object? sampleValue = TryParseValue(assign.ValueExpression);
-        var tempVar = new SNVariable(sampleValue ?? 0);
-        string typeName = tempVar.GetTypeForCompile();
+        Console.WriteLine($"[Type Detection] Variable '{varName}' has {assignments.Count} assignments");
+
+        foreach (var assign in assignments)
+        {
+            string expr = assign.ValueExpression.Trim();
+            string detected = VariableExpressionOrchestrator.GetTypeForValue(expr);
+
+            Console.WriteLine($"    → \"{expr}\" → {detected}");
+
+            if (IsBetterType(detected, bestType))
+                bestType = detected;
+        }
+
+        Console.WriteLine($"[Type] Final: private {bestType} {varName};\n");
 
         return SyntaxFactory.FieldDeclaration(
             SyntaxFactory.VariableDeclaration(
-                SyntaxFactory.ParseTypeName(typeName),
+                SyntaxFactory.ParseTypeName(bestType),
                 SyntaxFactory.SingletonSeparatedList(
                     SyntaxFactory.VariableDeclarator(varName))))
             .WithModifiers(SyntaxFactory.TokenList(SyntaxFactory.Token(SyntaxKind.PrivateKeyword)));
     }
 
-    private static object? TryParseValue(string expr)
+    private static bool IsBetterType(string newType, string currentType)
     {
-        expr = expr?.Trim() ?? "";
+        var priority = new Dictionary<string, int>
+        {
+            ["double"] = 5,
+            ["int"] = 4,
+            ["bool"] = 3,
+            ["string"] = 2,
+            ["var"] = 1
+        };
 
-        if (int.TryParse(expr, out int i)) return i;
-        if (double.TryParse(expr, out double d)) return d;
-        if (bool.TryParse(expr, out bool b)) return b;
-        if (expr.StartsWith("\"") && expr.EndsWith("\""))
-            return expr.Trim('"');
-
-        return expr; // fallback
+        return priority.GetValueOrDefault(newType, 0) > priority.GetValueOrDefault(currentType, 0);
     }
 }

@@ -9,7 +9,8 @@ namespace SNEngine.Scripting.CodeGen;
 
 /// <summary>
 /// Central orchestrator for all variable and expression processing.
-/// Single source of truth.
+/// Uses SNVariable.GetTypeForCompile() for accurate type inference.
+/// No more GetGlobal.
 /// </summary>
 public static class VariableExpressionOrchestrator
 {
@@ -34,25 +35,27 @@ public static class VariableExpressionOrchestrator
         if (IsSimpleIdentifier(rawExpr))
         {
             string name = rawExpr.Trim();
+
             if (scope.IsLocal(name))
                 return SyntaxFactory.IdentifierName(name);
 
-            return CreateGetGlobal(name); // временно
+            // Это поле класса — просто имя
+            return SyntaxFactory.IdentifierName(name);
         }
 
-        // Сложное выражение (например: "Iteration: " + i  или playerHealth < 50)
-        return SyntaxFactory.ParseExpression(rawExpr); // пока fallback
+        // Сложные выражения (конкатенация, условия и т.д.)
+        return SyntaxFactory.ParseExpression(rawExpr);
     }
 
     /// <summary>
-    /// Для Assignment (playerHealth = 35)
+    /// Для Assignment — используем SNVariable для определения типа (передаём в ClassGenerator)
     /// </summary>
     public static StatementSyntax CreateAssignment(AssignmentCommandNode node, ScopeManager scope)
     {
         string varName = node.VariableName.Trim();
         ExpressionSyntax right = GetExpression(node.ValueExpression, scope);
 
-        // Просто присваивание (поле уже создано в ClassGenerator)
+        // Просто присваивание — поле уже создано в ClassGenerator
         return SyntaxFactory.ExpressionStatement(
             SyntaxFactory.AssignmentExpression(
                 SyntaxKind.SimpleAssignmentExpression,
@@ -69,44 +72,67 @@ public static class VariableExpressionOrchestrator
             syntax = SyntaxFactory.LiteralExpression(SyntaxKind.NumericLiteralExpression, SyntaxFactory.Literal(i));
             return true;
         }
+
         if (double.TryParse(expr, out double d))
         {
             syntax = SyntaxFactory.LiteralExpression(SyntaxKind.NumericLiteralExpression, SyntaxFactory.Literal(d));
             return true;
         }
+
         if (bool.TryParse(expr, out bool b))
         {
-            syntax = b ? SyntaxFactory.LiteralExpression(SyntaxKind.TrueLiteralExpression)
-                       : SyntaxFactory.LiteralExpression(SyntaxKind.FalseLiteralExpression);
+            syntax = b
+                ? SyntaxFactory.LiteralExpression(SyntaxKind.TrueLiteralExpression)
+                : SyntaxFactory.LiteralExpression(SyntaxKind.FalseLiteralExpression);
             return true;
         }
+
         if (expr.StartsWith("\"") && expr.EndsWith("\""))
         {
             syntax = SyntaxFactory.LiteralExpression(SyntaxKind.StringLiteralExpression,
                 SyntaxFactory.Literal(expr.Trim('"')));
             return true;
         }
+
         return false;
     }
 
     private static bool IsSimpleIdentifier(string expr) =>
-        !expr.Contains(" ") && !expr.Contains("+") && !expr.Contains("<") && !expr.Contains(">") && !expr.Contains("=");
+        !expr.Contains(" ") &&
+        !expr.Contains("+") &&
+        !expr.Contains("<") &&
+        !expr.Contains(">") &&
+        !expr.Contains("=");
 
-    private static string InferType(string value)
+    /// <summary>
+    /// Вспомогательный метод — создаёт SNVariable и возвращает тип (можно использовать в ClassGenerator)
+    /// </summary>
+    public static string GetTypeForValue(string valueExpression)
     {
-        if (int.TryParse(value, out _)) return "int";
-        if (double.TryParse(value, out _)) return "double";
-        if (bool.TryParse(value, out _)) return "bool";
-        if (value.StartsWith("\"")) return "string";
-        return "var";
+        if (string.IsNullOrWhiteSpace(valueExpression))
+            return "var";
+
+        string expr = valueExpression.Trim();
+
+        // Сначала пробуем double (важно для 3.16)
+        if (double.TryParse(expr, System.Globalization.NumberStyles.Any,
+            System.Globalization.CultureInfo.InvariantCulture, out _))
+            return "double";
+
+        object? sample = TryParseValue(expr);
+        var tempVar = new SNVariable(sample ?? 0);
+        return tempVar.GetTypeForCompile();
     }
 
-    private static InvocationExpressionSyntax CreateGetGlobal(string name)
+    private static object? TryParseValue(string expr)
     {
-        return SyntaxFactory.InvocationExpression(
-            SyntaxFactory.IdentifierName("GetGlobal"),
-            SyntaxFactory.ArgumentList(SyntaxFactory.SingletonSeparatedList(
-                SyntaxFactory.Argument(SyntaxFactory.LiteralExpression(
-                    SyntaxKind.StringLiteralExpression, SyntaxFactory.Literal(name))))));
+        expr = expr?.Trim() ?? "";
+
+        if (int.TryParse(expr, out int i)) return i;
+        if (double.TryParse(expr, out double d)) return d;
+        if (bool.TryParse(expr, out bool b)) return b;
+        if (expr.StartsWith("\"") && expr.EndsWith("\"")) return expr.Trim('"');
+
+        return expr; // fallback
     }
 }

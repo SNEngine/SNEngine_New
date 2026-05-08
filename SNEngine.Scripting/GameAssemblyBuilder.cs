@@ -8,9 +8,10 @@ using System.Linq;
 
 namespace SNEngine.Scripting.CodeGen;
 
-public class GameAssemblyBuilder
+public class GameAssemblyBuilder : IDisposable
 {
     private readonly ScriptCodeGenerator _generator = new();
+    private BuildLogger? _logger;
 
     public GameAssemblyBuilder()
     {
@@ -19,9 +20,16 @@ public class GameAssemblyBuilder
 
     public bool Build(string inputDirectory, string outputDllPath = "game.dll")
     {
+        string outputDir = Path.GetDirectoryName(outputDllPath) ?? inputDirectory;
+        _logger = new BuildLogger(outputDir);
+
+        _logger.Log($"=== BUILD STARTED ===");
+        _logger.Log($"Input directory: {inputDirectory}");
+        _logger.Log($"Output DLL: {outputDllPath}");
+
         if (!Directory.Exists(inputDirectory))
         {
-            Console.WriteLine($"❌ Directory not found: {inputDirectory}");
+            _logger.LogError($"Directory not found: {inputDirectory}");
             return false;
         }
 
@@ -33,73 +41,51 @@ public class GameAssemblyBuilder
         var snFiles = Directory.GetFiles(inputDirectory, "*.sn", SearchOption.AllDirectories)
                                .OrderBy(f => f).ToArray();
 
-        Console.WriteLine($"Found {snFiles.Length} .sn files");
+        _logger.Log($"Found {snFiles.Length} .sn files");
 
         foreach (var snPath in snFiles)
         {
+            string fileName = Path.GetFileName(snPath);
+            _logger.Log($"Processing {fileName}");
+
             try
             {
                 string source = File.ReadAllText(snPath);
-                string fileName = Path.GetFileName(snPath);
-
-                string csCode;
-                try
-                {
-                    // === ДЕТАЛЬНЫЙ ВЫВОД ОШИБОК ПАРСИНГА ===
-                    csCode = SnToCsConverter.ConvertToCSharp(source, fileName);
-                }
-                catch (Exception ex)
-                {
-                    Console.ForegroundColor = ConsoleColor.Red;
-                    Console.WriteLine($"[✗] Failed to parse {fileName}");
-                    Console.WriteLine($"    Error: {ex.Message}");
-
-                    if (ex is ArgumentNullException argEx)
-                    {
-                        Console.WriteLine($"    Parameter: {argEx.ParamName}");
-                    }
-
-                    if (ex.InnerException != null)
-                    {
-                        Console.WriteLine($"    Inner: {ex.InnerException.Message}");
-                    }
-
-                    Console.WriteLine($"    Stack Trace: {ex.StackTrace?.Split('\n').FirstOrDefault() ?? "N/A"}");
-                    Console.ResetColor();
-                    continue;
-                }
+                string csCode = SnToCsConverter.ConvertToCSharp(source, fileName);
 
                 string tempCsPath = Path.Combine(genDirectory, Path.GetFileNameWithoutExtension(snPath) + ".generated.cs");
-                Directory.CreateDirectory(genDirectory);
                 File.WriteAllText(tempCsPath, csCode);
                 allCsFiles.Add(tempCsPath);
 
-                Console.WriteLine($"[✓] Compiled {fileName}");
+                _logger.LogSuccess($"Compiled {fileName}");
             }
             catch (Exception ex)
             {
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine($"[✗] Unexpected error with {Path.GetFileName(snPath)}: {ex.Message}");
-                Console.ResetColor();
+                _logger.LogError($"Failed to parse {fileName}: {ex.Message}");
+                if (ex.InnerException != null)
+                    _logger.LogError($"Inner: {ex.InnerException.Message}");
             }
         }
 
-        // 2. Добавляем ручные .cs файлы
+        // Добавляем ручные .cs файлы
         var manualCsFiles = Directory.GetFiles(inputDirectory, "*.cs", SearchOption.AllDirectories)
             .Where(f => !f.Contains("script_gen") && !f.EndsWith(".generated.cs"))
             .ToList();
 
         allCsFiles.AddRange(manualCsFiles);
 
-        Console.WriteLine($"Total files for compilation: {allCsFiles.Count}");
+        _logger.Log($"Total files for compilation: {allCsFiles.Count}");
 
         if (allCsFiles.Count == 0)
         {
-            Console.WriteLine("❌ No files to compile.");
+            _logger.LogError("No files to compile.");
             return false;
         }
 
-        return CompileToDll(allCsFiles, outputDllPath);
+        bool success = CompileToDll(allCsFiles, outputDllPath);
+
+        _logger.Log(success ? "BUILD SUCCEEDED" : "BUILD FAILED");
+        return success;
     }
 
     private static void EnsureDirectoryClean(string path)
@@ -114,10 +100,6 @@ public class GameAssemblyBuilder
             catch (Exception ex)
             {
                 Console.WriteLine($"[Warning] Could not delete script_gen: {ex.Message}");
-                foreach (var file in Directory.GetFiles(path, "*", SearchOption.AllDirectories))
-                {
-                    try { File.Delete(file); } catch { }
-                }
             }
         }
 
@@ -127,7 +109,6 @@ public class GameAssemblyBuilder
 
     private bool CompileToDll(List<string> csFiles, string outputDllPath)
     {
-        // ... (весь метод CompileToDll остаётся как у тебя был) ...
         var syntaxTrees = csFiles.Select(path =>
             CSharpSyntaxTree.ParseText(File.ReadAllText(path), path: path)).ToList();
 
@@ -139,45 +120,40 @@ public class GameAssemblyBuilder
                 .WithOptimizationLevel(OptimizationLevel.Release)
                 .WithPlatform(Platform.AnyCpu));
 
-        using (var dllStream = File.Create(outputDllPath))
+        using var dllStream = File.Create(outputDllPath);
+        var result = compilation.Emit(dllStream);
+
+        if (result.Success)
         {
-            var result = compilation.Emit(dllStream);
+            _logger?.LogSuccess($"SUCCESS! Built {outputDllPath} ({syntaxTrees.Count} files)");
+            return true;
+        }
+        else
+        {
+            _logger?.LogError($"Build failed with {result.Diagnostics.Count(d => d.Severity == DiagnosticSeverity.Error)} errors");
 
-            if (result.Success)
+            foreach (var d in result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error))
             {
-                Console.ForegroundColor = ConsoleColor.Green;
-                Console.WriteLine($"✅ SUCCESS! Built {outputDllPath} ({syntaxTrees.Count} files)");
-                Console.ResetColor();
-                return true;
+                var line = d.Location.GetLineSpan();
+                _logger?.LogError($"   [{line.Path}:{line.StartLinePosition.Line + 1}] {d.GetMessage()}");
             }
-            else
-            {
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine($"❌ Build failed with {result.Diagnostics.Count(d => d.Severity == DiagnosticSeverity.Error)} errors:");
-                foreach (var d in result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error))
-                {
-                    var line = d.Location.GetLineSpan();
-                    Console.WriteLine($"   [{line.Path}:{line.StartLinePosition.Line + 1}] {d.GetMessage()}");
-                }
-                Console.ResetColor();
 
-                dllStream.Close();
-                if (File.Exists(outputDllPath)) File.Delete(outputDllPath);
-                return false;
-            }
+            if (File.Exists(outputDllPath)) File.Delete(outputDllPath);
+            return false;
         }
     }
 
     private List<MetadataReference> GetFullReferences()
     {
-        // ... (твой оригинальный код GetFullReferences) ...
         var refs = new List<MetadataReference>();
-        var trustedAssembliesPaths = ((string)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")).Split(Path.PathSeparator);
+        var trustedAssembliesPaths = ((string)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES") ?? "")
+            .Split(Path.PathSeparator);
 
         var neededAssemblies = new[]
         {
             "System.Runtime", "System.Collections", "System.Console", "System.Linq",
-            "System.Private.CoreLib", "System.Runtime.InteropServices", "System.Reflection", "mscorlib", "netstandard"
+            "System.Private.CoreLib", "System.Runtime.InteropServices", "System.Reflection",
+            "mscorlib", "netstandard"
         };
 
         foreach (var path in trustedAssembliesPaths)
@@ -193,5 +169,10 @@ public class GameAssemblyBuilder
         refs.Add(MetadataReference.CreateFromFile(typeof(SNEngine.Core.Debug).Assembly.Location));
 
         return refs;
+    }
+
+    public void Dispose()
+    {
+        _logger?.Dispose();
     }
 }

@@ -10,7 +10,7 @@ using System.Reflection;
 namespace SNEngine.Scripting.CodeGen;
 
 /// <summary>
-/// Full-featured If / ElseIf / Else generator with new orchestrator support.
+/// Full-featured If / ElseIf / Else generator with detailed logging
 /// </summary>
 [SnCodeGenerator(typeof(IfCommandNode))]
 public sealed class IfCodeGenerator : ICommandCodeGenerator
@@ -28,7 +28,9 @@ public sealed class IfCodeGenerator : ICommandCodeGenerator
         if (node is not IfCommandNode ifNode)
             return SyntaxFactory.ParseStatement("// ERROR: Invalid IfCommandNode");
 
-        // Then branch
+        Console.WriteLine($"[IfCodeGenerator] === START IF ===");
+        Console.WriteLine($"[IfCodeGenerator] Condition: {ifNode.Condition}");
+
         var thenBlock = GenerateBlock(ifNode.ThenBody);
         var currentIf = SyntaxFactory.IfStatement(
             SyntaxFactory.ParseExpression(ProcessCondition(ifNode.Condition)),
@@ -39,6 +41,7 @@ public sealed class IfCodeGenerator : ICommandCodeGenerator
         // ElseIf branches
         foreach (var elseIf in ifNode.ElseIfClauses)
         {
+            Console.WriteLine($"[IfCodeGenerator]   ElseIf: {elseIf.Condition}");
             var elseIfBlock = GenerateBlock(elseIf.Body);
             var elseIfStmt = SyntaxFactory.IfStatement(
                 SyntaxFactory.ParseExpression(ProcessCondition(elseIf.Condition)),
@@ -50,11 +53,14 @@ public sealed class IfCodeGenerator : ICommandCodeGenerator
         // Else branch
         if (ifNode.ElseBody.Count > 0)
         {
+            Console.WriteLine($"[IfCodeGenerator]   Else branch present");
             var elseBlock = GenerateBlock(ifNode.ElseBody);
             lastIf = lastIf.WithElse(SyntaxFactory.ElseClause(elseBlock));
         }
 
-        return lastIf.NormalizeWhitespace();
+        var result = lastIf.NormalizeWhitespace();
+        Console.WriteLine($"[IfCodeGenerator] === END IF ===\n");
+        return result;
     }
 
     private BlockSyntax GenerateBlock(IEnumerable<CommandNode> commands)
@@ -116,14 +122,12 @@ public sealed class IfCodeGenerator : ICommandCodeGenerator
         }
     }
 
-    // ===================================================================
-    // ==================== CONDITION PROCESSING =========================
-    // ===================================================================
-
     private string ProcessCondition(string condition)
     {
-        // Используем новый оркестратор
+        Console.WriteLine($"[IfCodeGenerator] Processing condition: {condition}");
         ExpressionSyntax expr = VariableExpressionOrchestrator.GetExpression(condition, ScopeManager.Current);
-        return expr.ToFullString();   // временно (в будущем перейдём на полноценный ExpressionSyntax)
+        string result = expr.ToFullString();
+        Console.WriteLine($"[IfCodeGenerator] Condition result: {result}");
+        return result;
     }
 }

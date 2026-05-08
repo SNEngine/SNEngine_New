@@ -27,7 +27,9 @@ public sealed class ForCodeGenerator : ICommandCodeGenerator
         if (node is not ForCommandNode forNode)
             return SyntaxFactory.ParseStatement("// Invalid ForCommandNode");
 
-        // === Scope management for loop variable ===
+        Console.WriteLine($"[ForCodeGenerator] === START FOR ===");
+        Console.WriteLine($"[ForCodeGenerator] Variable: {forNode.Variable}, Init: {forNode.Init}, Condition: {forNode.Condition}");
+
         ScopeManager.Current.PushScope();
         ScopeManager.Current.Declare(forNode.Variable, SymbolKind.LoopVariable);
 
@@ -51,11 +53,13 @@ public sealed class ForCodeGenerator : ICommandCodeGenerator
                     SyntaxFactory.SingletonSeparatedList(
                         SyntaxFactory.ParseExpression(forNode.Increment.Trim()) as ExpressionSyntax));
 
-            return forStatement.NormalizeWhitespace();
+            var result = forStatement.NormalizeWhitespace();
+            Console.WriteLine($"[ForCodeGenerator] === END FOR ===\n");
+            return result;
         }
         finally
         {
-            ScopeManager.Current.PopScope(); // Always clean up scope
+            ScopeManager.Current.PopScope();
         }
     }
 
@@ -73,13 +77,11 @@ public sealed class ForCodeGenerator : ICommandCodeGenerator
         if (cmd == null)
             return SyntaxFactory.ParseStatement("// Null command in For");
 
-        // 1. Preferred way - through injected generators dictionary
         if (_generators?.TryGetValue(cmd.GetType(), out var generator) == true)
         {
             return SafeGenerate(generator, cmd);
         }
 
-        // 2. Fallback via reflection
         var fallbackGenerator = FindGeneratorByReflection(cmd.GetType());
         if (fallbackGenerator != null)
         {

@@ -8,7 +8,6 @@
   <Project Path="SNEngine.Scripting.Utils/SNEngine.Scripting.Utils.csproj" Id="eda3dabb-3ad9-4ee2-be68-1f4cb06ecd76" />
   <Project Path="SNEngine.Scripting.Validation/SNEngine.Scripting.Validation.csproj" Id="062c9bf4-7548-46b2-a4d8-3dc181fd677b" />
   <Project Path="SNEngine.Scripting/SNEngine.Scripting.csproj" Id="fcd74f94-0a6d-42ae-ad7f-d68b576db652" />
-  <Project Path="SNEngine.Studio/SNEngine.Studio.csproj" Id="9cabe631-ae17-4be5-9376-b1416f97699a" />
   <Project Path="SNEngine.Test/SNEngine.Test.csproj" Id="61f95ca2-ab33-4042-b209-cda3eba4c965" />
   <Project Path="SNEngine.UI/SNEngine.UI.csproj" Id="257b08ea-825a-4642-8a31-bdb11c916064" />
 </Solution>

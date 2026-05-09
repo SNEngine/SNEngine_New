@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UserSecretsId>snengine-backend-dev</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Основные пакеты -->
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="7.2.0" />
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.NewtonsoftJson" Version="9.0.0" />
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="9.0.15" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Ссылки на движок -->
+    <ProjectReference Include="..\SNEngine.Builder\SNEngine.Builder.csproj" />
+    <ProjectReference Include="..\SNEngine.Build\SNEngine.Build.csproj" />
+    <ProjectReference Include="..\SNEngine.Core\SNEngine.Core.csproj" />
+    <ProjectReference Include="..\SNEngine.Data\SNEngine.Data.csproj" />
+    <ProjectReference Include="..\SNEngine.Scripting\SNEngine.Scripting.csproj" />
+    <!-- SNEngine.Runtime оставляем, но он должен быть исправлен первым -->
+  </ItemGroup>
+
+</Project>

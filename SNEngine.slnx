@@ -1,6 +1,7 @@
 <Solution>
   <Project Path="E:/repos/SNEngine/SNEngine.Core/SNEngine.Core.csproj" />
   <Project Path="SNEngine.API/SNEngine.API.csproj" Id="ca1ba8ab-9b98-4e2a-8189-6a11d52e2b14" />
+  <Project Path="SNEngine.Backend/SNEngine.Backend.csproj" />
   <Project Path="SNEngine.Build/SNEngine.Build.csproj" Id="606fd1e3-6fd8-4a34-8052-bc07129909f5" />
   <Project Path="SNEngine.Builder/SNEngine.Builder.csproj" Id="ebdd6991-2983-485b-be8d-f10a78760c3d" />
   <Project Path="SNEngine.Data/SNEngine.Data.csproj" Id="1b463888-f3e1-470c-9780-f619102bb91f" />

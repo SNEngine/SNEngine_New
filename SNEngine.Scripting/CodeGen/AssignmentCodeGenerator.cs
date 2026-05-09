@@ -1,7 +1,9 @@
 ﻿using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using SNEngine.Scripting.Ast;
-using SNEngine.Scripting.CodeGen;
+using System;
+using System.Collections.Generic;
+using System.Text.RegularExpressions;
 
 namespace SNEngine.Scripting.CodeGen;
 
@@ -13,7 +15,20 @@ public sealed class AssignmentCodeGenerator : ICommandCodeGenerator
         if (node is not AssignmentCommandNode assign)
             return SyntaxFactory.ParseStatement("// Invalid AssignmentCommandNode");
 
-        // Используем новый оркестратор + Scope
-        return VariableExpressionOrchestrator.CreateAssignment(assign, ScopeManager.Current);
+        string varName = assign.VariableName.Trim();
+        string expr = assign.ValueExpression.Trim();
+
+        var (stmts, finalExpr) = ExpressionHelper.WrapWithTempIfNeeded(expr);
+
+        if (stmts.Count > 0)
+        {
+            stmts.Add(SyntaxFactory.ParseStatement($"{varName} = {finalExpr};"));
+            return SyntaxFactory.Block(stmts);
+        }
+
+        ExpressionSyntax right = VariableExpressionOrchestrator.GetExpression(expr, ScopeManager.Current);
+        return SyntaxFactory.ExpressionStatement(
+            SyntaxFactory.AssignmentExpression(SyntaxKind.SimpleAssignmentExpression,
+                SyntaxFactory.IdentifierName(varName), right));
     }
 }

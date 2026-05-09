@@ -4,9 +4,6 @@ using SNEngine.Scripting.Ast;
 
 namespace SNEngine.Scripting.CodeGen;
 
-/// <summary>
-/// Генерирует вызов функции с аргументами
-/// </summary>
 [SnCodeGenerator(typeof(CallCommandNode))]
 public sealed class CallCodeGenerator : ICommandCodeGenerator
 {
@@ -16,6 +13,6 @@ public sealed class CallCodeGenerator : ICommandCodeGenerator
             return SyntaxFactory.ParseStatement("// Invalid CallCommandNode");
 
         string args = string.Join(", ", call.Arguments);
-        return SyntaxFactory.ParseStatement($"{call.FunctionName}({args});");
+        return SyntaxFactory.ParseStatement($"await {call.FunctionName}({args});");
     }
 }

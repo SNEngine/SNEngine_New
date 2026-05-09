@@ -35,11 +35,22 @@ public class FunctionMethodGenerator : BaseCodeGenerator
 
             var statements = func.Body.Select(GenerateCommand).ToList();
 
-            return SyntaxFactory.MethodDeclaration(
-                SyntaxFactory.ParseTypeName(func.ReturnType), func.Name)
-                .WithModifiers(SyntaxFactory.TokenList(SyntaxFactory.Token(SyntaxKind.PrivateKeyword)))
+            // Определяем возвращаемый тип
+            bool isVoid = string.IsNullOrEmpty(func.ReturnType) ||
+                         func.ReturnType.Equals("void", StringComparison.OrdinalIgnoreCase);
+
+            var returnType = isVoid
+                ? SyntaxFactory.ParseTypeName("Task")
+                : SyntaxFactory.ParseTypeName($"Task<{func.ReturnType}>");
+
+            var method = SyntaxFactory.MethodDeclaration(returnType, func.Name)
+                .WithModifiers(SyntaxFactory.TokenList(
+                    SyntaxFactory.Token(SyntaxKind.PrivateKeyword),
+                    SyntaxFactory.Token(SyntaxKind.AsyncKeyword)))
                 .WithParameterList(SyntaxFactory.ParameterList(SyntaxFactory.SeparatedList(parameters)))
                 .WithBody(SyntaxFactory.Block(statements));
+
+            return method;
         }
         finally
         {

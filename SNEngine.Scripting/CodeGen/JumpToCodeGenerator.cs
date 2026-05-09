@@ -5,10 +5,6 @@ using SNEngine.Scripting.Ast;
 
 namespace SNEngine.Scripting.CodeGen;
 
-/// <summary>
-/// Clean and maintainable Jump To generator.
-/// Uses Block with separate statements to prevent formatting corruption.
-/// </summary>
 [SnCodeGenerator(typeof(JumpToCommandNode))]
 public sealed class JumpToCodeGenerator : ICommandCodeGenerator
 {
@@ -22,19 +18,14 @@ public sealed class JumpToCodeGenerator : ICommandCodeGenerator
         var target = jump.TargetScene.Trim();
         string varName = UniqueVariableNameGenerator.Generate();
 
-        // Create separate statements — this is the most reliable way
         var statements = new[]
         {
             SyntaxFactory.ParseStatement($"// Jump To {target}"),
-
             SyntaxFactory.ParseStatement($"var {varName} = new {target}();"),
-
-            SyntaxFactory.ParseStatement($"{varName}.OnLoad();"),
-
-            SyntaxFactory.ParseStatement($"{varName}.Execute();")
+            SyntaxFactory.ParseStatement($"await {varName}.OnLoadAsync();"),
+            SyntaxFactory.ParseStatement($"await {varName}.ExecuteAsync();")
         };
 
-        // Wrap in block and normalize whitespace
         return SyntaxFactory.Block(statements)
                             .NormalizeWhitespace()
                             .WithTrailingTrivia(SyntaxFactory.ElasticCarriageReturnLineFeed);

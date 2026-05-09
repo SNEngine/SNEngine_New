@@ -25,19 +25,13 @@ public class ClassGenerator : BaseCodeGenerator
     {
         var sceneName = script.SceneName ?? "UnnamedScene";
 
-        Console.WriteLine($"[ClassGenerator] Generating class: {sceneName}");
-
-        // Группируем присваивания
         var variableGroups = script.Commands
             .OfType<AssignmentCommandNode>()
             .GroupBy(a => a.VariableName.Trim())
             .ToDictionary(g => g.Key, g => g.ToList());
 
-        Console.WriteLine($"[ClassGenerator] Found {variableGroups.Count} unique variables");
-
         var members = new List<MemberDeclarationSyntax>();
 
-        // Создаём поля
         foreach (var group in variableGroups)
         {
             var field = CreateTypedField(group.Key, group.Value);
@@ -66,12 +60,12 @@ public class ClassGenerator : BaseCodeGenerator
             .WithUsings(SyntaxFactory.List(new[]
             {
                 SyntaxFactory.UsingDirective(SyntaxFactory.ParseName("SNEngine.API")),
-                SyntaxFactory.UsingDirective(SyntaxFactory.ParseName("SNEngine.Core"))
+                SyntaxFactory.UsingDirective(SyntaxFactory.ParseName("SNEngine.Core")),
+                SyntaxFactory.UsingDirective(SyntaxFactory.ParseName("System.Threading.Tasks"))
             }))
             .AddMembers(namespaceDeclaration)
             .NormalizeWhitespace();
 
-        Console.WriteLine($"[ClassGenerator] Finished generating {sceneName} ({members.Count} members)\n");
         return unit;
     }
 
@@ -79,20 +73,14 @@ public class ClassGenerator : BaseCodeGenerator
     {
         string bestType = "var";
 
-        Console.WriteLine($"[Type Detection] Variable '{varName}' has {assignments.Count} assignments");
-
         foreach (var assign in assignments)
         {
             string expr = assign.ValueExpression.Trim();
             string detected = VariableExpressionOrchestrator.GetTypeForValue(expr);
 
-            Console.WriteLine($"    → \"{expr}\" → {detected}");
-
             if (IsBetterType(detected, bestType))
                 bestType = detected;
         }
-
-        Console.WriteLine($"[Type] Final: private {bestType} {varName};\n");
 
         return SyntaxFactory.FieldDeclaration(
             SyntaxFactory.VariableDeclaration(

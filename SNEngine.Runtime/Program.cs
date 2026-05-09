@@ -87,8 +87,8 @@ class Program
 
             Console.WriteLine($"[Runtime] Starting Main script: {mainType.FullName}");
 
-            mainScript.OnLoad();
-            mainScript.Execute();
+            mainScript.OnLoadAsync();
+            mainScript.ExecuteAsync();
         }
         catch (Exception ex)
         {

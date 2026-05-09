@@ -1,5 +1,6 @@
 ﻿using Pidgin;
 using SNEngine.Scripting.Ast;
+using SNEngine.Scripting.AST;
 using System;
 using System.Collections.Generic;
 
@@ -19,18 +20,21 @@ namespace SNEngine.Scripting.Parsing
             var forBlockParser = new ForBlockParser();
             var switchBlockParser = new SwitchBlockParser();
             var whileBlockParser = new WhileBlockParser();
+            var nativeBlockParser = new NativeBlockParser();   // Native support
 
             var statementParser = new StatementParser(
                 commandParser,
                 ifBlockParser,
                 forBlockParser,
                 switchBlockParser,
-                whileBlockParser);
+                whileBlockParser,
+                nativeBlockParser);
 
             ifBlockParser.Initialize(statementParser);
             forBlockParser.Initialize(statementParser);
             switchBlockParser.Initialize(statementParser);
             whileBlockParser.Initialize(statementParser);
+            nativeBlockParser.Initialize(statementParser);   // Important!
 
             _statementParser = statementParser;
             _functionParser = new FunctionParser();

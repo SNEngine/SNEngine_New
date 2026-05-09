@@ -1,6 +1,8 @@
-﻿using SNEngine.Scripting.CodeGen;
+﻿using SNEngine.Scripting.AssemblyBuilder;
+using SNEngine.Scripting.AssemblyBuilder.Pipeline;
 using System;
 using System.Threading.Tasks;
+using R3;
 
 namespace SNEngine.Scripting;
 
@@ -46,20 +48,38 @@ internal class Program
         string inputDir = args.Length > 1 ? args[1] : "Scenes";
         string outputDll = args.Length > 2 ? args[2] : "game.dll";
 
-        Console.WriteLine("[Info] Starting async build...");
+        Console.WriteLine("[Info] Starting build with AssemblyBuilder pipeline...");
 
-        using var builder = new GameAssemblyBuilder();
+        var pipeline = new DefaultBuildPipeline();
+        using var builder = new GameAssemblyBuilder(pipeline);
+
+        // === R3 подписки ===
+        using var logSub = builder.LogMessages.Subscribe(msg =>
+        {
+            Console.WriteLine(msg);
+        });
+
+        using var progressSub = builder.Progress.Subscribe(progress =>
+        {
+            Console.Write($"\r[Progress] {progress.Current}/{progress.Total}");
+        });
+
+        using var completedSub = builder.BuildCompleted.Subscribe(result =>
+        {
+            Console.WriteLine(); // новая строка после прогресс-бара
+        });
+
         var result = await builder.BuildAsync(inputDir, outputDll);
 
         if (result.Success)
         {
             Console.ForegroundColor = ConsoleColor.Green;
-            Console.WriteLine($"[✓] BUILD SUCCESSFUL in {result.Seconds} seconds");
+            Console.WriteLine($"\n[✓] BUILD SUCCESSFUL in {result.Seconds:F2} seconds");
         }
         else
         {
             Console.ForegroundColor = ConsoleColor.Red;
-            Console.WriteLine($"[✗] BUILD FAILED after {result.Seconds} seconds");
+            Console.WriteLine($"\n[✗] BUILD FAILED");
         }
         Console.ResetColor();
     }
@@ -90,9 +110,12 @@ internal class Program
 
     private static void ShowHelp()
     {
-        Console.WriteLine("SNEngine Scripting Tool (Async Edition)");
+        Console.WriteLine("SNEngine Scripting Tool (AssemblyBuilder Edition)");
         Console.WriteLine("Usage:");
-        Console.WriteLine("  build [scenesFolder] [output.dll]   - Build all .sn files into game.dll");
-        Console.WriteLine("  convert <file.sn> [output.cs]       - Convert single .sn to .cs");
+        Console.WriteLine("  build [scenesFolder] [output.dll]   - Build all .sn files");
+        Console.WriteLine("  convert <file.sn> [output.cs]       - Convert single file");
+        Console.WriteLine();
+        Console.WriteLine("Example:");
+        Console.WriteLine("  dotnet run -- build Scenes game.dll");
     }
 }

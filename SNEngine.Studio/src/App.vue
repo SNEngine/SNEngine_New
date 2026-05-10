@@ -8,7 +8,6 @@
     </header>
 
     <div class="workspace">
-      <!-- Левая панель — дерево -->
       <div class="left-panel" :style="{ width: treeWidth + 'px' }">
         <DirectoryTree 
           base-path="C:/Users/Siphome/Desktop/testBuild"
@@ -19,35 +18,62 @@
 
       <div class="splitter" @mousedown="startResizing" />
 
-      <!-- Правая панель — табы -->
       <div class="right-panel">
         <EditorTabs ref="tabsRef" />
       </div>
     </div>
+
+    <!-- Важно! -->
+    <MessageBox ref="messageBoxRef" />
+    <InputBox ref="inputBoxRef" />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import DirectoryTree from "./components/DirectoryTree/DirectoryTree.vue"
-import EditorTabs from "./components/Tabs/EditorTabs.vue"   // ← путь к твоим табам
+import EditorTabs from "./components/Tabs/EditorTabs.vue"
+import MessageBox from "./components/MessageBox/MessageBox.vue"
+import InputBox from "./components/InputBox/InputBox.vue"
+
+import { useMessageBox } from './composables/useMessageBox'
+import { useInputBox } from './composables/useInputBox'
 
 const treeWidth = ref(320)
 let isResizing = false
 const currentFile = ref<string | null>(null)
 const tabsRef = ref<any>(null)
 
+const messageBoxRef = ref<any>(null)
+const inputBoxRef = ref<any>(null)
+
+const { messageBox } = useMessageBox()
+const { inputBox } = useInputBox()
+
+onMounted(() => {
+  messageBox.value = messageBoxRef.value
+  inputBox.value = inputBoxRef.value
+})
+
 const handleFileClick = async (filePath: string) => {
   currentFile.value = filePath
   const fileName = filePath.split(/[/\\]/).pop() || filePath
-  const ext = fileName.split('.').pop()?.toLowerCase() || ''
 
   if (tabsRef.value) {
-    await tabsRef.value.openFile(filePath)   // ← вызов твоего метода
+    try {
+      const content = await (window as any).electron.readFile(filePath)
+      tabsRef.value.openFile?.(filePath, content) || tabsRef.value.addTab?.({
+        id: filePath,
+        title: fileName,
+        content: content,
+      })
+    } catch (e) {
+      console.error('Failed to open file:', e)
+    }
   }
 }
 
-const startResizing = () => {
+const startResizing = (e: MouseEvent) => {
   isResizing = true
   document.addEventListener('mousemove', onMouseMove)
   document.addEventListener('mouseup', stopResizing)
@@ -65,7 +91,6 @@ const stopResizing = () => {
   document.removeEventListener('mouseup', stopResizing)
 }
 </script>
-
 <style>
 html, body { 
   margin: 0; padding: 0; height: 100vh; width: 100vw; 

@@ -1,41 +1,93 @@
-// 1. ОТКЛЮЧАЕМ ВАРНИНГИ БЕЗОПАСНОСТИ [cite: 2]
+// 1. ОТКЛЮЧАЕМ ВАРНИНГИ БЕЗОПАСНОСТИ
 process.env['ELECTRON_DISABLE_SECURITY_WARNINGS'] = 'true';
 
 const { app, BrowserWindow, Menu, ipcMain } = require('electron')
 const path = require('path')
 const fs = require('fs/promises')
+const chokidar = require('chokidar')
+
+let mainWindow;
+let watcher = null;
+
+// Находим правильный путь к preload в зависимости от того, упаковано приложение или нет
+const preloadPath = app.isPackaged 
+    ? path.join(app.getAppPath(), 'preload.cjs')
+    : path.join(__dirname, 'preload.cjs');
 
 function createWindow() {
-  const win = new BrowserWindow({
+  mainWindow = new BrowserWindow({
     width: 1400,
     height: 900,
     title: "SNEngine Studio",
     autoHideMenuBar: true,
     webPreferences: {
       nodeIntegration: false,
-      contextIsolation: true,     
-      preload: path.join(__dirname, 'preload.cjs'),
-      webSecurity: false, // Оставляем false для доступа к файлам [cite: 2]
+      contextIsolation: true,
+      preload: preloadPath,
+      webSecurity: false,
     }
   })
 
-  win.setTitle("SNEngine Studio")
+  mainWindow.setTitle("SNEngine Studio")
   Menu.setApplicationMenu(null)
 
   if (!app.isPackaged) {
-    win.loadURL('http://localhost:5173')
-    win.webContents.openDevTools()
+    mainWindow.loadURL('http://localhost:5173')
   } else {
-    win.loadFile(path.join(__dirname, 'dist/index.html'))
+    mainWindow.loadFile(path.join(__dirname, 'dist/index.html'))
   }
+
+  // Открываем инструменты разработчика в отдельном окне
+  mainWindow.webContents.openDevTools({ mode: 'detach' })
 }
 
-// ====================== IPC для чтения папок ======================
+// ====================== PROJECT PATH ======================
+ipcMain.handle('get-project-path', async () => {
+  if (!app.isPackaged) {
+    return 'C:/Users/Siphome/Desktop/testBuild'
+  }
+  
+  const projectDir = path.join(app.getAppPath(), '..', 'testBuild')
+  try {
+    await fs.mkdir(projectDir, { recursive: true })
+  } catch (e) {
+    console.error('Cannot create testBuild folder:', e)
+  }
+  return projectDir
+});
+
+// ====================== FILE WATCHER ======================
+ipcMain.on('start-watcher', (event, dirPath) => {
+  if (watcher) watcher.close();
+
+  watcher = chokidar.watch(dirPath, {
+    ignored: /(^|[\/\\])\../,
+    persistent: true,
+    ignoreInitial: true
+  });
+
+  watcher.on('all', (eventName, filePath) => {
+    if (mainWindow) {
+      mainWindow.webContents.send('file-change', { 
+        type: eventName, 
+        path: filePath 
+      });
+    }
+  });
+});
+
+ipcMain.on('stop-watcher', () => {
+  if (watcher) {
+    watcher.close();
+    watcher = null;
+  }
+});
+
+// ====================== FILE SYSTEM OPERATIONS ======================
 ipcMain.handle('read-directory', async (_, dirPath) => {
   try {
     const entries = await fs.readdir(dirPath, { withFileTypes: true })
     
-    // Сортируем: сначала папки, потом файлы (по алфавиту)
     const sortedEntries = entries.map(entry => ({
       name: entry.name,
       path: path.join(dirPath, entry.name),
@@ -55,9 +107,38 @@ ipcMain.handle('read-directory', async (_, dirPath) => {
 })
 
 ipcMain.handle('read-file', async (_, filePath) => {
-  return await fs.readFile(filePath, 'utf-8')
+  try {
+    return await fs.readFile(filePath, 'utf-8')
+  } catch (err) {
+    console.error('read-file error:', err)
+    return ''
+  }
 })
 
+ipcMain.handle('create-directory', async (_, dirPath) => {
+  await fs.mkdir(dirPath, { recursive: true })
+})
+
+ipcMain.handle('create-file', async (_, filePath) => {
+  await fs.writeFile(filePath, '', 'utf-8')
+})
+
+ipcMain.handle('rename-item', async (_, oldPath, newName) => {
+  const dir = path.dirname(oldPath)
+  const newPath = path.join(dir, newName)
+  await fs.rename(oldPath, newPath)
+})
+
+ipcMain.handle('delete-item', async (_, itemPath) => {
+  const stat = await fs.stat(itemPath)
+  if (stat.isDirectory()) {
+    await fs.rm(itemPath, { recursive: true, force: true })
+  } else {
+    await fs.unlink(itemPath)
+  }
+})
+
+// ====================== APP LIFECYCLE ======================
 app.whenReady().then(() => {
   createWindow()
 

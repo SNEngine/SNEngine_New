@@ -11,9 +11,10 @@
     "build": "vite build",
     "electron:dev": "electron .",
     "electron:build": "vite build && electron-builder",
-    "electron:dev:all": "concurrently \"npm run dev\" \"npm run electron:dev\""
+    "electron:build:fast": "vite build && electron-builder --win dir"
   },
   "dependencies": {
+    "chokidar": "^5.0.0",
     "monaco-editor": "^0.55.1",
     "monaco-editor-vue3": "^1.0.5",
     "vue": "^3.5.32"
@@ -32,29 +33,31 @@
     "vite-plugin-vue-devtools": "^8.1.1",
     "vue-tsc": "^3.2.6"
   },
-"build": {
-  "appId": "com.snengine.studio",
-  "productName": "SNEngine Studio",
-  "directories": {
-    "output": "release"
-  },
-  "files": [
-    "dist/**/*",
-    "electron.cjs",
-    "package.json"
-  ],
-  "win": {
-    "target": "nsis",
-    "icon": "public/icon.ico",
-    "signAndEditExecutable": false
-  },
-  "forceCodeSigning": false,
-  "npmRebuild": false,
-  "electronDownload": {
-    "cache": "C:\\Users\\Siphome\\AppData\\Local\\electron-builder\\Cache"
-  }
-},
-  "engines": {
-    "node": "^20.19.0 || >=22.12.0"
+  "build": {
+    "appId": "com.snengine.studio",
+    "productName": "SNEngine Studio",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "electron.cjs",
+      "preload.cjs",
+      "package.json"
+    ],
+    "asar": true,
+    "win": {
+      "target": [
+        "portable"
+      ],
+      "icon": "public/icon.ico",
+      "verifyUpdateCodeSignature": false
+    },
+    "cscLink": null,
+    "forceCodeSigning": false,
+    "electronLanguages": [
+      "en",
+      "ru"
+    ]
   }
 }

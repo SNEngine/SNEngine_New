@@ -1,3 +1,6 @@
+// 1. ОТКЛЮЧАЕМ ВАРНИНГИ БЕЗОПАСНОСТИ [cite: 2]
+process.env['ELECTRON_DISABLE_SECURITY_WARNINGS'] = 'true';
+
 const { app, BrowserWindow, Menu, ipcMain } = require('electron')
 const path = require('path')
 const fs = require('fs/promises')
@@ -10,9 +13,9 @@ function createWindow() {
     autoHideMenuBar: true,
     webPreferences: {
       nodeIntegration: false,
-      contextIsolation: true,     // лучше включить
-      preload: path.join(__dirname, 'preload.cjs'),  // ← КЛЮЧЕВОЕ
-      webSecurity: false,
+      contextIsolation: true,     
+      preload: path.join(__dirname, 'preload.cjs'),
+      webSecurity: false, // Оставляем false для доступа к файлам [cite: 2]
     }
   })
 
@@ -31,11 +34,20 @@ function createWindow() {
 ipcMain.handle('read-directory', async (_, dirPath) => {
   try {
     const entries = await fs.readdir(dirPath, { withFileTypes: true })
-    return entries.map(entry => ({
+    
+    // Сортируем: сначала папки, потом файлы (по алфавиту)
+    const sortedEntries = entries.map(entry => ({
       name: entry.name,
       path: path.join(dirPath, entry.name),
-      isFolder: entry.isDirectory()
-    }))
+      isFolder: entry.isDirectory(),
+      isOpen: false
+    })).sort((a, b) => {
+      if (a.isFolder && !b.isFolder) return -1;
+      if (!a.isFolder && b.isFolder) return 1;
+      return a.name.localeCompare(b.name);
+    });
+
+    return sortedEntries;
   } catch (err) {
     console.error('read-directory error:', err)
     return []

@@ -1,10 +1,14 @@
 <template>
   <div class="studio">
     <header class="header">
-      <h1>SNEngine Studio</h1>
+      <div class="logo-section">
+        <h1>SNEngine Studio</h1>
+        <span class="version">v0.0.1-dev</span>
+      </div>
     </header>
 
     <div class="workspace">
+      <!-- Левая панель — дерево -->
       <div class="left-panel" :style="{ width: treeWidth + 'px' }">
         <DirectoryTree 
           base-path="C:/Users/Siphome/Desktop/testBuild"
@@ -15,72 +19,31 @@
 
       <div class="splitter" @mousedown="startResizing" />
 
+      <!-- Правая панель — табы -->
       <div class="right-panel">
-        <component 
-          :is="currentEditor.component" 
-          v-if="currentEditor.component"
-          v-bind="currentEditor.props"
-          :key="currentFile"
-        />
-        <div v-else class="empty-editor">
-          <div class="welcome-screen">
-            <span class="welcome-icon">🚀</span>
-            <p>Выберите файл для начала работы</p>
-          </div>
-        </div>
+        <EditorTabs ref="tabsRef" />
       </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, shallowRef, markRaw } from 'vue'
+import { ref } from 'vue'
 import DirectoryTree from "./components/DirectoryTree/DirectoryTree.vue"
-import CodeEditor from "./components/CodeEditor/CodeEditor.vue"
-import ImagePreview from "./components/ImagePreview/ImagePreview.vue"
-import UnknownFile from "./components/UnknownFile/UnknownFile.vue"
+import EditorTabs from "./components/Tabs/EditorTabs.vue"   // ← путь к твоим табам
 
 const treeWidth = ref(320)
 let isResizing = false
 const currentFile = ref<string | null>(null)
-const currentEditor = shallowRef<{ component: any, props: any }>({ component: null, props: {} })
+const tabsRef = ref<any>(null)
 
 const handleFileClick = async (filePath: string) => {
   currentFile.value = filePath
-  const ext = filePath.toLowerCase().split('.').pop() || ''
-  
-  // 1. Изображения
-  if (['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp'].includes(ext)) {
-    currentEditor.value = {
-      component: markRaw(ImagePreview),
-      props: { imagePath: filePath }
-    }
-    return
-  }
+  const fileName = filePath.split(/[/\\]/).pop() || filePath
+  const ext = fileName.split('.').pop()?.toLowerCase() || ''
 
-  // 2. Текстовые файлы (чтение через Electron)
-  const textExts = ['sn', 'ts', 'js', 'json', 'txt', 'html', 'css', 'md']
-  if (textExts.includes(ext)) {
-    try {
-      const content = await (window as any).electron.readFile(filePath)
-      currentEditor.value = {
-        component: markRaw(CodeEditor),
-        props: {
-          modelValue: content,
-          language: ext === 'sn' ? 'sn' : (ext === 'ts' ? 'typescript' : ext),
-          theme: 'snengine-dark'
-        }
-      }
-    } catch (err) {
-      console.error("Ошибка чтения файла:", err)
-    }
-    return
-  }
-
-  // 3. Неизвестный формат
-  currentEditor.value = {
-    component: markRaw(UnknownFile),
-    props: { filePath }
+  if (tabsRef.value) {
+    await tabsRef.value.openFile(filePath)   // ← вызов твоего метода
   }
 }
 
@@ -104,49 +67,42 @@ const stopResizing = () => {
 </script>
 
 <style>
-/* Глобальные настройки */
 html, body { 
-  margin: 0; 
-  padding: 0; 
-  height: 100vh; 
-  width: 100vw;
-  overflow: hidden; 
-  background: #1e1e1e; 
-  color: white;
-  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  margin: 0; padding: 0; height: 100vh; width: 100vw; 
+  overflow: hidden; background: #1e1e1e; color: white;
+  font-family: 'Segoe UI', system-ui, sans-serif;
 }
 
-.studio { 
-  height: 100vh; 
-  display: flex; 
-  flex-direction: column; 
-}
+.studio { height: 100vh; display: flex; flex-direction: column; }
 
-/* Исправленный заголовок */
 .header { 
   height: 40px; 
-  background: #252526;
+  background: #252526; 
   display: flex; 
   align-items: center; 
-  padding: 0 16px;
-  border-bottom: 1px solid #333;
+  padding: 0 16px; 
+  border-bottom: 1px solid #333; 
   flex-shrink: 0;
 }
 
+.logo-section { display: flex; align-items: center; gap: 12px; }
 .header h1 { 
   margin: 0; 
   font-size: 13px; 
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  color: #FF5252;
+  font-weight: 600; 
+  color: #FF5252; 
+  text-transform: uppercase; 
+  letter-spacing: 0.5px;
+}
+.version {
+  font-size: 10px;
+  color: #666;
+  background: #1a1a1a;
+  padding: 2px 6px;
+  border-radius: 4px;
 }
 
-.workspace { 
-  flex: 1; 
-  display: flex; 
-  overflow: hidden; 
-}
+.workspace { flex: 1; display: flex; overflow: hidden; }
 
 .left-panel { 
   background: #161616; 
@@ -155,38 +111,19 @@ html, body {
 }
 
 .splitter { 
-  width: 2px; 
+  width: 4px; 
   cursor: col-resize; 
   background: #252526; 
-  transition: background 0.2s;
+  transition: background 0.2s; 
+  z-index: 10;
 }
-
-.splitter:hover { 
-  background: #FF5252; 
-}
+.splitter:hover { background: #FF5252; }
 
 .right-panel { 
   flex: 1; 
-  position: relative; 
+  overflow: hidden; 
   background: #1e1e1e; 
-}
-
-.empty-editor { 
-  height: 100%; 
-  display: flex; 
-  align-items: center; 
-  justify-content: center; 
-}
-
-.welcome-screen { 
-  text-align: center; 
-  color: #555;
-}
-
-.welcome-icon { 
-  font-size: 48px; 
-  display: block; 
-  margin-bottom: 10px; 
-  opacity: 0.2; 
+  display: flex;
+  flex-direction: column;
 }
 </style>

@@ -1,6 +1,5 @@
 <template>
-  <div class="directory-tree">
-    <!-- Только поисковая строка -->
+  <div class="directory-tree-container">
     <div class="tree-header">
       <div class="search-box">
         <input 
@@ -11,37 +10,40 @@
       </div>
     </div>
 
-    <div v-if="loading" class="loading">Загрузка директории...</div>
-
-    <div class="tree-content">
-      <div 
-        v-for="item in filteredItems" 
-        :key="item.path"
-        class="tree-item"
-      >
+    <div class="tree-viewport">
+      <div v-if="loading && isRoot" class="loading">Загрузка директории...</div>
+      
+      <div class="tree-content">
         <div 
-          class="tree-node"
-          :class="{ 
-            'is-folder': item.isFolder, 
-            'is-open': item.isOpen,
-            'is-active': activePath === item.path 
-          }"
-          @click="toggleItem(item)"
+          v-for="item in filteredItems" 
+          :key="item.path"
+          class="tree-item"
         >
-          <BaseIcon 
-            :name="item.isFolder ? 'folder_icon' : getFileIcon(item.name)" 
-            :color="item.isFolder ? '#FFCA28' : '#FF5252'"
-            class="node-icon"
-          />
-          <span class="node-name">{{ item.name }}</span>
-        </div>
+          <div 
+            class="tree-node"
+            :class="{ 
+              'is-folder': item.isFolder, 
+              'is-open': item.isOpen,
+              'is-active': activePath === item.path 
+            }"
+            @click="toggleItem(item)"
+          >
+            <BaseIcon 
+              :name="item.isFolder ? 'folder_icon' : getFileIcon(item.name)" 
+              :color="item.isFolder ? '#FFCA28' : '#FF5252'"
+              class="node-icon"
+            />
+            <span class="node-name">{{ item.name }}</span>
+          </div>
 
-        <div v-if="item.isFolder && item.isOpen" class="tree-children">
-          <DirectoryTree 
-            :base-path="item.path" 
-            :active-path="activePath"
-            @file-click="handleFileClick"
-          />
+          <div v-if="item.isFolder && item.isOpen" class="tree-children">
+            <DirectoryTree 
+              :base-path="item.path" 
+              :active-path="activePath"
+              :is-sub-tree="true"
+              @file-click="handleFileClick"
+            />
+          </div>
         </div>
       </div>
     </div>
@@ -63,6 +65,7 @@ interface TreeItem {
 const props = defineProps<{
   basePath: string
   activePath?: string
+  isSubTree?: boolean // Флаг, чтобы отличать вложенные компоненты
 }>()
 
 const emit = defineEmits<{
@@ -73,6 +76,8 @@ const items = ref<TreeItem[]>([])
 const loading = ref(true)
 const searchQuery = ref('')
 const activePath = ref(props.activePath || '')
+
+const isRoot = computed(() => !props.isSubTree)
 
 const filteredItems = computed(() => {
   if (!searchQuery.value.trim()) return items.value
@@ -117,19 +122,20 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.directory-tree {
+/* Главный контейнер */
+.directory-tree-container {
   height: 100%;
-  background: #161616;
-  border: 1px solid #333;
-  border-radius: 6px;
-  overflow: hidden;
+  width: 100%;
   display: flex;
   flex-direction: column;
+  background: #161616;
+  color: #eeeeee;
+  box-sizing: border-box;
 }
 
-/* Шапка только с поиском */
+/* Шапка с поиском — всегда сверху */
 .tree-header {
-  padding: 8px 12px;
+  padding: 12px;
   border-bottom: 1px solid #333;
   flex-shrink: 0;
 }
@@ -140,59 +146,100 @@ onMounted(() => {
 
 .search-input {
   width: 100%;
+  box-sizing: border-box;
   background: #252526;
   border: 1px solid #444;
   color: #ddd;
-  padding: 7px 12px;
+  padding: 8px 12px;
   border-radius: 6px;
   font-size: 13.5px;
   outline: none;
-  transition: all 0.2s;
+  transition: border-color 0.2s;
 }
 
 .search-input:focus {
   border-color: #FF5252;
-  box-shadow: 0 0 0 2px rgba(255, 82, 82, 0.25);
 }
 
-/* Остальные стили без изменений */
-.tree-content {
+/* Область прокрутки */
+.tree-viewport {
   flex: 1;
   overflow-y: auto;
-  padding: 4px 0;
-  scrollbar-width: thin;
-  scrollbar-color: #FF5252 #1e1e1e;
+  overflow-x: hidden;
 }
 
-.tree-content::-webkit-scrollbar { width: 6px; }
-.tree-content::-webkit-scrollbar-thumb {
+.tree-viewport::-webkit-scrollbar {
+  width: 6px;
+}
+
+.tree-viewport::-webkit-scrollbar-thumb {
   background: #FF5252;
   border-radius: 3px;
+}
+
+.tree-content {
+  padding: 4px 0;
 }
 
 .tree-node {
   display: flex;
   align-items: center;
   padding: 6px 12px;
-  border-radius: 4px;
   cursor: pointer;
-  transition: all 0.1s ease;
+  transition: background 0.1s;
   min-height: 30px;
+  user-select: none;
 }
 
-.tree-node:hover { background: #252526; }
-.tree-node.is-active { background: #2a2a3a; border-left: 3px solid #FF5252; }
+.tree-node:hover {
+  background: #252526;
+}
 
-.node-icon { margin-right: 8px; flex-shrink: 0; width: 18px; height: 18px; }
-.node-name { color: #eeeeee; line-height: 1.4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tree-node.is-active {
+  background: #2a2a3a;
+  border-left: 3px solid #FF5252;
+}
 
-.tree-node.is-folder .node-name { color: #ffffff; font-weight: 500; }
+.node-icon {
+  margin-right: 10px;
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+}
 
+.node-name {
+  line-height: 1.4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 14px;
+}
+
+.tree-node.is-folder .node-name {
+  font-weight: 500;
+}
+
+/* Отступ для вложенных элементов */
 .tree-children {
-  padding-left: 26px;
+  margin-left: 14px;
+  padding-left: 10px;
   border-left: 1px solid #333;
-  margin-left: 10px;
 }
 
-.loading { padding: 20px; color: #666; font-style: italic; }
+.loading {
+  padding: 16px;
+  color: #666;
+  font-size: 13px;
+}
+
+/* Убираем лишние рамки и фон у вложенных компонентов, 
+   чтобы они не создавали эффект "матрешки" */
+.tree-children :deep(.directory-tree-container) {
+  background: transparent;
+  border: none;
+  height: auto;
+}
+.tree-children :deep(.tree-header) {
+  display: none; /* Прячем поиск во вложенных папках */
+}
 </style>

@@ -6,31 +6,30 @@
     </div>
 
     <div class="main-controls">
-      <button @click="openWebEditor" class="big-btn primary">
-        🌐 Открыть WebEditor
-      </button>
-      
       <button @click="openSceneEditor" class="big-btn secondary">
         📝 Открыть Редактор Сцены (.sn)
       </button>
     </div>
 
-    <!-- Здесь будет WebEditor -->
-    <WebEditor v-if="showWebEditor" />
+    <!-- Тест BaseIcon -->
+    <div class="icons-test">
+      <h2>Тест иконок (BaseIcon)</h2>
+      <div class="icon-grid">
+        <BaseIcon name="folder_icon" color="#FF5252" />
+        <BaseIcon name="html_icon" color="#FF9800" />
+        <BaseIcon name="css_icon" color="#2196F3" />
+        <BaseIcon name="image_icon" color="#4CAF50" />
+        <BaseIcon name="sn_script_icon" color="#E91E63" />
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
-import WebEditor from "./components/WebEditor/WebEditor.vue"
 import { useCodeEditor } from "./composables/useCodeEditor"
+import BaseIcon from "./components/icons/BaseIcon.vue"
 
 const { openEditor } = useCodeEditor()
-const showWebEditor = ref(false)
-
-const openWebEditor = () => {
-  showWebEditor.value = true
-}
 
 const openSceneEditor = () => {
   openEditor({
@@ -93,16 +92,6 @@ endif`,
   transition: all 0.2s;
 }
 
-.primary {
-  background: #0066ff;
-  color: white;
-}
-
-.primary:hover {
-  background: #0052cc;
-  transform: translateY(-2px);
-}
-
 .secondary {
   background: #252526;
   color: #ccc;
@@ -110,5 +99,21 @@ endif`,
 
 .secondary:hover {
   background: #333;
+}
+
+/* Тест иконок */
+.icons-test {
+  padding: 30px;
+}
+
+.icons-test h2 {
+  margin-bottom: 20px;
+  color: #ccc;
+}
+
+.icon-grid {
+  display: flex;
+  gap: 32px;
+  flex-wrap: wrap;
 }
 </style>

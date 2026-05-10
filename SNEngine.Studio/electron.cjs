@@ -9,7 +9,8 @@ function createWindow() {
     autoHideMenuBar: true,
     webPreferences: {
       nodeIntegration: false,
-      contextIsolation: true,
+      contextIsolation: false,        // важно для dev
+        webSecurity: false,             // ← разрешаем file://
     },
     icon: path.join(__dirname, 'public/icon.png')
   })

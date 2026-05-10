@@ -3,18 +3,19 @@
     <div class="split-view">
       <!-- Левая панель — Код -->
       <div class="code-panel">
+        <div class="section-header">HTML (полный документ)</div>
         <div class="editor-wrapper">
           <CodeEditor 
             v-model="htmlCode"
             language="html"
             theme="snengine-dark"
-            height="100%"
           />
         </div>
       </div>
 
       <!-- Правая панель — Превью -->
       <div class="preview-panel">
+        <div class="section-header">Live Preview</div>
         <WebPreview 
           :html="htmlCode" 
           :css="cssCode"
@@ -25,12 +26,16 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import CodeEditor from '../CodeEditor/CodeEditor.vue'
 import WebPreview from '../Preview/WebPreview.vue'
 
-// Начальные значения
-const htmlCode = ref(`<!DOCTYPE html>
+const props = defineProps<{
+  filePath?: string
+  initialHtml?: string
+}>()
+
+const htmlCode = ref(props.initialHtml || `<!DOCTYPE html>
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
@@ -39,7 +44,6 @@ const htmlCode = ref(`<!DOCTYPE html>
 <body>
   <h1>Добро пожаловать в SNEngine!</h1>
   <p>Это тест WebEditor.</p>
-  <button onclick="alert('Работает!')">Нажми меня</button>
 </body>
 </html>`)
 
@@ -54,11 +58,17 @@ const cssCode = ref(`body {
 }
 
 h1 { font-size: 3em; margin-bottom: 20px; }`)
+
+onMounted(() => {
+  if (props.filePath) {
+    console.log('[WebEditor] Открыт файл:', props.filePath)
+  }
+})
 </script>
 
 <style scoped>
 .web-editor {
-  height: 100vh;
+  height: 100%;
   display: flex;
   flex-direction: column;
   background: #1e1e1e;
@@ -72,28 +82,29 @@ h1 { font-size: 3em; margin-bottom: 20px; }`)
 }
 
 .code-panel {
-  width: 48%;
+  width: 50%;
   display: flex;
   flex-direction: column;
   border-right: 1px solid #333;
 }
 
+.preview-panel {
+  width: 50%;
+  display: flex;
+  flex-direction: column;
+}
+
 .section-header {
   padding: 8px 16px;
-  background: #2d2d2d;
+  background: #252526;
   color: #aaa;
   font-size: 13px;
   font-weight: 500;
+  border-bottom: 1px solid #333;
 }
 
 .editor-wrapper {
   flex: 1;
-  min-height: 0;
-}
-
-.preview-panel {
-  width: 52%;
-  display: flex;
-  flex-direction: column;
+  overflow: hidden;
 }
 </style>

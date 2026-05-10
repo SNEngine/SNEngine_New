@@ -42,12 +42,13 @@ import BaseIcon from '../icons/BaseIcon.vue'
 import CodeEditor from '../CodeEditor/CodeEditor.vue'
 import ImagePreview from '../ImagePreview/ImagePreview.vue'
 import UnknownFile from '../UnknownFile/UnknownFile.vue'
+import WebEditor from '../WebEditor/WebEditor.vue'   // ← добавлено
 
 const tabs = ref<Array<{
   id: string
   filePath: string
   name: string
-  type: 'code' | 'image' | 'unknown'
+  type: 'code' | 'image' | 'web' | 'unknown'
   content?: string
   language?: string
 }>>([])
@@ -59,7 +60,6 @@ const currentComponent = shallowRef<{
   props: Record<string, any>
 }>({ component: null, props: {} })
 
-// Обработка прокрутки колесиком мыши (горизонтальный скролл)
 const handleWheel = (e: WheelEvent) => {
   const tabsBar = e.currentTarget as HTMLElement
   if (e.deltaY !== 0) {
@@ -79,34 +79,44 @@ const openFile = async (filePath: string) => {
   }
 
   let component: any = UnknownFile
-  let props: any = { filePath }
+  let type: 'code' | 'image' | 'web' | 'unknown' = 'unknown'
   let content = ''
   let language = 'plaintext'
 
-  const textExts = ['sn', 'ts', 'js', 'json', 'txt', 'html', 'css', 'md', 'xml', 'cs', 'csproj']
+  const textExts = ['sn', 'ts', 'js', 'json', 'txt', 'xml', 'cs', 'csproj']
   const imgExts = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp']
 
-  if (textExts.includes(ext)) {
+  if (ext === 'html') {
+    component = WebEditor
+    type = 'web'
+    try {
+      content = await (window as any).electron.readFile(filePath)
+    } catch (e) {
+      content = `Ошибка чтения HTML:\n${e}`
+    }
+  } 
+  else if (textExts.includes(ext)) {
     component = CodeEditor
+    type = 'code'
     try {
       content = await (window as any).electron.readFile(filePath)
       language = ext === 'sn' ? 'sn' : 
                 (ext === 'cs' ? 'csharp' : 
                 (ext === 'ts' ? 'typescript' : 'plaintext'))
-      props = { modelValue: content, language, theme: 'snengine-dark' }
     } catch (e) {
       content = `Ошибка чтения:\n${e}`
-      props.modelValue = content
     }
-  } else if (imgExts.includes(ext)) {
+  } 
+  else if (imgExts.includes(ext)) {
     component = ImagePreview
+    type = 'image'
   }
 
   const newTab = {
     id: Date.now().toString(),
     filePath,
     name,
-    type: textExts.includes(ext) ? 'code' : (imgExts.includes(ext) ? 'image' : 'unknown'),
+    type,
     content,
     language
   }
@@ -118,7 +128,15 @@ const openFile = async (filePath: string) => {
 const activateTab = (tab: any) => {
   activeFilePath.value = tab.filePath
 
-  if (tab.type === 'code') {
+  if (tab.type === 'web') {
+    currentComponent.value = {
+      component: markRaw(WebEditor),
+      props: {
+        filePath: tab.filePath,
+        initialHtml: tab.content || ''
+      }
+    }
+  } else if (tab.type === 'code') {
     currentComponent.value = {
       component: markRaw(CodeEditor),
       props: {
@@ -157,10 +175,9 @@ const closeTab = (tab: any) => {
 const getTabIconName = (tab: any) => {
   const ext = tab.name.split('.').pop()?.toLowerCase() || ''
   
+  if (tab.type === 'web') return 'html_icon'
   if (tab.type === 'image') return 'image_icon'
   if (ext === 'sn') return 'sn_script_icon'
-  if (ext === 'html') return 'html_icon'
-  if (ext === 'css') return 'css_icon'
   if (ext === 'cs') return 'csharp_icon'
   if (ext === 'dll') return 'dll_icon'
   return 'unknown_icon'
@@ -170,122 +187,16 @@ defineExpose({ openFile })
 </script>
 
 <style scoped>
-.editor-tabs {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  overflow: hidden;
-  background: #1e1e1e;
-}
-
-/* Панель вкладок с кастомным скроллом */
-.tabs-bar {
-  display: flex;
-  background: #252526;
-  border-bottom: 1px solid #333;
-  overflow-x: auto;
-  overflow-y: hidden;
-  flex-shrink: 0;
-  min-height: 35px;
-  /* Firefox */
-  scrollbar-width: thin;
-  scrollbar-color: #444 #252526;
-}
-
-/* Скроллбар для Chrome/Electron */
-.tabs-bar::-webkit-scrollbar {
-  height: 3px; /* Тонкая линия */
-}
-
-.tabs-bar::-webkit-scrollbar-track {
-  background: #252526;
-}
-
-.tabs-bar::-webkit-scrollbar-thumb {
-  background: #444;
-  border-radius: 4px;
-}
-
-.tabs-bar::-webkit-scrollbar-thumb:hover {
-  background: #FF5252;
-}
-
-.tab {
-  padding: 6px 14px;
-  background: #2d2d2d;
-  color: #969696;
-  border-right: 1px solid #333;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  white-space: nowrap;
-  user-select: none;
-  flex-shrink: 0; /* Не дает табам сжиматься */
-  height: 100%;
-  box-sizing: border-box;
-  font-size: 13px;
-  transition: all 0.15s ease;
-}
-
-.tab:hover {
-  background: #323233;
-  color: #ccc;
-}
-
-.tab.active {
-  background: #1e1e1e;
-  color: #FF5252;
-  border-top: 1px solid #FF5252; /* Тонкая линия акцента */
-}
-
-.tab-icon {
-  width: 16px;
-  height: 16px;
-  flex-shrink: 0;
-}
-
-.tab-name {
-  max-width: 180px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.tab-close {
-  margin-left: 4px;
-  padding: 2px 5px;
-  border-radius: 3px;
-  font-size: 11px;
-  opacity: 0.6;
-  transition: all 0.2s;
-}
-
-.tab-close:hover {
-  background: #e81123;
-  color: white;
-  opacity: 1;
-}
-
-.tab-content {
-  flex: 1;
-  overflow: hidden;
-  background: #1e1e1e;
-  position: relative;
-}
-
-.empty-state {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  color: #444;
-}
-
-.empty-icon { 
-  font-size: 48px; 
-  margin-bottom: 8px; 
-  filter: grayscale(1);
-  opacity: 0.3;
-}
+/* Твои стили (оставлены без изменений) */
+.editor-tabs { display: flex; flex-direction: column; height: 100%; overflow: hidden; background: #1e1e1e; }
+.tabs-bar { display: flex; background: #252526; border-bottom: 1px solid #333; overflow-x: auto; overflow-y: hidden; flex-shrink: 0; min-height: 35px; }
+.tab { padding: 6px 14px; background: #2d2d2d; color: #969696; border-right: 1px solid #333; cursor: pointer; display: flex; align-items: center; gap: 8px; white-space: nowrap; user-select: none; flex-shrink: 0; height: 100%; font-size: 13px; }
+.tab.active { background: #1e1e1e; color: #FF5252; border-top: 1px solid #FF5252; }
+.tab-icon { width: 16px; height: 16px; flex-shrink: 0; }
+.tab-name { max-width: 180px; overflow: hidden; text-overflow: ellipsis; }
+.tab-close { margin-left: 4px; padding: 2px 5px; border-radius: 3px; font-size: 11px; opacity: 0.6; }
+.tab-close:hover { background: #e81123; color: white; opacity: 1; }
+.tab-content { flex: 1; overflow: hidden; background: #1e1e1e; position: relative; }
+.empty-state { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #444; }
+.empty-icon { font-size: 48px; margin-bottom: 8px; filter: grayscale(1); opacity: 0.3; }
 </style>

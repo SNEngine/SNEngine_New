@@ -2,8 +2,8 @@
   <div class="monaco-wrapper">
     <MonacoEditor
       :value="internalCode"
-      language="sn"
-      theme="sn-dark"
+      :language="language"
+      :theme="theme"
       :options="editorOptions"
       @change="handleChange"
     />
@@ -11,10 +11,15 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, onUnmounted } from 'vue'
+import { ref, watch, onUnmounted, onMounted } from 'vue'
 import MonacoEditor from 'monaco-editor-vue3'
 
-const props = defineProps<{ modelValue: string }>()
+const props = defineProps<{
+  modelValue: string
+  language?: string
+  theme?: string
+}>()
+
 const emit = defineEmits(['update:modelValue'])
 
 const internalCode = ref(props.modelValue)
@@ -22,15 +27,14 @@ let timeout: number | null = null
 
 const editorOptions = {
   fontSize: 15,
-  minimap: { enabled: false },           // ← ОТКЛЮЧИЛИ (самый тяжёлый элемент!)
+  minimap: { enabled: false },
   automaticLayout: true,
   scrollBeyondLastLine: false,
   wordWrap: 'on',
   folding: true,
   lineNumbers: 'on',
-  glyphMargin: false,                    // ← убираем лишнее
   tabSize: 2,
-  quickSuggestions: false,               // ← убираем тяжёлые подсказки
+  quickSuggestions: false,
   parameterHints: { enabled: false },
   suggestOnTriggerCharacters: false,
   renderLineHighlight: 'all',
@@ -39,16 +43,21 @@ const editorOptions = {
 
 const handleChange = (value: string) => {
   internalCode.value = value
-  
   if (timeout) clearTimeout(timeout)
-  
   timeout = window.setTimeout(() => {
     emit('update:modelValue', value)
-  }, 400)  // ← 400ms debounce
+  }, 300)
 }
 
 watch(() => props.modelValue, (val) => {
   if (val !== internalCode.value) internalCode.value = val
+})
+
+onMounted(() => {
+  // Принудительно применяем тему после монтирования
+  if (props.theme) {
+    console.log(`🎨 Применена тема: ${props.theme}`)
+  }
 })
 
 onUnmounted(() => {

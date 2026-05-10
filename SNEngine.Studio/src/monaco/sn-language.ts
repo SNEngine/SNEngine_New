@@ -23,10 +23,10 @@ export function registerSnLanguage() {
         [/\bnative\b/, 'native-block'],
         [/\bendnative\b/, 'native-block'],
 
-        // Слово "call" — отдельным цветом
+        // Слово "call"
         [/\bcall\b/, 'call-keyword'],
 
-        // Остальные ключевые слова
+        // Обычные ключевые слова
         [/\b(if|else|endif|switch|for|endfor|while|endwhile|function|endfunc|print|Quit)\b/, 'keyword'],
 
         // Переменные
@@ -45,25 +45,28 @@ export function registerSnLanguage() {
     }
   })
 
-  // === ТЕМА ===
-  monaco.editor.defineTheme('sn-dark', {
+  // === SNENGINE ТЕМА (чёрно-красная) ===
+  monaco.editor.defineTheme('snengine-dark', {
     base: 'vs-dark',
     inherit: true,
     rules: [
-      { token: 'keyword', foreground: '#C586C0', fontStyle: 'bold' },           // if, function, print и т.д.
-      { token: 'call-keyword', foreground: '#FFCC00', fontStyle: 'bold' },      // call — ЖЁЛТЫЙ / ЗОЛОТОЙ
-      { token: 'special-command', foreground: '#FF79C6', fontStyle: 'bold' },   // Show Character, Play Music и т.д.
-      { token: 'native-block', foreground: '#FFCC00', fontStyle: 'bold' },      // native / endnative
-      { token: 'variable', foreground: '#9CDCFE' },
-      { token: 'string', foreground: '#CE9178' },
-      { token: 'number', foreground: '#B5CEA8' },
-      { token: 'comment', foreground: '#6A9955', fontStyle: 'italic' }
+      { token: 'keyword', foreground: '#FF3B5C', fontStyle: 'bold' },           // Основные ключевые слова
+      { token: 'special-command', foreground: '#FF1744', fontStyle: 'bold' },   // Show Character, Play Music и т.д.
+      { token: 'call-keyword', foreground: '#FF5252', fontStyle: 'bold' },      // call
+      { token: 'native-block', foreground: '#FF1744', fontStyle: 'bold' },      // native / endnative
+
+      { token: 'variable', foreground: '#B0BEC5' },
+      { token: 'string', foreground: '#FFCC80' },
+      { token: 'number', foreground: '#FF8A80' },
+      { token: 'number.float', foreground: '#FF8A80' },
+      { token: 'comment', foreground: '#6D7278', fontStyle: 'italic' }
     ],
     colors: {
-      'editor.background': '#1E1E1E',
-      'editor.foreground': '#D4D4D4',
-      'editorLineNumber.foreground': '#858585',
-      'editorCursor.foreground': '#AEAFAD'
+      'editor.background': '#1F1F1F',
+      'editor.foreground': '#E0E0E0',
+      'editorLineNumber.foreground': '#757575',
+      'editorCursor.foreground': '#FF1744',
+      'editor.selectionBackground': '#FF174440'
     }
   })
 }

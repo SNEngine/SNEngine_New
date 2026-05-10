@@ -3,7 +3,7 @@
     <MonacoEditor
       :value="internalCode"
       language="sn"
-      theme="vs-dark"
+      theme="sn-dark"
       :options="editorOptions"
       @change="handleChange"
     />

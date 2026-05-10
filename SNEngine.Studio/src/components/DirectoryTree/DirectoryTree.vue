@@ -1,32 +1,34 @@
 <template>
-  <div class="directory-tree">
+  <div class="directory-tree-container">
+    <div class="directory-tree">
 
-    <div v-if="loading" class="loading">Загрузка директории...</div>
+      <div v-if="loading" class="loading">Загрузка директории...</div>
 
-    <div class="tree-content">
-      <div 
-        v-for="item in items" 
-        :key="item.path"
-        class="tree-item"
-      >
+      <div class="tree-content">
         <div 
-          class="tree-node"
-          :class="{ 'is-folder': item.isFolder, 'is-open': item.isOpen }"
-          @click="toggleItem(item)"
+          v-for="item in items" 
+          :key="item.path"
+          class="tree-item"
         >
-          <BaseIcon 
-            :name="item.isFolder ? 'folder_icon' : getFileIcon(item.name)" 
-            :color="item.isFolder ? '#FFCA28' : '#FF5252'"
-            class="node-icon"
-          />
-          <span class="node-name">{{ item.name }}</span>
-        </div>
+          <div 
+            class="tree-node"
+            :class="{ 'is-folder': item.isFolder, 'is-open': item.isOpen }"
+            @click="toggleItem(item)"
+          >
+            <BaseIcon 
+              :name="item.isFolder ? 'folder_icon' : getFileIcon(item.name)" 
+              :color="item.isFolder ? '#FFCA28' : '#FF5252'"
+              class="node-icon"
+            />
+            <span class="node-name">{{ item.name }}</span>
+          </div>
 
-        <div v-if="item.isFolder && item.isOpen" class="tree-children">
-          <DirectoryTree 
-            :base-path="item.path" 
-            @file-click="emitFileClick"
-          />
+          <div v-if="item.isFolder && item.isOpen" class="tree-children">
+            <DirectoryTree 
+              :base-path="item.path" 
+              @file-click="emitFileClick"
+            />
+          </div>
         </div>
       </div>
     </div>
@@ -59,7 +61,6 @@ const loading = ref(true)
 const loadDirectory = async () => {
   try {
     const result = await (window as any).electron.readDirectory(props.basePath)
-    
     items.value = result.sort((a: any, b: any) => {
       if (a.isFolder && !b.isFolder) return -1
       if (!a.isFolder && b.isFolder) return 1
@@ -80,15 +81,24 @@ const toggleItem = (item: TreeItem) => {
   item.isOpen = !item.isOpen
 }
 
+const emitFileClick = (path: string) => {
+  emit('file-click', path)
+}
+
 onMounted(() => {
   loadDirectory()
 })
 </script>
 
 <style scoped>
+.directory-tree-container {
+  height: 100%;
+  overflow: hidden; /* Убирает внешние скроллбары контейнера */
+}
+
 .directory-tree {
   height: 100%;
-  background: #161616;           /* тёмный фон как на твоём маркере */
+  background: #161616;
   border: 1px solid #333;
   border-radius: 6px;
   overflow: hidden;
@@ -116,19 +126,33 @@ onMounted(() => {
   flex: 1;
   overflow-y: auto;
   padding: 4px 0;
+  
+  /* Скрытие стандартного скроллбара для Firefox */
   scrollbar-width: thin;
-  scrollbar-color: #FF5252 #2a2a2a;
+  scrollbar-color: #FF5252 #1e1e1e;
 }
 
+/* Стилизация кастомного скроллбара для Chrome/Electron */
 .tree-content::-webkit-scrollbar {
   width: 6px;
 }
+
+.tree-content::-webkit-scrollbar-track {
+  background: #161616;
+}
+
 .tree-content::-webkit-scrollbar-thumb {
   background: #FF5252;
   border-radius: 3px;
 }
+
 .tree-content::-webkit-scrollbar-thumb:hover {
   background: #FF1744;
+}
+
+/* Принудительное скрытие системных полос, если они пробиваются */
+.tree-content {
+  -ms-overflow-style: none; /* IE/Edge */
 }
 
 .tree-node {

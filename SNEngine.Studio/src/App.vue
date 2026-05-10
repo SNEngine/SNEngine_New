@@ -11,7 +11,6 @@
       </button>
     </div>
 
-    <!-- Тест Дерева Директорий -->
     <div class="directory-test">
       <DirectoryTree 
         base-path="C:/Users/Siphome/Desktop/testBuild"
@@ -50,11 +49,20 @@ endif`,
 
 const handleFileClick = (filePath: string) => {
   console.log("📂 Выбран файл:", filePath)
-  // Здесь позже будет открытие файла в редакторе
 }
 </script>
 
 <style>
+/* Глобальные стили для удаления системного скролла */
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden; /* Убирает белый скроллбар окна */
+  background: #1e1e1e;
+}
+
 .studio {
   height: 100vh;
   background: #1e1e1e;
@@ -102,11 +110,13 @@ const handleFileClick = (filePath: string) => {
   background: #333;
 }
 
-/* Тест дерева */
+/* Контейнер дерева */
 .directory-test {
-  padding: 20px 30px;
+  padding: 0 30px 20px 30px;
   flex: 1;
-  overflow: auto;
+  overflow: hidden; /* Скролл будет внутри DirectoryTree.vue */
+  display: flex;
+  flex-direction: column;
 }
 
 .directory-test h2 {

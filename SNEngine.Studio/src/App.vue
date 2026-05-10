@@ -11,23 +11,19 @@
       </button>
     </div>
 
-    <!-- Тест BaseIcon -->
-    <div class="icons-test">
-      <h2>Тест иконок (BaseIcon)</h2>
-      <div class="icon-grid">
-        <BaseIcon name="folder_icon" color="#FF5252" />
-        <BaseIcon name="html_icon" color="#FF9800" />
-        <BaseIcon name="css_icon" color="#2196F3" />
-        <BaseIcon name="image_icon" color="#4CAF50" />
-        <BaseIcon name="sn_script_icon" color="#E91E63" />
-      </div>
+    <!-- Тест Дерева Директорий -->
+    <div class="directory-test">
+      <DirectoryTree 
+        base-path="C:/Users/Siphome/Desktop/testBuild"
+        @file-click="handleFileClick"
+      />
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { useCodeEditor } from "./composables/useCodeEditor"
-import BaseIcon from "./components/icons/BaseIcon.vue"
+import DirectoryTree from "./components/DirectoryTree/DirectoryTree.vue"
 
 const { openEditor } = useCodeEditor()
 
@@ -50,6 +46,11 @@ endif`,
       console.log(code)
     }
   })
+}
+
+const handleFileClick = (filePath: string) => {
+  console.log("📂 Выбран файл:", filePath)
+  // Здесь позже будет открытие файла в редакторе
 }
 </script>
 
@@ -101,19 +102,15 @@ endif`,
   background: #333;
 }
 
-/* Тест иконок */
-.icons-test {
-  padding: 30px;
+/* Тест дерева */
+.directory-test {
+  padding: 20px 30px;
+  flex: 1;
+  overflow: auto;
 }
 
-.icons-test h2 {
-  margin-bottom: 20px;
+.directory-test h2 {
+  margin-bottom: 16px;
   color: #ccc;
-}
-
-.icon-grid {
-  display: flex;
-  gap: 32px;
-  flex-wrap: wrap;
 }
 </style>

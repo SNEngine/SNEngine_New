@@ -1,5 +1,6 @@
-const { app, BrowserWindow, Menu } = require('electron')
+const { app, BrowserWindow, Menu, ipcMain } = require('electron')
 const path = require('path')
+const fs = require('fs/promises')
 
 function createWindow() {
   const win = new BrowserWindow({
@@ -9,15 +10,13 @@ function createWindow() {
     autoHideMenuBar: true,
     webPreferences: {
       nodeIntegration: false,
-      contextIsolation: false,        // важно для dev
-        webSecurity: false,             // ← разрешаем file://
-    },
-    icon: path.join(__dirname, 'public/icon.png')
+      contextIsolation: true,     // лучше включить
+      preload: path.join(__dirname, 'preload.cjs'),  // ← КЛЮЧЕВОЕ
+      webSecurity: false,
+    }
   })
 
-  // ПРИНУДИТЕЛЬНО устанавливаем title
   win.setTitle("SNEngine Studio")
-  
   Menu.setApplicationMenu(null)
 
   if (!app.isPackaged) {
@@ -26,9 +25,22 @@ function createWindow() {
   } else {
     win.loadFile(path.join(__dirname, 'dist/index.html'))
   }
-
-  win.webContents.openDevTools()
 }
+
+// ====================== IPC для чтения папок ======================
+ipcMain.handle('read-directory', async (_, dirPath) => {
+  try {
+    const entries = await fs.readdir(dirPath, { withFileTypes: true })
+    return entries.map(entry => ({
+      name: entry.name,
+      path: path.join(dirPath, entry.name),
+      isFolder: entry.isDirectory()
+    }))
+  } catch (err) {
+    console.error('read-directory error:', err)
+    return []
+  }
+})
 
 app.whenReady().then(() => {
   createWindow()

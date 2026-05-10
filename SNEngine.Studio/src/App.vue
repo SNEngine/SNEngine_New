@@ -1,126 +1,192 @@
 <template>
   <div class="studio">
-    <div class="header">
+    <header class="header">
       <h1>SNEngine Studio</h1>
-      <div class="version">v0.0.1-dev</div>
-    </div>
+    </header>
 
-    <div class="main-controls">
-      <button @click="openSceneEditor" class="big-btn secondary">
-        📝 Открыть Редактор Сцены (.sn)
-      </button>
-    </div>
+    <div class="workspace">
+      <div class="left-panel" :style="{ width: treeWidth + 'px' }">
+        <DirectoryTree 
+          base-path="C:/Users/Siphome/Desktop/testBuild"
+          :active-path="currentFile || ''"
+          @file-click="handleFileClick"
+        />
+      </div>
 
-    <div class="directory-test">
-      <DirectoryTree 
-        base-path="C:/Users/Siphome/Desktop/testBuild"
-        @file-click="handleFileClick"
-      />
+      <div class="splitter" @mousedown="startResizing" />
+
+      <div class="right-panel">
+        <component 
+          :is="currentEditor.component" 
+          v-if="currentEditor.component"
+          v-bind="currentEditor.props"
+          :key="currentFile"
+        />
+        <div v-else class="empty-editor">
+          <div class="welcome-screen">
+            <span class="welcome-icon">🚀</span>
+            <p>Выберите файл для начала работы</p>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { useCodeEditor } from "./composables/useCodeEditor"
+import { ref, shallowRef, markRaw } from 'vue'
 import DirectoryTree from "./components/DirectoryTree/DirectoryTree.vue"
+import CodeEditor from "./components/CodeEditor/CodeEditor.vue"
+import ImagePreview from "./components/ImagePreview/ImagePreview.vue"
+import UnknownFile from "./components/UnknownFile/UnknownFile.vue"
 
-const { openEditor } = useCodeEditor()
+const treeWidth = ref(320)
+let isResizing = false
+const currentFile = ref<string | null>(null)
+const currentEditor = shallowRef<{ component: any, props: any }>({ component: null, props: {} })
 
-const openSceneEditor = () => {
-  openEditor({
-    title: "scene_main.sn",
-    code: `name: main_scene
-
-print "Привет из SNEngine!"
-
-playerHealth = 100
-
-if playerHealth < 50 then
-    print "Ты ранен!"
-    Quit
-endif`,
-    language: "sn",
-    onSave: (code) => {
-      console.log("💾 Сцена сохранена!")
-      console.log(code)
+const handleFileClick = async (filePath: string) => {
+  currentFile.value = filePath
+  const ext = filePath.toLowerCase().split('.').pop() || ''
+  
+  // 1. Изображения
+  if (['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp'].includes(ext)) {
+    currentEditor.value = {
+      component: markRaw(ImagePreview),
+      props: { imagePath: filePath }
     }
-  })
+    return
+  }
+
+  // 2. Текстовые файлы (чтение через Electron)
+  const textExts = ['sn', 'ts', 'js', 'json', 'txt', 'html', 'css', 'md']
+  if (textExts.includes(ext)) {
+    try {
+      const content = await (window as any).electron.readFile(filePath)
+      currentEditor.value = {
+        component: markRaw(CodeEditor),
+        props: {
+          modelValue: content,
+          language: ext === 'sn' ? 'sn' : (ext === 'ts' ? 'typescript' : ext),
+          theme: 'snengine-dark'
+        }
+      }
+    } catch (err) {
+      console.error("Ошибка чтения файла:", err)
+    }
+    return
+  }
+
+  // 3. Неизвестный формат
+  currentEditor.value = {
+    component: markRaw(UnknownFile),
+    props: { filePath }
+  }
 }
 
-const handleFileClick = (filePath: string) => {
-  console.log("📂 Выбран файл:", filePath)
+const startResizing = () => {
+  isResizing = true
+  document.addEventListener('mousemove', onMouseMove)
+  document.addEventListener('mouseup', stopResizing)
+}
+
+const onMouseMove = (e: MouseEvent) => {
+  if (isResizing) {
+    treeWidth.value = Math.max(200, Math.min(e.clientX, 600))
+  }
+}
+
+const stopResizing = () => {
+  isResizing = false
+  document.removeEventListener('mousemove', onMouseMove)
+  document.removeEventListener('mouseup', stopResizing)
 }
 </script>
 
 <style>
-/* Глобальные стили для удаления системного скролла */
-html, body {
-  margin: 0;
-  padding: 0;
-  height: 100vh;
+/* Глобальные настройки */
+html, body { 
+  margin: 0; 
+  padding: 0; 
+  height: 100vh; 
   width: 100vw;
-  overflow: hidden; /* Убирает белый скроллбар окна */
-  background: #1e1e1e;
-}
-
-.studio {
-  height: 100vh;
-  background: #1e1e1e;
+  overflow: hidden; 
+  background: #1e1e1e; 
   color: white;
-  font-family: system-ui, sans-serif;
-  display: flex;
-  flex-direction: column;
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
 }
 
-.header {
-  padding: 20px 30px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  border-bottom: 1px solid #333;
+.studio { 
+  height: 100vh; 
+  display: flex; 
+  flex-direction: column; 
 }
 
-.version {
-  color: #666;
-  font-size: 14px;
-}
-
-.main-controls {
-  padding: 30px;
-  display: flex;
-  gap: 16px;
-  flex-wrap: wrap;
-}
-
-.big-btn {
-  padding: 14px 32px;
-  font-size: 17px;
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.secondary {
+/* Исправленный заголовок */
+.header { 
+  height: 40px; 
   background: #252526;
-  color: #ccc;
+  display: flex; 
+  align-items: center; 
+  padding: 0 16px;
+  border-bottom: 1px solid #333;
+  flex-shrink: 0;
 }
 
-.secondary:hover {
-  background: #333;
+.header h1 { 
+  margin: 0; 
+  font-size: 13px; 
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #FF5252;
 }
 
-/* Контейнер дерева */
-.directory-test {
-  padding: 0 30px 20px 30px;
-  flex: 1;
-  overflow: hidden; /* Скролл будет внутри DirectoryTree.vue */
-  display: flex;
-  flex-direction: column;
+.workspace { 
+  flex: 1; 
+  display: flex; 
+  overflow: hidden; 
 }
 
-.directory-test h2 {
-  margin-bottom: 16px;
-  color: #ccc;
+.left-panel { 
+  background: #161616; 
+  height: 100%; 
+  overflow: hidden;
+}
+
+.splitter { 
+  width: 2px; 
+  cursor: col-resize; 
+  background: #252526; 
+  transition: background 0.2s;
+}
+
+.splitter:hover { 
+  background: #FF5252; 
+}
+
+.right-panel { 
+  flex: 1; 
+  position: relative; 
+  background: #1e1e1e; 
+}
+
+.empty-editor { 
+  height: 100%; 
+  display: flex; 
+  align-items: center; 
+  justify-content: center; 
+}
+
+.welcome-screen { 
+  text-align: center; 
+  color: #555;
+}
+
+.welcome-icon { 
+  font-size: 48px; 
+  display: block; 
+  margin-bottom: 10px; 
+  opacity: 0.2; 
 }
 </style>

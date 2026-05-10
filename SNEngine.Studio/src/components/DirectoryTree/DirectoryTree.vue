@@ -1,34 +1,47 @@
 <template>
-  <div class="directory-tree-container">
-    <div class="directory-tree">
+  <div class="directory-tree">
+    <!-- Только поисковая строка -->
+    <div class="tree-header">
+      <div class="search-box">
+        <input 
+          v-model="searchQuery"
+          placeholder="Поиск по файлам..."
+          class="search-input"
+        />
+      </div>
+    </div>
 
-      <div v-if="loading" class="loading">Загрузка директории...</div>
+    <div v-if="loading" class="loading">Загрузка директории...</div>
 
-      <div class="tree-content">
+    <div class="tree-content">
+      <div 
+        v-for="item in filteredItems" 
+        :key="item.path"
+        class="tree-item"
+      >
         <div 
-          v-for="item in items" 
-          :key="item.path"
-          class="tree-item"
+          class="tree-node"
+          :class="{ 
+            'is-folder': item.isFolder, 
+            'is-open': item.isOpen,
+            'is-active': activePath === item.path 
+          }"
+          @click="toggleItem(item)"
         >
-          <div 
-            class="tree-node"
-            :class="{ 'is-folder': item.isFolder, 'is-open': item.isOpen }"
-            @click="toggleItem(item)"
-          >
-            <BaseIcon 
-              :name="item.isFolder ? 'folder_icon' : getFileIcon(item.name)" 
-              :color="item.isFolder ? '#FFCA28' : '#FF5252'"
-              class="node-icon"
-            />
-            <span class="node-name">{{ item.name }}</span>
-          </div>
+          <BaseIcon 
+            :name="item.isFolder ? 'folder_icon' : getFileIcon(item.name)" 
+            :color="item.isFolder ? '#FFCA28' : '#FF5252'"
+            class="node-icon"
+          />
+          <span class="node-name">{{ item.name }}</span>
+        </div>
 
-          <div v-if="item.isFolder && item.isOpen" class="tree-children">
-            <DirectoryTree 
-              :base-path="item.path" 
-              @file-click="emitFileClick"
-            />
-          </div>
+        <div v-if="item.isFolder && item.isOpen" class="tree-children">
+          <DirectoryTree 
+            :base-path="item.path" 
+            :active-path="activePath"
+            @file-click="handleFileClick"
+          />
         </div>
       </div>
     </div>
@@ -36,7 +49,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { getFileIcon } from '@/utils/fileIcons'
 import BaseIcon from '../icons/BaseIcon.vue'
 
@@ -49,6 +62,7 @@ interface TreeItem {
 
 const props = defineProps<{
   basePath: string
+  activePath?: string
 }>()
 
 const emit = defineEmits<{
@@ -57,6 +71,16 @@ const emit = defineEmits<{
 
 const items = ref<TreeItem[]>([])
 const loading = ref(true)
+const searchQuery = ref('')
+const activePath = ref(props.activePath || '')
+
+const filteredItems = computed(() => {
+  if (!searchQuery.value.trim()) return items.value
+  const q = searchQuery.value.toLowerCase().trim()
+  return items.value.filter(item => 
+    item.name.toLowerCase().includes(q)
+  )
+})
 
 const loadDirectory = async () => {
   try {
@@ -75,13 +99,15 @@ const loadDirectory = async () => {
 
 const toggleItem = (item: TreeItem) => {
   if (!item.isFolder) {
+    activePath.value = item.path
     emit('file-click', item.path)
     return
   }
   item.isOpen = !item.isOpen
 }
 
-const emitFileClick = (path: string) => {
+const handleFileClick = (path: string) => {
+  activePath.value = path
   emit('file-click', path)
 }
 
@@ -91,11 +117,6 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.directory-tree-container {
-  height: 100%;
-  overflow: hidden; /* Убирает внешние скроллбары контейнера */
-}
-
 .directory-tree {
   height: 100%;
   background: #161616;
@@ -106,53 +127,47 @@ onMounted(() => {
   flex-direction: column;
 }
 
+/* Шапка только с поиском */
 .tree-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 14px;
-  color: #FF5252;
-  font-weight: 600;
+  padding: 8px 12px;
   border-bottom: 1px solid #333;
   flex-shrink: 0;
 }
 
-.header-icon {
-  width: 20px;
-  height: 20px;
+.search-box {
+  width: 100%;
 }
 
+.search-input {
+  width: 100%;
+  background: #252526;
+  border: 1px solid #444;
+  color: #ddd;
+  padding: 7px 12px;
+  border-radius: 6px;
+  font-size: 13.5px;
+  outline: none;
+  transition: all 0.2s;
+}
+
+.search-input:focus {
+  border-color: #FF5252;
+  box-shadow: 0 0 0 2px rgba(255, 82, 82, 0.25);
+}
+
+/* Остальные стили без изменений */
 .tree-content {
   flex: 1;
   overflow-y: auto;
   padding: 4px 0;
-  
-  /* Скрытие стандартного скроллбара для Firefox */
   scrollbar-width: thin;
   scrollbar-color: #FF5252 #1e1e1e;
 }
 
-/* Стилизация кастомного скроллбара для Chrome/Electron */
-.tree-content::-webkit-scrollbar {
-  width: 6px;
-}
-
-.tree-content::-webkit-scrollbar-track {
-  background: #161616;
-}
-
+.tree-content::-webkit-scrollbar { width: 6px; }
 .tree-content::-webkit-scrollbar-thumb {
   background: #FF5252;
   border-radius: 3px;
-}
-
-.tree-content::-webkit-scrollbar-thumb:hover {
-  background: #FF1744;
-}
-
-/* Принудительное скрытие системных полос, если они пробиваются */
-.tree-content {
-  -ms-overflow-style: none; /* IE/Edge */
 }
 
 .tree-node {
@@ -165,29 +180,13 @@ onMounted(() => {
   min-height: 30px;
 }
 
-.tree-node:hover {
-  background: #252526;
-}
+.tree-node:hover { background: #252526; }
+.tree-node.is-active { background: #2a2a3a; border-left: 3px solid #FF5252; }
 
-.node-icon {
-  margin-right: 8px;
-  flex-shrink: 0;
-  width: 18px;
-  height: 18px;
-}
+.node-icon { margin-right: 8px; flex-shrink: 0; width: 18px; height: 18px; }
+.node-name { color: #eeeeee; line-height: 1.4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-.node-name {
-  color: #eeeeee;
-  line-height: 1.4;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.tree-node.is-folder .node-name {
-  color: #ffffff;
-  font-weight: 500;
-}
+.tree-node.is-folder .node-name { color: #ffffff; font-weight: 500; }
 
 .tree-children {
   padding-left: 26px;
@@ -195,9 +194,5 @@ onMounted(() => {
   margin-left: 10px;
 }
 
-.loading {
-  padding: 20px;
-  color: #666;
-  font-style: italic;
-}
+.loading { padding: 20px; color: #666; font-style: italic; }
 </style>

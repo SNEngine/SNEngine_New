@@ -54,6 +54,10 @@ ipcMain.handle('read-directory', async (_, dirPath) => {
   }
 })
 
+ipcMain.handle('read-file', async (_, filePath) => {
+  return await fs.readFile(filePath, 'utf-8')
+})
+
 app.whenReady().then(() => {
   createWindow()
 

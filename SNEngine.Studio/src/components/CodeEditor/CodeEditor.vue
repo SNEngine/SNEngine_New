@@ -2,16 +2,17 @@
   <div class="monaco-wrapper">
     <MonacoEditor
       :value="internalCode"
-      :language="language"
-      :theme="theme"
+      :language="language || 'plaintext'"
+      :theme="theme || 'snengine-dark'"
       :options="editorOptions"
       @change="handleChange"
+      class="editor-instance"
     />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, watch, onUnmounted, onMounted } from 'vue'
+import { ref, watch, onUnmounted } from 'vue'
 import MonacoEditor from 'monaco-editor-vue3'
 
 const props = defineProps<{
@@ -25,20 +26,20 @@ const emit = defineEmits(['update:modelValue'])
 const internalCode = ref(props.modelValue)
 let timeout: number | null = null
 
+// Опции редактора для стабильного лейаута
 const editorOptions = {
   fontSize: 15,
+  fontFamily: "'Fira Code', 'Cascadia Code', Consolas, monospace",
   minimap: { enabled: false },
-  automaticLayout: true,
+  automaticLayout: true, // Позволяет редактору менять размер вместе с окном
   scrollBeyondLastLine: false,
-  wordWrap: 'on',
+  wordWrap: 'on' as const,
   folding: true,
-  lineNumbers: 'on',
+  lineNumbers: 'on' as const,
   tabSize: 2,
-  quickSuggestions: false,
-  parameterHints: { enabled: false },
-  suggestOnTriggerCharacters: false,
-  renderLineHighlight: 'all',
-  cursorBlinking: 'smooth',
+  renderLineHighlight: 'all' as const,
+  cursorBlinking: 'smooth' as const,
+  contextmenu: true,
 }
 
 const handleChange = (value: string) => {
@@ -49,14 +50,10 @@ const handleChange = (value: string) => {
   }, 300)
 }
 
-watch(() => props.modelValue, (val) => {
-  if (val !== internalCode.value) internalCode.value = val
-})
-
-onMounted(() => {
-  // Принудительно применяем тему после монтирования
-  if (props.theme) {
-    console.log(`🎨 Применена тема: ${props.theme}`)
+// Следим за внешним изменением кода (например, при переключении файлов)
+watch(() => props.modelValue, (newVal) => {
+  if (newVal !== internalCode.value) {
+    internalCode.value = newVal
   }
 })
 
@@ -69,8 +66,18 @@ onUnmounted(() => {
 .monaco-wrapper {
   width: 100%;
   height: 100%;
+  min-height: 200px; /* Важно, чтобы контейнер не схлопывался */
+  position: relative;
   background: #1e1e1e;
-  border-radius: 6px;
-  overflow: hidden;
+}
+
+.editor-instance {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* Глубокий селектор для внутренней части Monaco, если нужно подправить шрифты */
+:deep(.monaco-editor) {
+  padding-top: 8px;
 }
 </style>

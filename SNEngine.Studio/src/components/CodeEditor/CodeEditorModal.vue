@@ -1,29 +1,30 @@
 <template>
   <Teleport to="body">
-    <div class="modal-overlay" @click.self="close">
+    <div v-if="isOpen" class="modal-overlay" @click.self="closeEditor">
       <div class="modal-content">
-        <!-- Заголовок -->
         <div class="modal-header">
           <div class="header-left">
             <span class="file-icon">📄</span>
             <span class="file-name">{{ currentOptions.title }}</span>
-            <span class="file-lang">.sn</span>
+            <span class="file-lang">{{ currentOptions.language }}</span>
           </div>
           <div class="header-actions">
-            <button class="btn-save" @click="save">💾 Save (Ctrl+S)</button>
-            <button class="btn-close" @click="close">✕</button>
+            <button class="btn-save" @click="save">💾 Сохранить</button>
+            <button class="btn-close" @click="closeEditor">✕</button>
           </div>
         </div>
 
-        <!-- Редактор -->
         <div class="editor-container">
-          <CodeEditor v-model="localCode" />
+          <CodeEditor 
+            v-model="localCode" 
+            :language="currentOptions.language"
+            theme="snengine-dark"
+          />
         </div>
 
-        <!-- Футер -->
         <div class="modal-footer">
-          <span class="status">Ready • {{ localCode.split('\n').length }} lines</span>
-          <span class="shortcut">Ctrl+S — Save • Esc — Close</span>
+          <span class="status">Строк: {{ localCode.split('\n').length }}</span>
+          <span class="shortcut">Ctrl+S — Сохранить • Esc — Закрыть</span>
         </div>
       </div>
     </div>
@@ -36,28 +37,41 @@ import CodeEditor from './CodeEditor.vue'
 import { useCodeEditor } from '../../composables/useCodeEditor'
 
 const { isOpen, currentOptions, saveAndClose, closeEditor } = useCodeEditor()
-const localCode = ref(currentOptions.value.code)
 
-watch(() => currentOptions.value.code, (val) => localCode.value = val)
+const localCode = ref('')
 
-const save = () => saveAndClose(localCode.value)
-const close = () => closeEditor()
+// Синхронизируем код при открытии модалки
+watch(isOpen, (val) => {
+  if (val) {
+    localCode.value = currentOptions.value.code
+  }
+})
+
+const save = () => {
+  if (currentOptions.value.onSave) {
+    currentOptions.value.onSave(localCode.value)
+  }
+  saveAndClose(localCode.value)
+}
 </script>
 
 <style scoped>
 .modal-overlay {
   position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.85);
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 10000;
-  backdrop-filter: blur(4px);
+  z-index: 9999;
 }
 
 .modal-content {
-  width: 92%;
+  width: 90vw;
   max-width: 1200px;
   height: 85vh;
   background: #1e1e1e;
@@ -76,6 +90,7 @@ const close = () => closeEditor()
   justify-content: space-between;
   align-items: center;
   border-bottom: 1px solid #333;
+  flex-shrink: 0;
 }
 
 .header-left {
@@ -84,41 +99,13 @@ const close = () => closeEditor()
   gap: 10px;
 }
 
-.file-icon { font-size: 18px; }
 .file-name { color: #d4d4d4; font-weight: 600; }
-.file-lang { color: #6a9955; font-size: 13px; background: #2d2d2d; padding: 2px 8px; border-radius: 4px; }
-
-.header-actions { display: flex; gap: 8px; }
-
-.btn-save {
-  background: #0d8f0d;
-  color: white;
-  border: none;
-  padding: 6px 16px;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 13px;
-  transition: background 0.2s;
-}
-.btn-save:hover { background: #0a6b0a; }
-
-.btn-close {
-  background: #c42b1c;
-  color: white;
-  border: none;
-  width: 32px;
-  height: 32px;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 16px;
-  transition: background 0.2s;
-}
-.btn-close:hover { background: #9c2116; }
+.file-lang { color: #FF5252; font-size: 12px; background: #2d2d2d; padding: 2px 8px; border-radius: 4px; text-transform: uppercase; }
 
 .editor-container {
-  flex: 1;
-  padding: 8px;
-  background: #1e1e1e;
+  flex: 1; /* Занимает всё доступное пространство */
+  width: 100%;
+  overflow: hidden;
 }
 
 .modal-footer {
@@ -127,8 +114,30 @@ const close = () => closeEditor()
   border-top: 1px solid #333;
   display: flex;
   justify-content: space-between;
-  align-items: center;
   font-size: 12px;
-  color: #858585;
+  color: #888;
 }
+
+.btn-save {
+  background: #FF5252;
+  color: white;
+  border: none;
+  padding: 6px 14px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.btn-save:hover { background: #ff1744; }
+
+.btn-close {
+  background: transparent;
+  border: none;
+  color: #888;
+  font-size: 20px;
+  cursor: pointer;
+  padding: 0 10px;
+}
+
+.btn-close:hover { color: white; }
 </style>

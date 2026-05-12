@@ -1,11 +1,7 @@
 <template>
   <div class="editor-tabs" @keydown.ctrl.s.prevent="handleGlobalSave">
     <!-- Панель вкладок -->
-    <div 
-      class="tabs-bar" 
-      v-if="tabs.length > 0"
-      @wheel="handleWheel"
-    >
+    <div class="tabs-bar" v-if="tabs.length > 0" @wheel="handleWheel">
       <div 
         v-for="tab in tabs" 
         :key="tab.id"
@@ -14,23 +10,20 @@
         @click="activateTab(tab)"
         @contextmenu.prevent="showTabContextMenu($event, tab)"
       >
-        <BaseIcon 
-          :name="getTabIconName(tab)" 
-          class="tab-icon"
-        />
+        <BaseIcon :name="getTabIconName(tab)" class="tab-icon" />
         <span class="tab-name">{{ tab.name }}</span>
         <span class="tab-close" @click.stop="closeTab(tab)">✕</span>
       </div>
     </div>
 
-    <!-- Контент вкладки -->
+    <!-- Динамический редактор -->
     <div class="tab-content">
       <component 
-        :is="currentComponent.component" 
-        v-if="currentComponent.component"
-        v-bind="currentComponent.props"
-        :key="activeFilePath"
-        ref="activeComponentRef"
+        v-if="currentComponent"
+        :is="currentComponent"
+        v-bind="currentProps"
+        ref="activeEditorRef"
+        @update:modelValue="handleContentUpdate"
         @save="handleComponentSave"
       />
       <div v-else class="empty-state">
@@ -39,219 +32,193 @@
       </div>
     </div>
 
-    <!-- Контекстное меню для вкладок -->
     <ContextMenu ref="tabContextMenuRef" />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import BaseIcon from '../icons/BaseIcon.vue'
 import ContextMenu from '../ContextMenu/ContextMenu.vue'
+
+import CodeEditor from '../CodeEditor/CodeEditor.vue'
+import ImagePreview from '../ImagePreview/ImagePreview.vue'
+import AudioPreview from '../AudioPreview/AudioPreview.vue'
+import WebEditor from '../WebEditor/WebEditor.vue'
+import UnknownFile from '../UnknownFile/UnknownFile.vue'
 
 import { useTabs } from '@/composables/useTabs'
 import { useFileType } from '@/composables/useFileType'
 
-const { tabs, activeFilePath, currentComponent, openFile, activateTab, closeTab } = useTabs()
+const { tabs, activeFilePath, openFile, activateTab, closeTab } = useTabs()
 const { getFileHandler } = useFileType()
 
 const tabContextMenuRef = ref<any>(null)
-const activeComponentRef = ref<any>(null)
+const activeEditorRef = ref<any>(null)
 
-// Открытие файла из дерева
-const handleOpenFile = async (filePath: string) => {
-  await openFile(filePath, getFileHandler)
+// ====================== ОПРЕДЕЛЕНИЕ ТИПА РЕДАКТОРА ======================
+const getEditorComponent = (filePath: string) => {
+  const ext = filePath.split('.').pop()?.toLowerCase() || ''
+  if (['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'].includes(ext)) return ImagePreview
+  if (['mp3', 'wav', 'ogg', 'm4a', 'flac'].includes(ext)) return AudioPreview
+  if (['html', 'htm'].includes(ext)) return WebEditor
+  if (['sn', 'cs', 'txt', 'js', 'ts', 'json', 'css', 'md', 'log'].includes(ext)) return CodeEditor
+  return UnknownFile
 }
 
-// Обработчик события save от компонента (например CodeEditor)
-const handleComponentSave = async (content: string) => {
-  console.log('💾 [event save] от компонента, контент длина:', content.length)
-  await saveFileToDisk(content)
-}
+const currentComponent = computed(() => {
+  if (!activeFilePath.value) return null
+  return getEditorComponent(activeFilePath.value)
+})
 
-// Глобальный обработчик Ctrl+S
-const handleGlobalSave = async () => {
-  console.log('⌨️ [global] Ctrl+S нажат')
-  
-  if (!activeFilePath.value) {
-    console.warn('⚠️ [global] Нет активного файла')
-    return
+const currentProps = computed(() => {
+  const tab = tabs.value.find(t => t.filePath === activeFilePath.value)
+  if (!tab) return {}
+  const ext = activeFilePath.value.split('.').pop()?.toLowerCase() || ''
+
+  if (['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'].includes(ext)) return { imagePath: activeFilePath.value }
+  if (['mp3', 'wav', 'ogg', 'm4a', 'flac'].includes(ext)) return { audioPath: activeFilePath.value }
+  if (['html', 'htm'].includes(ext)) return { filePath: activeFilePath.value, initialHtml: tab.content }
+  if (['sn', 'cs', 'txt', 'js', 'ts', 'json', 'css', 'md', 'log'].includes(ext)) {
+    return { modelValue: tab.content || '', language: getLanguageFromExt(ext), theme: 'snengine-dark' }
   }
+  return { filePath: activeFilePath.value }
+})
+
+const getLanguageFromExt = (ext: string) => {
+  const map: Record<string, string> = {
+    sn: 'sn', cs: 'csharp', js: 'javascript', ts: 'typescript',
+    json: 'json', css: 'css', md: 'markdown', txt: 'plaintext', log: 'plaintext'
+  }
+  return map[ext] || 'plaintext'
+}
+
+// ====================== ОТКРЫТИЕ ФАЙЛА ======================
+const handleOpenFile = async (filePath: string) => {
+  let fileContent = ''
+  const ext = filePath.split('.').pop()?.toLowerCase() || ''
+  if (!['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'mp3', 'wav', 'ogg'].includes(ext)) {
+    try {
+      if ((window as any).electron?.readFile) {
+        fileContent = await (window as any).electron.readFile(filePath)
+      }
+    } catch (e) {}
+  }
+
+  const existing = tabs.value.find(t => t.filePath === filePath)
+  if (existing) {
+    existing.content = fileContent
+    activateTab(existing)
+  } else {
+    const newTab = { id: Date.now().toString(), filePath, name: filePath.split(/[/\\]/).pop() || filePath, type: 'code', content: fileContent, language: getLanguageFromExt(ext) }
+    tabs.value.push(newTab)
+    activateTab(newTab)
+  }
+}
+
+// ====================== ОБНОВЛЕНИЕ СОДЕРЖИМОГО ======================
+const handleContentUpdate = (newContent: string) => {
+  const activeTab = tabs.value.find(t => t.filePath === activeFilePath.value)
+  if (activeTab) activeTab.content = newContent
+}
+
+// ====================== НАДЁЖНОЕ СОХРАНЕНИЕ ======================
+const saveCurrentFile = async () => {
+  const activeTab = tabs.value.find(t => t.filePath === activeFilePath.value)
+  if (!activeTab) return
 
   let content = ''
-  const comp = activeComponentRef.value
-  console.log('🔍 [global] activeComponentRef.value:', comp)
+  const comp = activeEditorRef.value
 
-  if (comp) {
-    // 1. Monaco Editor
-    const editor = comp.editorRef?.value
-    console.log('   editorRef?.value:', editor)
-    if (editor && typeof editor.getValue === 'function') {
-      content = editor.getValue()
-      console.log('📝 [global] Взято из Monaco Editor')
-    }
-    // 2. internalCode (Ref)
-    else if (comp.internalCode?.value !== undefined) {
-      content = comp.internalCode.value
-      console.log('📝 [global] Взято из internalCode, значение:', content.substring(0, 100))
-    }
-    // 3. modelValue
-    else if (comp.modelValue?.value !== undefined) {
-      content = comp.modelValue.value
-    }
-    else if (comp.modelValue !== undefined) {
-      content = comp.modelValue
-    }
-    // 4. code
-    else if (comp.code?.value !== undefined) {
-      content = comp.code.value
-    }
-    else if (comp.code !== undefined) {
-      content = comp.code
-    }
-    // 5. value
-    else if (comp.value?.value !== undefined) {
-      content = comp.value.value
-    }
-    else if (comp.value !== undefined) {
-      content = comp.value
-    }
-    // 6. textarea
-    else if (comp.$el) {
-      const textarea = comp.$el.querySelector('textarea')
-      if (textarea) {
-        content = textarea.value
-        console.log('📝 [global] Взято из textarea')
+  // Для CodeEditor — напрямую из Monaco
+  if (comp?.editorRef?.value && typeof comp.editorRef.value.getValue === 'function') {
+    content = comp.editorRef.value.getValue()
+  } 
+  // Для других редакторов
+  else if (comp?.internalCode?.value) {
+    content = comp.internalCode.value
+  } 
+  else if (comp?.htmlCode?.value) {
+    content = comp.htmlCode.value
+  } 
+  else {
+    content = activeTab.content || ''
+  }
+
+  console.log('💾 Сохранение:', activeTab.filePath, `(${content.length} символов)`)
+
+  try {
+    if ((window as any).electron?.writeFile) {
+      const result = await (window as any).electron.writeFile(activeTab.filePath, content)
+      if (result.success) {
+        console.log('✅ ФАЙЛ УСПЕШНО СОХРАНЁН!')
       }
     }
-
-    if (!content) {
-      console.warn('⚠️ [global] Не удалось извлечь контент. Ключи comp:', Object.keys(comp))
-    }
-  } else {
-    console.warn('⚠️ [global] comp равен null/undefined')
-  }
-
-  if (content) {
-    await saveFileToDisk(content)
-  } else {
-    console.warn('⚠️ [global] Контент пуст, сохранение не выполнено')
+  } catch (e) {
+    console.error('💥 Ошибка:', e)
   }
 }
 
-// Запись файла на диск
-const saveFileToDisk = async (content: string) => {
-  try {
-    const result = await window.electron.writeFile(activeFilePath.value!, content)
-    if (result.success) {
-      console.log('✅ Файл сохранён:', activeFilePath.value)
-    } else {
-      console.error('❌ Ошибка сохранения:', result.error)
-    }
-  } catch (err) {
-    console.error('❌ Исключение при сохранении:', err)
-  }
-}
+const handleGlobalSave = () => saveCurrentFile()
+const handleComponentSave = (content: string) => saveCurrentFile()
 
-// Контекстное меню по правому клику на вкладке
+// ====================== КОНТЕКСТНОЕ МЕНЮ + ОСТАЛЬНОЕ ======================
 const showTabContextMenu = (e: MouseEvent, currentTab: any) => {
-  const currentIndex = tabs.value.findIndex(t => t.id === currentTab.id)
-
-  const menuItems = [
-    { 
-      label: 'Закрыть вкладку', 
-      action: () => closeTab(currentTab) 
-    },
-    { 
-      label: 'Закрыть другие вкладки', 
-      action: () => closeOtherTabs(currentTab) 
-    },
-    { 
-      label: 'Закрыть вкладки справа', 
-      action: () => closeTabsToRight(currentIndex) 
-    },
-    { 
-      label: 'Закрыть вкладки слева', 
-      action: () => closeTabsToLeft(currentIndex) 
-    },
-    { 
-      label: 'Закрыть все вкладки', 
-      action: closeAllTabs 
-    },
+  const i = tabs.value.findIndex(t => t.id === currentTab.id)
+  const menu = [
+    { label: 'Закрыть вкладку', action: () => closeTab(currentTab) },
+    { label: 'Закрыть другие', action: () => closeOtherTabs(currentTab) },
+    { label: 'Закрыть справа', action: () => closeTabsToRight(i) },
+    { label: 'Закрыть слева', action: () => closeTabsToLeft(i) },
+    { type: 'separator' },
+    { label: 'Закрыть все', action: closeAllTabs },
   ]
-
-  if (tabContextMenuRef.value) {
-    tabContextMenuRef.value.show(e.clientX, e.clientY, menuItems)
-  }
+  tabContextMenuRef.value?.show(e.clientX, e.clientY, menu)
 }
 
-// Вспомогательные функции закрытия
-const closeOtherTabs = (currentTab: any) => {
-  const toClose = tabs.value.filter(t => t.id !== currentTab.id)
-  toClose.forEach(tab => closeTab(tab))
-}
+const closeOtherTabs = (tab: any) => tabs.value.filter(t => t.id !== tab.id).forEach(closeTab)
+const closeTabsToRight = (i: number) => tabs.value.slice(i + 1).forEach(closeTab)
+const closeTabsToLeft = (i: number) => tabs.value.slice(0, i).forEach(closeTab)
+const closeAllTabs = () => { while (tabs.value.length) closeTab(tabs.value[0]) }
 
-const closeTabsToRight = (currentIndex: number) => {
-  const toClose = tabs.value.slice(currentIndex + 1)
-  toClose.forEach(tab => closeTab(tab))
-}
-
-const closeTabsToLeft = (currentIndex: number) => {
-  const toClose = tabs.value.slice(0, currentIndex)
-  toClose.forEach(tab => closeTab(tab))
-}
-
-const closeAllTabs = () => {
-  while (tabs.value.length > 0) {
-    closeTab(tabs.value[0])
-  }
-}
-
-const handleWheel = (e: WheelEvent) => {
-  const tabsBar = e.currentTarget as HTMLElement
-  if (e.deltaY !== 0) {
-    tabsBar.scrollLeft += e.deltaY
-    e.preventDefault()
-  }
-}
+const handleWheel = (e: WheelEvent) => { (e.currentTarget as HTMLElement).scrollLeft += e.deltaY; e.preventDefault() }
 
 const getTabIconName = (tab: any) => {
-  if (tab.type === 'web') return 'html_icon'
-  if (tab.type === 'image') return 'image_icon'
-  if (tab.type === 'audio') return 'audio_icon'
-  if (tab.type === 'code') {
-    const ext = tab.filePath.split('.').pop()?.toLowerCase()
-    if (ext === 'sn') return 'sn_script_icon'
-    if (ext === 'cs') return 'csharp_icon'
-    if (ext === 'dll') return 'dll_icon'
-  }
+  const ext = tab.filePath.split('.').pop()?.toLowerCase() || ''
+  if (['png', 'jpg', 'jpeg', 'gif', 'webp'].includes(ext)) return 'image_icon'
+  if (['mp3', 'wav', 'ogg', 'm4a'].includes(ext)) return 'audio_icon'
+  if (['html', 'htm'].includes(ext)) return 'html_icon'
+  if (ext === 'sn') return 'sn_script_icon'
+  if (ext === 'cs') return 'csharp_icon'
   return 'unknown_icon'
 }
 
-defineExpose({
-  openFile: handleOpenFile
-})
+defineExpose({ openFile: handleOpenFile })
 </script>
 
 <style scoped>
-/* Все стили без изменений (те же, что и раньше) */
 .editor-tabs {
   display: flex;
   flex-direction: column;
   height: 100%;
   overflow: hidden;
   background: #1e1e1e;
+  user-select: none;
 }
 
+/* Панель вкладок с кастомным скроллом */
 .tabs-bar {
   display: flex;
   background: #252526;
   overflow-x: auto;
   overflow-y: hidden;
-  flex-shrink: 0;
   height: 35px;
+  /* Firefox */
+  scrollbar-width: thin;
+  scrollbar-color: #3e3e3e transparent;
 }
 
+/* Стилизация скроллбара (Chrome, Edge, Safari) */
 .tabs-bar::-webkit-scrollbar {
   height: 3px;
 }
@@ -262,28 +229,34 @@ defineExpose({
 
 .tabs-bar::-webkit-scrollbar-thumb {
   background: #3e3e3e;
+  border-radius: 10px;
+}
+
+.tabs-bar:hover::-webkit-scrollbar-thumb {
+  background: #4f4f4f;
 }
 
 .tabs-bar::-webkit-scrollbar-thumb:hover {
-  background: #FF5252;
+  background: #ff5252;
 }
 
+/* Стили вкладок */
 .tab {
-  padding: 0 12px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px;
+  height: 100%;
   background: #2d2d2d;
   color: #969696;
   border-right: 1px solid #1e1e1e;
   cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  white-space: nowrap;
-  user-select: none;
-  flex-shrink: 0;
-  height: 100%;
   font-size: 13px;
   position: relative;
   transition: background 0.2s, color 0.2s;
+  min-width: 100px;
+  max-width: 200px;
 }
 
 .tab:hover {
@@ -293,17 +266,17 @@ defineExpose({
 
 .tab.active {
   background: #1e1e1e;
-  color: #FF5252;
+  color: #ff5252;
 }
 
 .tab.active::after {
   content: '';
   position: absolute;
-  top: 0;
+  bottom: 0;
   left: 0;
   right: 0;
-  height: 1px;
-  background: #FF5252;
+  height: 2px;
+  background: #ff5252;
 }
 
 .tab-icon {
@@ -312,27 +285,28 @@ defineExpose({
   flex-shrink: 0;
 }
 
+/* Исправление длинных названий */
 .tab-name {
-  max-width: 160px;
+  flex: 1;
+  white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .tab-close {
-  margin-left: 6px;
-  padding: 2px;
-  border-radius: 3px;
-  font-size: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 16px;
-  height: 16px;
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  font-size: 10px;
   opacity: 0;
-  transition: all 0.2s;
+  margin-left: 4px;
+  transition: opacity 0.2s, background 0.2s;
 }
 
-.tab:hover .tab-close,
+.tab:hover .tab-close, 
 .tab.active .tab-close {
   opacity: 0.6;
 }
@@ -343,10 +317,12 @@ defineExpose({
   opacity: 1 !important;
 }
 
+/* Контентная область */
 .tab-content {
   flex: 1;
   overflow: hidden;
   background: #1e1e1e;
+  position: relative;
 }
 
 .empty-state {

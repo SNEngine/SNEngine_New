@@ -23,7 +23,7 @@
       </div>
     </div>
 
-    <!-- Важно! -->
+    <!-- Модальные окна -->
     <MessageBox ref="messageBoxRef" />
     <InputBox ref="inputBoxRef" />
   </div>
@@ -55,18 +55,13 @@ onMounted(() => {
   inputBox.value = inputBoxRef.value
 })
 
+// Основная обработка клика по файлу
 const handleFileClick = async (filePath: string) => {
   currentFile.value = filePath
-  const fileName = filePath.split(/[/\\]/).pop() || filePath
 
-  if (tabsRef.value) {
+  if (tabsRef.value?.openFile) {
     try {
-      const content = await (window as any).electron.readFile(filePath)
-      tabsRef.value.openFile?.(filePath, content) || tabsRef.value.addTab?.({
-        id: filePath,
-        title: fileName,
-        content: content,
-      })
+      await tabsRef.value.openFile(filePath)   // ← Только путь!
     } catch (e) {
       console.error('Failed to open file:', e)
     }
@@ -91,6 +86,7 @@ const stopResizing = () => {
   document.removeEventListener('mouseup', stopResizing)
 }
 </script>
+
 <style>
 html, body { 
   margin: 0; padding: 0; height: 100vh; width: 100vw; 

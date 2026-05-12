@@ -1,5 +1,6 @@
 <template>
   <div class="editor-tabs">
+    <!-- Панель вкладок -->
     <div 
       class="tabs-bar" 
       v-if="tabs.length > 0"
@@ -21,6 +22,7 @@
       </div>
     </div>
 
+    <!-- Контент вкладки -->
     <div class="tab-content">
       <component 
         :is="currentComponent.component" 
@@ -37,29 +39,20 @@
 </template>
 
 <script setup lang="ts">
-import { ref, shallowRef, markRaw } from 'vue'
+import { ref, onMounted } from 'vue'
 import BaseIcon from '../icons/BaseIcon.vue'
-import CodeEditor from '../CodeEditor/CodeEditor.vue'
-import ImagePreview from '../ImagePreview/ImagePreview.vue'
-import AudioPreview from '../AudioPreview/AudioPreview.vue'   // ← НОВЫЙ
-import UnknownFile from '../UnknownFile/UnknownFile.vue'
-import WebEditor from '../WebEditor/WebEditor.vue'
+import { useTabs } from '@/composables/useTabs'
+import { useFileType } from '@/composables/useFileType'
+import { getFileIcon } from '@/utils/fileIcons'
 
-const tabs = ref<Array<{
-  id: string
-  filePath: string
-  name: string
-  type: 'code' | 'image' | 'web' | 'audio' | 'unknown'   // ← добавлен audio
-  content?: string
-  language?: string
-}>>([])
+// Инициализация composables
+const { tabs, activeFilePath, currentComponent, openFile, activateTab, closeTab } = useTabs()
+const { getFileHandler } = useFileType()
 
-const activeFilePath = ref<string | null>(null)
-
-const currentComponent = shallowRef<{
-  component: any
-  props: Record<string, any>
-}>({ component: null, props: {} })
+// Открытие файла (вызывается из App.vue / DirectoryTree)
+const handleOpenFile = async (filePath: string) => {
+  await openFile(filePath, getFileHandler)
+}
 
 const handleWheel = (e: WheelEvent) => {
   const tabsBar = e.currentTarget as HTMLElement
@@ -69,101 +62,26 @@ const handleWheel = (e: WheelEvent) => {
   }
 }
 
-const openFile = async (filePath: string) => {
-  const name = filePath.split(/[/\\]/).pop() || filePath
-  const ext = name.split('.').pop()?.toLowerCase() || ''
-
-  const existing = tabs.value.find(t => t.filePath === filePath)
-  if (existing) {
-    activateTab(existing)
-    return
-  }
-
-  let component: any = UnknownFile
-  let type: 'code' | 'image' | 'web' | 'audio' | 'unknown' = 'unknown'
-  let content = ''
-  let language = 'plaintext'
-
-  const textExts = ['sn', 'ts', 'js', 'json', 'txt', 'xml', 'cs', 'csproj', 'log']
-  const imgExts = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp']
-  const audioExts = ['mp3', 'wav', 'ogg', 'm4a', 'flac', 'aac']   // ← новые расширения
-
-  if (ext === 'html') {
-    component = WebEditor
-    type = 'web'
-    try { content = await (window as any).electron.readFile(filePath) } catch (e) { content = `Ошибка чтения HTML:\n${e}` }
-  } 
-  else if (textExts.includes(ext)) {
-    component = CodeEditor
-    type = 'code'
-    try {
-      content = await (window as any).electron.readFile(filePath)
-      language = ext === 'sn' ? 'sn' : (ext === 'cs' ? 'csharp' : (ext === 'ts' ? 'typescript' : 'plaintext'))
-    } catch (e) { content = `Ошибка чтения:\n${e}` }
-  } 
-  else if (imgExts.includes(ext)) {
-    component = ImagePreview
-    type = 'image'
-  }
-  else if (audioExts.includes(ext)) {          // ← обработка аудио
-    component = AudioPreview
-    type = 'audio'
-  }
-
-  const newTab = { id: Date.now().toString(), filePath, name, type, content, language }
-  tabs.value.push(newTab)
-  activateTab(newTab)
-}
-
-const activateTab = (tab: any) => {
-  activeFilePath.value = tab.filePath
-
-  if (tab.type === 'web') {
-    currentComponent.value = { component: markRaw(WebEditor), props: { filePath: tab.filePath, initialHtml: tab.content || '' } }
-  } 
-  else if (tab.type === 'code') {
-    currentComponent.value = { component: markRaw(CodeEditor), props: { modelValue: tab.content || '', language: tab.language || 'plaintext', theme: 'snengine-dark' } }
-  } 
-  else if (tab.type === 'image') {
-    currentComponent.value = { component: markRaw(ImagePreview), props: { imagePath: tab.filePath } }
-  } 
-  else if (tab.type === 'audio') {             // ← новый блок
-    currentComponent.value = { component: markRaw(AudioPreview), props: { audioPath: tab.filePath } }
-  } 
-  else {
-    currentComponent.value = { component: markRaw(UnknownFile), props: { filePath: tab.filePath } }
-  }
-}
-
-const closeTab = (tab: any) => {
-  const index = tabs.value.findIndex(t => t.id === tab.id)
-  tabs.value.splice(index, 1)
-  if (activeFilePath.value === tab.filePath) {
-    if (tabs.value.length > 0) {
-      activateTab(tabs.value[Math.max(0, index - 1)])
-    } else {
-      activeFilePath.value = null
-      currentComponent.value = { component: null, props: {} }
-    }
-  }
-}
-
 const getTabIconName = (tab: any) => {
-  const ext = tab.name.split('.').pop()?.toLowerCase() || ''
   if (tab.type === 'web') return 'html_icon'
   if (tab.type === 'image') return 'image_icon'
-  if (tab.type === 'audio') return 'audio_icon'      // ← новая иконка
-  if (ext === 'sn') return 'sn_script_icon'
-  if (ext === 'cs') return 'csharp_icon'
-  if (ext === 'dll') return 'dll_icon'
+  if (tab.type === 'audio') return 'audio_icon'
+  if (tab.type === 'code') {
+    const ext = tab.filePath.split('.').pop()?.toLowerCase()
+    if (ext === 'sn') return 'sn_script_icon'
+    if (ext === 'cs') return 'csharp_icon'
+    if (ext === 'dll') return 'dll_icon'
+  }
   return 'unknown_icon'
 }
 
-defineExpose({ openFile })
+// Экспонируем метод для внешнего использования
+defineExpose({
+  openFile: handleOpenFile
+})
 </script>
 
 <style scoped>
-/* (стили остались без изменений — полностью как в твоём файле) */
 .editor-tabs {
   display: flex;
   flex-direction: column;

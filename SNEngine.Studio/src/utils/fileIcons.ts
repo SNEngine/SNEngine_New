@@ -21,7 +21,16 @@ export function getFileIcon(filename: string): string {
     case 'gif':
     case 'webp':
     case 'svg':
+    case 'bmp':
       return 'image_icon'
+
+    case 'mp3':
+    case 'wav':
+    case 'ogg':
+    case 'm4a':
+    case 'flac':
+    case 'aac':
+      return 'audio_icon'           // ← Теперь правильно
 
     case 'cs':
       return 'csharp_icon'
@@ -34,7 +43,7 @@ export function getFileIcon(filename: string): string {
     case 'yaml':
     case 'toml':
     case 'config':
-      return 'folder_icon'   // или сделаем config_icon позже
+      return 'file_icon'            // Более логично, чем folder
 
     default:
       return 'unknown_icon'

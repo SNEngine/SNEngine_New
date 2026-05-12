@@ -25,10 +25,14 @@ import csharpSvg from '@/assets/icons/csharp_icon.svg?raw'
 import dllSvg from '@/assets/icons/dll_icon.svg?raw'
 import unknownSvg from '@/assets/icons/unknown_icon.svg?raw'
 import deleteSvg from '@/assets/icons/delete_icon.svg?raw'
+import audioSvg from '@/assets/icons/audio_icon.svg?raw'
+import volumeSvg from '@/assets/icons/volume_icon.svg?raw'
+import repeatSvg from '@/assets/icons/repeat_icon.svg?raw'
+import repeatOneSvg from '@/assets/icons/repeat_one_icon.svg?raw'   // ← НОВОЕ
 
 const iconMap: Record<string, string> = {
   folder_icon: folderSvg,
-  file_icon: fileSvg,                    // ← новая
+  file_icon: fileSvg,
   html_icon: htmlSvg,
   css_icon: cssSvg,
   image_icon: imageSvg,
@@ -36,7 +40,11 @@ const iconMap: Record<string, string> = {
   csharp_icon: csharpSvg,
   dll_icon: dllSvg,
   unknown_icon: unknownSvg,
-  delete_icon: deleteSvg,                // ← новая
+  delete_icon: deleteSvg,
+  audio_icon: audioSvg,
+  volume_icon: volumeSvg,
+  repeat_icon: repeatSvg,
+  repeat_one_icon: repeatOneSvg,     // ← Добавлено
 }
 
 const svgContent = computed(() => {

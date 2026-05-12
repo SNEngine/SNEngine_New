@@ -37,11 +37,11 @@
 </template>
 
 <script setup lang="ts">
-// Логика остается без изменений, как в вашем исходном файле
 import { ref, shallowRef, markRaw } from 'vue'
 import BaseIcon from '../icons/BaseIcon.vue'
 import CodeEditor from '../CodeEditor/CodeEditor.vue'
 import ImagePreview from '../ImagePreview/ImagePreview.vue'
+import AudioPreview from '../AudioPreview/AudioPreview.vue'   // ← НОВЫЙ
 import UnknownFile from '../UnknownFile/UnknownFile.vue'
 import WebEditor from '../WebEditor/WebEditor.vue'
 
@@ -49,7 +49,7 @@ const tabs = ref<Array<{
   id: string
   filePath: string
   name: string
-  type: 'code' | 'image' | 'web' | 'unknown'
+  type: 'code' | 'image' | 'web' | 'audio' | 'unknown'   // ← добавлен audio
   content?: string
   language?: string
 }>>([])
@@ -80,12 +80,13 @@ const openFile = async (filePath: string) => {
   }
 
   let component: any = UnknownFile
-  let type: 'code' | 'image' | 'web' | 'unknown' = 'unknown'
+  let type: 'code' | 'image' | 'web' | 'audio' | 'unknown' = 'unknown'
   let content = ''
   let language = 'plaintext'
 
-  const textExts = ['sn', 'ts', 'js', 'json', 'txt', 'xml', 'cs', 'csproj']
+  const textExts = ['sn', 'ts', 'js', 'json', 'txt', 'xml', 'cs', 'csproj', 'log']
   const imgExts = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp']
+  const audioExts = ['mp3', 'wav', 'ogg', 'm4a', 'flac', 'aac']   // ← новые расширения
 
   if (ext === 'html') {
     component = WebEditor
@@ -104,6 +105,10 @@ const openFile = async (filePath: string) => {
     component = ImagePreview
     type = 'image'
   }
+  else if (audioExts.includes(ext)) {          // ← обработка аудио
+    component = AudioPreview
+    type = 'audio'
+  }
 
   const newTab = { id: Date.now().toString(), filePath, name, type, content, language }
   tabs.value.push(newTab)
@@ -112,13 +117,20 @@ const openFile = async (filePath: string) => {
 
 const activateTab = (tab: any) => {
   activeFilePath.value = tab.filePath
+
   if (tab.type === 'web') {
     currentComponent.value = { component: markRaw(WebEditor), props: { filePath: tab.filePath, initialHtml: tab.content || '' } }
-  } else if (tab.type === 'code') {
+  } 
+  else if (tab.type === 'code') {
     currentComponent.value = { component: markRaw(CodeEditor), props: { modelValue: tab.content || '', language: tab.language || 'plaintext', theme: 'snengine-dark' } }
-  } else if (tab.type === 'image') {
+  } 
+  else if (tab.type === 'image') {
     currentComponent.value = { component: markRaw(ImagePreview), props: { imagePath: tab.filePath } }
-  } else {
+  } 
+  else if (tab.type === 'audio') {             // ← новый блок
+    currentComponent.value = { component: markRaw(AudioPreview), props: { audioPath: tab.filePath } }
+  } 
+  else {
     currentComponent.value = { component: markRaw(UnknownFile), props: { filePath: tab.filePath } }
   }
 }
@@ -140,6 +152,7 @@ const getTabIconName = (tab: any) => {
   const ext = tab.name.split('.').pop()?.toLowerCase() || ''
   if (tab.type === 'web') return 'html_icon'
   if (tab.type === 'image') return 'image_icon'
+  if (tab.type === 'audio') return 'audio_icon'      // ← новая иконка
   if (ext === 'sn') return 'sn_script_icon'
   if (ext === 'cs') return 'csharp_icon'
   if (ext === 'dll') return 'dll_icon'
@@ -150,6 +163,7 @@ defineExpose({ openFile })
 </script>
 
 <style scoped>
+/* (стили остались без изменений — полностью как в твоём файле) */
 .editor-tabs {
   display: flex;
   flex-direction: column;
@@ -158,19 +172,17 @@ defineExpose({ openFile })
   background: #1e1e1e;
 }
 
-/* --- ПАНЕЛЬ ВКЛАДОК --- */
 .tabs-bar {
   display: flex;
   background: #252526;
   overflow-x: auto;
   overflow-y: hidden;
   flex-shrink: 0;
-  height: 35px; /* Фиксированная высота для стабильности */
+  height: 35px;
 }
 
-/* Стилизация скроллбара для панели вкладок */
 .tabs-bar::-webkit-scrollbar {
-  height: 3px; /* Тонкий скроллбар */
+  height: 3px;
 }
 
 .tabs-bar::-webkit-scrollbar-track {
@@ -185,12 +197,11 @@ defineExpose({ openFile })
   background: #FF5252;
 }
 
-/* --- ВКЛАДКА --- */
 .tab {
   padding: 0 12px;
   background: #2d2d2d;
   color: #969696;
-  border-right: 1px solid #1e1e1e; /* Темная граница между вкладками */
+  border-right: 1px solid #1e1e1e;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -210,11 +221,10 @@ defineExpose({ openFile })
 }
 
 .tab.active {
-  background: #1e1e1e; /* Совпадает с фоном контента */
+  background: #1e1e1e;
   color: #FF5252;
 }
 
-/* Полоска сверху активной вкладки (акцент) */
 .tab.active::after {
   content: '';
   position: absolute;
@@ -247,11 +257,10 @@ defineExpose({ openFile })
   justify-content: center;
   width: 16px;
   height: 16px;
-  opacity: 0; /* Прячем крестик по умолчанию */
+  opacity: 0;
   transition: all 0.2s;
 }
 
-/* Показываем крестик при ховере на вкладку или если она активна */
 .tab:hover .tab-close,
 .tab.active .tab-close {
   opacity: 0.6;
@@ -263,7 +272,6 @@ defineExpose({ openFile })
   opacity: 1 !important;
 }
 
-/* --- КОНТЕНТ --- */
 .tab-content {
   flex: 1;
   overflow: hidden;

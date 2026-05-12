@@ -138,6 +138,16 @@ ipcMain.handle('delete-item', async (_, itemPath) => {
   }
 })
 
+ipcMain.handle('write-file', async (_, filePath, content) => {
+  try {
+    await fs.writeFile(filePath, content, 'utf-8')
+    return { success: true }
+  } catch (err) {
+    console.error('write-file error:', err)
+    return { success: false, error: err.message }
+  }
+})
+
 // ====================== APP LIFECYCLE ======================
 app.whenReady().then(() => {
   createWindow()

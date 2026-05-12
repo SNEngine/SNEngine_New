@@ -1,5 +1,5 @@
 <template>
-  <div class="editor-tabs">
+  <div class="editor-tabs" @keydown.ctrl.s.prevent="handleGlobalSave">
     <!-- Панель вкладок -->
     <div 
       class="tabs-bar" 
@@ -30,6 +30,8 @@
         v-if="currentComponent.component"
         v-bind="currentComponent.props"
         :key="activeFilePath"
+        ref="activeComponentRef"
+        @save="handleComponentSave"
       />
       <div v-else class="empty-state">
         <span class="empty-icon">📂</span>
@@ -54,10 +56,101 @@ const { tabs, activeFilePath, currentComponent, openFile, activateTab, closeTab 
 const { getFileHandler } = useFileType()
 
 const tabContextMenuRef = ref<any>(null)
+const activeComponentRef = ref<any>(null)
 
 // Открытие файла из дерева
 const handleOpenFile = async (filePath: string) => {
   await openFile(filePath, getFileHandler)
+}
+
+// Обработчик события save от компонента (например CodeEditor)
+const handleComponentSave = async (content: string) => {
+  console.log('💾 [event save] от компонента, контент длина:', content.length)
+  await saveFileToDisk(content)
+}
+
+// Глобальный обработчик Ctrl+S
+const handleGlobalSave = async () => {
+  console.log('⌨️ [global] Ctrl+S нажат')
+  
+  if (!activeFilePath.value) {
+    console.warn('⚠️ [global] Нет активного файла')
+    return
+  }
+
+  let content = ''
+  const comp = activeComponentRef.value
+  console.log('🔍 [global] activeComponentRef.value:', comp)
+
+  if (comp) {
+    // 1. Monaco Editor
+    const editor = comp.editorRef?.value
+    console.log('   editorRef?.value:', editor)
+    if (editor && typeof editor.getValue === 'function') {
+      content = editor.getValue()
+      console.log('📝 [global] Взято из Monaco Editor')
+    }
+    // 2. internalCode (Ref)
+    else if (comp.internalCode?.value !== undefined) {
+      content = comp.internalCode.value
+      console.log('📝 [global] Взято из internalCode, значение:', content.substring(0, 100))
+    }
+    // 3. modelValue
+    else if (comp.modelValue?.value !== undefined) {
+      content = comp.modelValue.value
+    }
+    else if (comp.modelValue !== undefined) {
+      content = comp.modelValue
+    }
+    // 4. code
+    else if (comp.code?.value !== undefined) {
+      content = comp.code.value
+    }
+    else if (comp.code !== undefined) {
+      content = comp.code
+    }
+    // 5. value
+    else if (comp.value?.value !== undefined) {
+      content = comp.value.value
+    }
+    else if (comp.value !== undefined) {
+      content = comp.value
+    }
+    // 6. textarea
+    else if (comp.$el) {
+      const textarea = comp.$el.querySelector('textarea')
+      if (textarea) {
+        content = textarea.value
+        console.log('📝 [global] Взято из textarea')
+      }
+    }
+
+    if (!content) {
+      console.warn('⚠️ [global] Не удалось извлечь контент. Ключи comp:', Object.keys(comp))
+    }
+  } else {
+    console.warn('⚠️ [global] comp равен null/undefined')
+  }
+
+  if (content) {
+    await saveFileToDisk(content)
+  } else {
+    console.warn('⚠️ [global] Контент пуст, сохранение не выполнено')
+  }
+}
+
+// Запись файла на диск
+const saveFileToDisk = async (content: string) => {
+  try {
+    const result = await window.electron.writeFile(activeFilePath.value!, content)
+    if (result.success) {
+      console.log('✅ Файл сохранён:', activeFilePath.value)
+    } else {
+      console.error('❌ Ошибка сохранения:', result.error)
+    }
+  } catch (err) {
+    console.error('❌ Исключение при сохранении:', err)
+  }
 }
 
 // Контекстное меню по правому клику на вкладке
@@ -141,7 +234,7 @@ defineExpose({
 </script>
 
 <style scoped>
-/* Твои текущие стили (оставляем без изменений) */
+/* Все стили без изменений (те же, что и раньше) */
 .editor-tabs {
   display: flex;
   flex-direction: column;

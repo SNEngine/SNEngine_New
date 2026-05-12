@@ -13,19 +13,18 @@
         @click.stop
       >
         <div 
-          v-for="(item, i) in items" 
+          v-for="(item, i) in currentItems" 
           :key="i"
           class="menu-item"
           :class="{ 
             'is-disabled': item.disabled,
-            'is-separator': item.type === 'separator'
+            'is-separator': item.type === 'separator',
+            'is-danger': item.danger
           }"
           @click="handleClick(item)"
         >
-          <!-- Разделитель -->
           <div v-if="item.type === 'separator'" class="separator"></div>
-
-          <!-- Обычный пункт -->
+          
           <template v-else>
             <BaseIcon 
               v-if="item.icon" 
@@ -33,7 +32,6 @@
               class="item-icon"
             />
             <span class="item-label">{{ item.label }}</span>
-            <span v-if="item.shortcut" class="item-shortcut">{{ item.shortcut }}</span>
           </template>
         </div>
       </div>
@@ -48,17 +46,13 @@ import BaseIcon from '../icons/BaseIcon.vue'
 export interface ContextMenuItem {
   label?: string
   icon?: string
-  shortcut?: string
-  disabled?: boolean
-  type?: 'separator'
   action?: () => void | Promise<void>
-  children?: ContextMenuItem[] // для подменю в будущем
+  type?: 'separator'
+  danger?: boolean
+  disabled?: boolean
 }
 
-const props = defineProps<{
-  items: ContextMenuItem[]
-}>()
-
+const currentItems = ref<ContextMenuItem[]>([])
 const visible = ref(false)
 const menuRef = ref<HTMLElement | null>(null)
 const position = ref({ x: 0, y: 0 })
@@ -68,21 +62,15 @@ const menuStyle = computed(() => ({
   top: `${position.value.y}px`
 }))
 
-const show = (x: number, y: number) => {
+const show = (x: number, y: number, items: ContextMenuItem[]) => {
   position.value = { x, y }
+  currentItems.value = items
   visible.value = true
-
-  // Автоматическое закрытие при клике вне меню
-  setTimeout(() => {
-    document.addEventListener('click', closeOnce, { once: true })
-  }, 10)
 }
 
 const close = () => {
   visible.value = false
 }
-
-const closeOnce = () => close()
 
 const handleClick = (item: ContextMenuItem) => {
   if (item.disabled || item.type === 'separator') return
@@ -130,6 +118,10 @@ defineExpose({ show, close })
   color: white;
 }
 
+.menu-item.is-danger:hover {
+  background: #e63939;
+}
+
 .menu-item.is-disabled {
   opacity: 0.4;
   cursor: not-allowed;
@@ -148,12 +140,6 @@ defineExpose({ show, close })
 
 .item-label {
   flex: 1;
-}
-
-.item-shortcut {
-  font-size: 12px;
-  color: #777;
-  margin-left: auto;
 }
 
 .separator {

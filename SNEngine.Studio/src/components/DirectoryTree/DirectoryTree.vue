@@ -8,7 +8,7 @@
           class="search-input"
         />
       </div>
-      <button class="refresh-btn" @click="manualRefresh" title="Обновить">⟳</button>
+      <button class="refresh-btn" @click="refresh" title="Обновить">⟳</button>
     </div>
 
     <div 
@@ -17,7 +17,7 @@
       @click="selectedItem = null"
     >
       <div v-if="loading && items.length === 0" class="loading">Загрузка...</div>
-      
+
       <div class="tree-content">
         <div 
           v-for="item in filteredItems" 
@@ -29,7 +29,7 @@
             :class="{ 
               'is-folder': item.isFolder, 
               'is-open': item.isOpen,
-              'is-active': activePath === item.path || (selectedItem && selectedItem.path === item.path)
+              'is-active': activePath === item.path || selectedItem?.path === item.path
             }"
             @click.stop="toggleItem(item)"
             @contextmenu.stop.prevent="onContextMenu($event, item)"
@@ -39,7 +39,7 @@
               :color="item.isFolder ? '#FFCA28' : '#FF5252'"
               class="node-icon"
             />
-            <span class="node-name">{{ item.name }}</span>
+            <span class="node-name" v-html="highlightMatch(item.name)"></span>
           </div>
 
           <div v-if="item.isFolder && item.isOpen" class="tree-children">
@@ -47,33 +47,26 @@
               :base-path="item.path" 
               :active-path="activePath"
               :is-sub-tree="true"
-              @file-click="handleFileClick"
+              @file-click="emitFileClick"
             />
           </div>
         </div>
       </div>
     </div>
 
-    <ContextMenu ref="contextMenuRef" :items="menuItems" />
+    <ContextMenu ref="contextMenuRef" />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
-import { getFileIcon } from '@/utils/fileIcons'
-import { lastUpdate } from '@/utils/watcherState'
-import { useMessageBox } from '@/composables/useMessageBox'
-import { useInputBox } from '@/composables/useInputBox'
+import { ref, onMounted, watch } from 'vue'
 import BaseIcon from '../icons/BaseIcon.vue'
-import ContextMenu from '@/components/ContextMenu/ContextMenu.vue'
+import ContextMenu from '../ContextMenu/ContextMenu.vue'
+import { getFileIcon } from '@/utils/fileIcons'
 
-interface TreeItem {
-  name: string
-  path: string
-  isFolder: boolean
-  isOpen: boolean
-  children?: any[]
-}
+import { useDirectoryTree } from '@/composables/useDirectoryTree'
+import { useTreeSearch } from '@/composables/useTreeSearch'
+import { useContextMenu } from '@/composables/useContextMenu'
 
 const props = defineProps<{
   basePath: string
@@ -85,169 +78,59 @@ const emit = defineEmits<{
   (e: 'file-click', path: string): void
 }>()
 
-const items = ref<TreeItem[]>([])
-const loading = ref(true)
-const searchQuery = ref('')
-const isRoot = computed(() => !props.isSubTree)
+const isRoot = !props.isSubTree
 
-const { showMessageBox } = useMessageBox()
-const { showInputBox } = useInputBox()
+// Composables
+const {
+  items,
+  loading,
+  selectedItem,
+  loadDirectory,
+  createItem,
+  renameItem,
+  deleteItem,
+  toggleOpen
+} = useDirectoryTree(props.basePath, isRoot)
 
-const contextMenuRef = ref<any>(null)
-const selectedItem = ref<TreeItem | null>(null)
+const { searchQuery, filteredItems, highlightMatch } = useTreeSearch(items)
+const { contextMenuRef, show: showContextMenu } = useContextMenu()
 
-const menuItems = computed(() => {
-  const common = [
-    { label: 'Создать файл', icon: 'file_icon', action: () => handleCreate(false) },
-    { label: 'Создать папку', icon: 'folder_icon', action: () => handleCreate(true) },
-  ]
-  if (selectedItem.value) {
-    return [
-      ...common,
-      { type: 'separator' },
-      { label: 'Переименовать', action: handleRename },
-      { label: 'Удалить', icon: 'delete_icon', action: handleDelete }
-    ]
-  }
-  return common
-})
-
-const loadDirectory = async () => {
-  loading.value = true
-  try {
-    const result = await (window as any).electron.readDirectory(props.basePath)
-    const openedPaths = new Set(items.value.filter(i => i.isOpen).map(i => i.path))
-    
-    items.value = result.map((item: any) => ({
-      ...item,
-      isOpen: openedPaths.has(item.path)
-    })).sort((a: any, b: any) => {
-      if (a.isFolder && !b.isFolder) return -1
-      if (!a.isFolder && b.isFolder) return 1
-      return a.name.localeCompare(b.name)
-    })
-  } catch (err) {
-    console.error('Directory read error:', err)
-  } finally {
-    loading.value = false
-  }
-}
-
-const onContextMenu = (e: MouseEvent, item: TreeItem | null) => {
+// Контекстное меню
+const onContextMenu = (e: MouseEvent, item: any) => {
   selectedItem.value = item
-  contextMenuRef.value?.show(e.clientX, e.clientY)
+
+  const menuItems = [
+    { label: 'Создать файл', icon: 'file_icon', action: () => createItem(false) },
+    { label: 'Создать папку', icon: 'folder_icon', action: () => createItem(true) },
+  ]
+
+  if (item) {
+    menuItems.push(
+      { type: 'separator' },
+      { label: 'Переименовать', action: renameItem },
+      { label: 'Удалить', icon: 'delete_icon', action: deleteItem, danger: true }
+    )
+  }
+
+  showContextMenu(e, menuItems)
 }
 
-const handleCreate = async (isFolder: boolean) => {
-  let targetDir = props.basePath
-  if (selectedItem.value) {
-    targetDir = selectedItem.value.isFolder ? selectedItem.value.path : props.basePath
-  }
-  
-  const name = await showInputBox({
-    title: isFolder ? 'Новая папка' : 'Новый файл',
-    message: `Создание в: ${targetDir.split(/[\\/]/).pop() || 'Корень'}`,
-    placeholder: isFolder ? 'Имя папки' : 'new_file.sn'
-  })
-  
-  if (name) {
-    const fullPath = `${targetDir}/${name}`
-    try {
-      if (isFolder) {
-        await (window as any).electron.createDirectory(fullPath)
-      } else {
-        await (window as any).electron.createFile(fullPath)
-      }
-      lastUpdate.value = Date.now()
-    } catch (err) {
-      await showMessageBox({ title: 'Ошибка', message: 'Не удалось создать объект', icon: 'error' })
-    }
-  }
-}
-
-const handleRename = async () => {
-  if (!selectedItem.value) return
-  const newName = await showInputBox({
-    title: 'Переименование',
-    message: `Введите новое имя для ${selectedItem.value.name}:`,
-    value: selectedItem.value.name
-  })
-  if (newName && newName !== selectedItem.value.name) {
-    try {
-      await (window as any).electron.renameItem(selectedItem.value.path, newName)
-      lastUpdate.value = Date.now()
-    } catch (err) {
-      await showMessageBox({ title: 'Ошибка', message: 'Ошибка переименования', icon: 'error' })
-    }
-  }
-}
-
-const handleDelete = async () => {
-  if (!selectedItem.value) return
-  const result = await showMessageBox({
-    title: 'Удаление',
-    message: `Вы действительно хотите удалить ${selectedItem.value.name}?`,
-    type: 'yesno',
-    icon: 'warning'
-  })
-  if (result === 'yes') {
-    try {
-      await (window as any).electron.deleteItem(selectedItem.value.path)
-      lastUpdate.value = Date.now()
-    } catch (err) {
-      await showMessageBox({ title: 'Ошибка', message: 'Не удалось удалить', icon: 'error' })
-    }
-  }
-}
-
-const toggleItem = (item: TreeItem) => {
+const toggleItem = (item: any) => {
   selectedItem.value = item
   if (!item.isFolder) {
     emit('file-click', item.path)
     return
   }
-  item.isOpen = !item.isOpen
+  toggleOpen(item)
 }
 
-const handleFileClick = (path: string) => emit('file-click', path)
-const manualRefresh = () => { lastUpdate.value = Date.now() }
+const emitFileClick = (path: string) => emit('file-click', path)
+const refresh = () => loadDirectory()
 
-const filteredItems = computed(() => {
-  if (!searchQuery.value.trim()) return items.value
-  const q = searchQuery.value.toLowerCase().trim()
-  return items.value.filter(item => item.name.toLowerCase().includes(q))
-})
-
-watch(lastUpdate, () => loadDirectory())
-
-let watcherCleanup: (() => void) | null = null
-const setupWatcher = () => {
-  if (!isRoot.value) return
-  const handler = () => { lastUpdate.value = Date.now() }
-  (window as any).electron.onFileChange(handler)
-  watcherCleanup = () => {
-    (window as any).electron.offFileChange(handler)
-    ;(window as any).electron.stopWatcher()
-  }
-  ;(window as any).electron.startWatcher(props.basePath)
-}
-
-onMounted(() => {
-  loadDirectory()
-  if (isRoot.value) setupWatcher()
-})
-
-onUnmounted(() => { if (watcherCleanup) watcherCleanup() })
-
-watch(() => props.basePath, (newPath) => {
-  loadDirectory()
-  if (isRoot.value) (window as any).electron.startWatcher(newPath)
-})
+onMounted(loadDirectory)
+watch(() => props.basePath, loadDirectory)
 </script>
-
 <style scoped>
-/* Убираем лишние высоты, чтобы контейнер подстраивался под контент, 
-   но в корне занимал всё доступное пространство */
 .directory-tree-container {
   display: flex;
   flex-direction: column;
@@ -255,9 +138,9 @@ watch(() => props.basePath, (newPath) => {
   color: #eeeeee;
   user-select: none;
   width: 100%;
+  height: 100%;
 }
 
-/* Ограничиваем высоту только для корневого контейнера */
 :not(.tree-children) > .directory-tree-container {
   height: 100%;
 }
@@ -295,12 +178,10 @@ watch(() => props.basePath, (newPath) => {
   overflow-x: hidden;
 }
 
-/* Элемент дерева */
-/* В секции <style scoped> найдите этот блок: */
 .tree-node {
   display: flex;
   align-items: center;
-  padding: 4px 10px; /* Было 2px 10px, увеличили вертикальный отступ для комфортного клика */
+  padding: 4px 10px;
   cursor: pointer;
   font-size: 13px;
   white-space: nowrap;
@@ -317,17 +198,10 @@ watch(() => props.basePath, (newPath) => {
   flex-shrink: 0; 
 }
 
-/* Вложенность */
 .tree-children {
-  /* Вложенные списки не должны иметь своей высоты 100% */
   height: auto; 
   margin-left: 12px;
   border-left: 1px solid #2d2d2d;
-}
-
-/* Убираем лишние отступы у вложенных контейнеров */
-.tree-children :deep(.directory-tree-container) {
-  height: auto;
 }
 
 .loading { 

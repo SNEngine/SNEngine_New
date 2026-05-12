@@ -12,6 +12,7 @@
         class="tab"
         :class="{ active: tab.filePath === activeFilePath }"
         @click="activateTab(tab)"
+        @contextmenu.prevent="showTabContextMenu($event, tab)"
       >
         <BaseIcon 
           :name="getTabIconName(tab)" 
@@ -35,23 +36,82 @@
         <p>Выберите файл в дереве проекта</p>
       </div>
     </div>
+
+    <!-- Контекстное меню для вкладок -->
+    <ContextMenu ref="tabContextMenuRef" />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref } from 'vue'
 import BaseIcon from '../icons/BaseIcon.vue'
+import ContextMenu from '../ContextMenu/ContextMenu.vue'
+
 import { useTabs } from '@/composables/useTabs'
 import { useFileType } from '@/composables/useFileType'
-import { getFileIcon } from '@/utils/fileIcons'
 
-// Инициализация composables
 const { tabs, activeFilePath, currentComponent, openFile, activateTab, closeTab } = useTabs()
 const { getFileHandler } = useFileType()
 
-// Открытие файла (вызывается из App.vue / DirectoryTree)
+const tabContextMenuRef = ref<any>(null)
+
+// Открытие файла из дерева
 const handleOpenFile = async (filePath: string) => {
   await openFile(filePath, getFileHandler)
+}
+
+// Контекстное меню по правому клику на вкладке
+const showTabContextMenu = (e: MouseEvent, currentTab: any) => {
+  const currentIndex = tabs.value.findIndex(t => t.id === currentTab.id)
+
+  const menuItems = [
+    { 
+      label: 'Закрыть вкладку', 
+      action: () => closeTab(currentTab) 
+    },
+    { 
+      label: 'Закрыть другие вкладки', 
+      action: () => closeOtherTabs(currentTab) 
+    },
+    { 
+      label: 'Закрыть вкладки справа', 
+      action: () => closeTabsToRight(currentIndex) 
+    },
+    { 
+      label: 'Закрыть вкладки слева', 
+      action: () => closeTabsToLeft(currentIndex) 
+    },
+    { 
+      label: 'Закрыть все вкладки', 
+      action: closeAllTabs 
+    },
+  ]
+
+  if (tabContextMenuRef.value) {
+    tabContextMenuRef.value.show(e.clientX, e.clientY, menuItems)
+  }
+}
+
+// Вспомогательные функции закрытия
+const closeOtherTabs = (currentTab: any) => {
+  const toClose = tabs.value.filter(t => t.id !== currentTab.id)
+  toClose.forEach(tab => closeTab(tab))
+}
+
+const closeTabsToRight = (currentIndex: number) => {
+  const toClose = tabs.value.slice(currentIndex + 1)
+  toClose.forEach(tab => closeTab(tab))
+}
+
+const closeTabsToLeft = (currentIndex: number) => {
+  const toClose = tabs.value.slice(0, currentIndex)
+  toClose.forEach(tab => closeTab(tab))
+}
+
+const closeAllTabs = () => {
+  while (tabs.value.length > 0) {
+    closeTab(tabs.value[0])
+  }
 }
 
 const handleWheel = (e: WheelEvent) => {
@@ -75,13 +135,13 @@ const getTabIconName = (tab: any) => {
   return 'unknown_icon'
 }
 
-// Экспонируем метод для внешнего использования
 defineExpose({
   openFile: handleOpenFile
 })
 </script>
 
 <style scoped>
+/* Твои текущие стили (оставляем без изменений) */
 .editor-tabs {
   display: flex;
   flex-direction: column;

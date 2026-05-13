@@ -14,11 +14,20 @@ const preloadPath = app.isPackaged
     : path.join(__dirname, 'preload.cjs');
 
 function createWindow() {
+  // Путь к иконке (работает и в dev, и в собранном приложении)
+  const iconPath = app.isPackaged
+    ? path.join(app.getAppPath(), '../build/icons/png/512x512.png')
+    : path.join(__dirname, 'build/icons/png/512x512.png')
+
   mainWindow = new BrowserWindow({
     width: 1400,
     height: 900,
     title: "SNEngine Studio",
     autoHideMenuBar: true,
+    
+    // ←←←←←←←←←←←←←←←←← ИКОНКА ЗДЕСЬ
+    icon: iconPath,
+    
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,

@@ -1,13 +1,13 @@
 // src/config/icons.config.ts
 
-// Новое рекомендуемое API (Vite 5+)
+// Динамический импорт всех SVG
 const rawIcons = import.meta.glob('@/assets/icons/*.svg', { 
-  query: '?raw',     // ← новое
-  import: 'default', // ← новое
+  query: '?raw',     
+  import: 'default', 
   eager: true 
 })
 
-// Создаём карту: имя_файла → содержимое SVG
+// Карта иконок: имя_файла → SVG содержимое
 export const iconMap = Object.fromEntries(
   Object.entries(rawIcons).map(([path, content]) => {
     const fileName = path.split('/').pop()?.replace('.svg', '') || ''
@@ -43,6 +43,15 @@ const extensionToIcon: Record<string, string> = {
   'm4a': 'audio_icon',
   'flac': 'audio_icon',
   'aac': 'audio_icon',
+
+  // === ВИДЕО ===
+  'mp4': 'video_icon',
+  'webm': 'video_icon',
+  'mov': 'video_icon',
+  'avi': 'video_icon',
+  'mkv': 'video_icon',
+  'm4v': 'video_icon',
+  'ogv': 'video_icon',
 
   // Other
   'dll': 'dll_icon',

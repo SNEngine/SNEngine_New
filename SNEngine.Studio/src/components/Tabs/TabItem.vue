@@ -5,7 +5,10 @@
     @click="$emit('activate', tab)"
     @contextmenu.prevent="$emit('context-menu', $event, tab)"
   >
-    <BaseIcon :name="getTabIconName(tab)" class="tab-icon" />
+    <BaseIcon 
+      :name="getTabIconName(tab)" 
+      class="tab-icon" 
+    />
     <span class="tab-name">
       {{ tab.name }}
       <span v-if="tab.isDirty" class="dirty-indicator">*</span>
@@ -16,6 +19,7 @@
 
 <script setup lang="ts">
 import BaseIcon from '../icons/BaseIcon.vue'
+import { getFileIcon } from '@/config/icons.config'
 
 interface Tab {
   id: string
@@ -36,14 +40,10 @@ defineEmits<{
   (e: 'context-menu', event: MouseEvent, tab: Tab): void
 }>()
 
-const getTabIconName = (tab: Tab) => {
-  const ext = tab.filePath.split('.').pop()?.toLowerCase() || ''
-  if (['png', 'jpg', 'jpeg', 'gif', 'webp'].includes(ext)) return 'image_icon'
-  if (['mp3', 'wav', 'ogg', 'm4a'].includes(ext)) return 'audio_icon'
-  if (['html', 'htm'].includes(ext)) return 'html_icon'
-  if (ext === 'sn') return 'sn_script_icon'
-  if (ext === 'cs') return 'csharp_icon'
-  return 'unknown_icon'
+// Теперь используем единую функцию из icons.config.ts
+const getTabIconName = (tab: Tab): string => {
+  if (!tab.filePath) return 'unknown_icon'
+  return getFileIcon(tab.filePath)
 }
 </script>
 

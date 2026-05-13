@@ -1,13 +1,14 @@
 import { markRaw, type Component } from 'vue'
 
-// Импорты компонентов редакторов
+// Импорты компонентов
 import CodeEditor from '../components/CodeEditor/CodeEditor.vue'
 import ImagePreview from '../components/ImagePreview/ImagePreview.vue'
 import AudioPreview from '../components/AudioPreview/AudioPreview.vue'
+import VideoPreview from '../components/VideoPreview/VideoPreview.vue'   // ← Новый
 import WebEditor from '../components/WebEditor/WebEditor.vue'
 import UnknownFile from '../components/UnknownFile/UnknownFile.vue'
 
-export type FileType = 'code' | 'image' | 'audio' | 'web' | 'unknown'
+export type FileType = 'code' | 'image' | 'audio' | 'video' | 'web' | 'unknown'
 
 export interface FileHandlerResult {
   component: Component
@@ -31,6 +32,10 @@ const IMAGE_EXTENSIONS = new Set([
 
 const AUDIO_EXTENSIONS = new Set([
   'mp3', 'wav', 'ogg', 'm4a', 'flac', 'aac', 'wma', 'opus'
+])
+
+const VIDEO_EXTENSIONS = new Set([     // ← Новый блок
+  'mp4', 'webm', 'mov', 'avi', 'mkv', 'm4v', 'ogv', 'flv', 'wmv'
 ])
 
 const LANGUAGE_MAP: Record<string, string> = {
@@ -62,7 +67,7 @@ export function useFileType() {
     const name = filePath.split(/[/\\]/).pop() || filePath
     const ext = name.split('.').pop()?.toLowerCase() || ''
 
-    // HTML (специальная обработка)
+    // HTML (WebEditor)
     if (ext === 'html' || ext === 'htm') {
       return {
         component: markRaw(WebEditor),
@@ -73,7 +78,37 @@ export function useFileType() {
       }
     }
 
-    // Текстовые файлы (включая .sn)
+    // Видео (Новый обработчик)
+    if (VIDEO_EXTENSIONS.has(ext)) {
+      return {
+        component: markRaw(VideoPreview),
+        type: 'video',
+        props: { videoPath: filePath },
+        icon: 'video_icon'
+      }
+    }
+
+    // Аудио
+    if (AUDIO_EXTENSIONS.has(ext)) {
+      return {
+        component: markRaw(AudioPreview),
+        type: 'audio',
+        props: { audioPath: filePath },
+        icon: 'audio_icon'
+      }
+    }
+
+    // Изображения
+    if (IMAGE_EXTENSIONS.has(ext)) {
+      return {
+        component: markRaw(ImagePreview),
+        type: 'image',
+        props: { imagePath: filePath },
+        icon: 'image_icon'
+      }
+    }
+
+    // Текстовые файлы
     if (TEXT_EXTENSIONS.has(ext)) {
       const content = await safeReadFile(filePath)
       const language = LANGUAGE_MAP[ext] || 'plaintext'
@@ -91,27 +126,7 @@ export function useFileType() {
       }
     }
 
-    // Изображения
-    if (IMAGE_EXTENSIONS.has(ext)) {
-      return {
-        component: markRaw(ImagePreview),
-        type: 'image',
-        props: { imagePath: filePath },
-        icon: 'image_icon'
-      }
-    }
-
-    // Аудио
-    if (AUDIO_EXTENSIONS.has(ext)) {
-      return {
-        component: markRaw(AudioPreview),
-        type: 'audio',
-        props: { audioPath: filePath },
-        icon: 'audio_icon'
-      }
-    }
-
-    // Неизвестный тип файла
+    // Неизвестный файл
     return {
       component: markRaw(UnknownFile),
       type: 'unknown',
@@ -120,27 +135,23 @@ export function useFileType() {
     }
   }
 
-  // Безопасное чтение файла
   const safeReadFile = async (path: string): Promise<string> => {
     try {
-      if (!(window as any).electron?.readFile) {
-        return '// Electron API недоступен'
-      }
-      return await (window as any).electron.readFile(path)
+      return await (window as any).electron?.readFile?.(path) || ''
     } catch (error) {
       console.error('Ошибка чтения файла:', error)
-      return `// Ошибка чтения файла: ${error}`
+      return `// Ошибка чтения: ${error}`
     }
   }
 
-  // Утилита: определить тип без загрузки содержимого
   const getFileType = (filePath: string): FileType => {
     const ext = filePath.split('.').pop()?.toLowerCase() || ''
     
     if (ext === 'html' || ext === 'htm') return 'web'
-    if (TEXT_EXTENSIONS.has(ext)) return 'code'
-    if (IMAGE_EXTENSIONS.has(ext)) return 'image'
+    if (VIDEO_EXTENSIONS.has(ext)) return 'video'
     if (AUDIO_EXTENSIONS.has(ext)) return 'audio'
+    if (IMAGE_EXTENSIONS.has(ext)) return 'image'
+    if (TEXT_EXTENSIONS.has(ext)) return 'code'
     return 'unknown'
   }
 
@@ -149,6 +160,7 @@ export function useFileType() {
     getFileType,
     TEXT_EXTENSIONS,
     IMAGE_EXTENSIONS,
-    AUDIO_EXTENSIONS
+    AUDIO_EXTENSIONS,
+    VIDEO_EXTENSIONS   // ← добавлено
   }
 }

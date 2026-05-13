@@ -1,4 +1,4 @@
-import { ref, watch } from 'vue'
+import { ref, watch, onMounted, onUnmounted } from 'vue'
 import { lastUpdate } from '@/utils/watcherState'
 import { useMessageBox } from './useMessageBox'
 import { useInputBox } from './useInputBox'
@@ -18,11 +18,11 @@ export function useDirectoryTree(basePath: string, isRoot = true) {
   const { showMessageBox } = useMessageBox()
   const { showInputBox } = useInputBox()
 
-  // Загрузка директории
+  // ====================== ЗАГРУЗКА ======================
   const loadDirectory = async () => {
     loading.value = true
     try {
-      const result = await (window as any).electron.readDirectory(basePath)
+      const result = await (window as any).electron?.readDirectory?.(basePath) || []
       
       items.value = result.map((item: any) => ({
         ...item,
@@ -39,7 +39,34 @@ export function useDirectoryTree(basePath: string, isRoot = true) {
     }
   }
 
-  // Создать файл/папку
+  // ====================== WATCHER ======================
+  const startWatcher = () => {
+    if (!isRoot) return
+    try {
+      if ((window as any).electron?.startWatcher) {
+        (window as any).electron.startWatcher(basePath)
+      }
+    } catch (e) {
+      console.warn('Не удалось запустить watcher:', e)
+    }
+  }
+
+  const stopWatcher = () => {
+    if (!isRoot) return
+    try {
+      (window as any).electron?.stopWatcher?.()
+    } catch (e) {
+      // ignore
+    }
+  }
+
+  const handleFileChange = () => {
+    if (isRoot) {
+      loadDirectory()
+    }
+  }
+
+  // ====================== ОПЕРАЦИИ ======================
   const createItem = async (isFolder: boolean) => {
     let targetDir = basePath
     if (selectedItem.value?.isFolder) {
@@ -54,7 +81,7 @@ export function useDirectoryTree(basePath: string, isRoot = true) {
 
     if (!name) return
 
-    const fullPath = `${targetDir}/${name}`
+    const fullPath = `${targetDir}/${name}`.replace(/\\/g, '/')
 
     try {
       if (isFolder) {
@@ -72,7 +99,6 @@ export function useDirectoryTree(basePath: string, isRoot = true) {
     }
   }
 
-  // Переименовать
   const renameItem = async () => {
     if (!selectedItem.value) return
 
@@ -96,7 +122,6 @@ export function useDirectoryTree(basePath: string, isRoot = true) {
     }
   }
 
-  // Удалить
   const deleteItem = async () => {
     if (!selectedItem.value) return
 
@@ -121,7 +146,25 @@ export function useDirectoryTree(basePath: string, isRoot = true) {
     }
   }
 
-  // Watcher для автоматического обновления
+  const toggleOpen = (item: TreeItem) => {
+    item.isOpen = !item.isOpen
+  }
+
+  // ====================== LIFECYCLE ======================
+  onMounted(() => {
+    loadDirectory()
+    startWatcher()
+
+    // Подписка на изменения от Electron
+    ;(window as any).electron?.onFileChange?.(handleFileChange)
+  })
+
+  onUnmounted(() => {
+    stopWatcher()
+    ;(window as any).electron?.offFileChange?.(handleFileChange)
+  })
+
+  // Fallback обновление
   watch(lastUpdate, () => {
     if (isRoot) loadDirectory()
   })
@@ -134,8 +177,6 @@ export function useDirectoryTree(basePath: string, isRoot = true) {
     createItem,
     renameItem,
     deleteItem,
-    toggleOpen: (item: TreeItem) => {
-      item.isOpen = !item.isOpen
-    }
+    toggleOpen
   }
 }

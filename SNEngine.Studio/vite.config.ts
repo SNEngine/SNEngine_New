@@ -4,14 +4,24 @@ import { fileURLToPath, URL } from 'node:url'
 
 export default defineConfig({
   plugins: [vue()],
-  base: './',
+  base: process.env.NODE_ENV === 'production' ? './' : '/',
+  
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
   },
+
   server: {
     port: 5173,
     open: true,
+  },
+
+  optimizeDeps: {
+    include: ['monaco-editor']
+  },
+
+  worker: {
+    format: 'es'
   }
 })

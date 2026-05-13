@@ -1,17 +1,30 @@
 import { createApp } from 'vue'
 import App from './App.vue'
 
-// Регистрируем ВСЕ языки и темы
+// ====================== MONACO SETUP ======================
 import { registerSnLanguage } from './monaco/sn-language'
 import { registerHtmlLanguage } from './monaco/html-language'
 import { registerCssLanguage } from './monaco/css-language'
-import { registerNagatoroTheme } from './monaco/nagatoro-theme'
 import { registerSnEngineTheme } from './monaco/snengine-theme'
 
-registerSnLanguage()
-registerHtmlLanguage()
-registerCssLanguage()
-registerNagatoroTheme()
-registerSnEngineTheme()
+// Центральная функция инициализации Monaco
+function setupMonaco() {
+  console.log('🔧 Настройка Monaco...')
 
+  try {
+    registerSnLanguage()
+    registerHtmlLanguage()
+    registerCssLanguage()
+    registerSnEngineTheme()
+
+    console.log('✅ Monaco успешно настроен (языки + темы)')
+  } catch (error) {
+    console.error('❌ Ошибка при настройке Monaco:', error)
+  }
+}
+
+// Запускаем настройку **до** создания приложения
+setupMonaco()
+
+// Создаём приложение
 createApp(App).mount('#app')

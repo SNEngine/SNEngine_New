@@ -1,5 +1,4 @@
-import { ref, shallowRef } from 'vue'
-import type { FileHandlerResult } from './useFileType'
+import { ref } from 'vue'
 
 export function useTabs() {
   const tabs = ref<Array<{
@@ -7,18 +6,14 @@ export function useTabs() {
     filePath: string
     name: string
     type: string
-    component: any          // ← ДОБАВЛЕНО
-    props: Record<string, any>
     content?: string
     language?: string
+    isDirty: boolean
   }>>([])
 
   const activeFilePath = ref<string | null>(null)
-  const currentComponent = shallowRef<{ component: any; props: Record<string, any> }>({
-    component: null,
-    props: {}
-  })
 
+  // ====================== ОТКРЫТИЕ ФАЙЛА ======================
   const openFile = async (filePath: string, getFileHandler: any) => {
     const existing = tabs.value.find(t => t.filePath === filePath)
     if (existing) {
@@ -33,9 +28,9 @@ export function useTabs() {
       filePath,
       name: filePath.split(/[/\\]/).pop() || filePath,
       type,
-      component,                    // ← ВАЖНО: сохраняем компонент
-      props: props || {},
-      language
+      content: props.modelValue || props.initialHtml || '',
+      language,
+      isDirty: false
     }
 
     tabs.value.push(newTab)
@@ -44,10 +39,6 @@ export function useTabs() {
 
   const activateTab = (tab: any) => {
     activeFilePath.value = tab.filePath
-    currentComponent.value = {
-      component: tab.component,
-      props: tab.props || {}
-    }
   }
 
   const closeTab = (tab: any) => {
@@ -61,17 +52,27 @@ export function useTabs() {
         activateTab(tabs.value[Math.max(0, index - 1)])
       } else {
         activeFilePath.value = null
-        currentComponent.value = { component: null, props: {} }
       }
     }
+  }
+
+  const markDirty = (filePath: string) => {
+    const tab = tabs.value.find(t => t.filePath === filePath)
+    if (tab) tab.isDirty = true
+  }
+
+  const markClean = (filePath: string) => {
+    const tab = tabs.value.find(t => t.filePath === filePath)
+    if (tab) tab.isDirty = false
   }
 
   return {
     tabs,
     activeFilePath,
-    currentComponent,
     openFile,
     activateTab,
-    closeTab
+    closeTab,
+    markDirty,
+    markClean
   }
 }

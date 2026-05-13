@@ -10,20 +10,10 @@ interface Shortcut {
 const shortcuts = new Map<string, Shortcut>()
 let isGlobalListenerAttached = false
 
-const normalizeCombo = (combo: string): string => {
-  return combo
-    .toLowerCase()
-    .split('+')
-    .map(k => k.trim())
-    .sort()
-    .join('+')
-}
-
 const handleKeyDown = (e: KeyboardEvent) => {
-  // Специально для Monaco — принудительно обрабатываем Ctrl+S
-  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
-    console.log('🎯 Ctrl+S нажат (перехвачен до Monaco)')
-    
+  // Специальная обработка Ctrl+S / Cmd+S — работает на ЛЮБОЙ раскладке
+  if ((e.ctrlKey || e.metaKey) && e.code === 'KeyS') {
+    console.log('🎯 Ctrl+S (или Cmd+S) нажат — layout-independent')
     const shortcut = shortcuts.get('ctrl+s')
     if (shortcut) {
       e.preventDefault()
@@ -33,7 +23,7 @@ const handleKeyDown = (e: KeyboardEvent) => {
     }
   }
 
-  // Основная логика
+  // Основная логика для остальных шорткатов
   const keys: string[] = []
   if (e.ctrlKey || e.metaKey) keys.push('ctrl')
   if (e.altKey) keys.push('alt')
@@ -58,13 +48,13 @@ const handleKeyDown = (e: KeyboardEvent) => {
 
 export function useKeyboard() {
   const add = (combo: string, handler: KeyHandler, preventDefault = true) => {
-    const normalized = normalizeCombo(combo)
+    const normalized = combo.toLowerCase().trim()
     shortcuts.set(normalized, { handler, preventDefault })
     console.log(`✅ Шорткат зарегистрирован: ${normalized}`)
   }
 
   const remove = (combo: string) => {
-    const normalized = normalizeCombo(combo)
+    const normalized = combo.toLowerCase().trim()
     shortcuts.delete(normalized)
   }
 
@@ -72,10 +62,14 @@ export function useKeyboard() {
 
   onMounted(() => {
     if (!isGlobalListenerAttached) {
-      window.addEventListener('keydown', handleKeyDown, true) // capture phase
+      window.addEventListener('keydown', handleKeyDown, true)
       isGlobalListenerAttached = true
-      console.log('🔊 Глобальный клавиатурный listener запущен')
+      console.log('🔊 Глобальный keyboard listener запущен')
     }
+  })
+
+  onUnmounted(() => {
+    // Не удаляем глобальный listener — он один на всё приложение
   })
 
   return { add, remove, clear }

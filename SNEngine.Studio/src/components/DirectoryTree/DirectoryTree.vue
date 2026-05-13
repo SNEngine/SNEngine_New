@@ -35,8 +35,8 @@
             @contextmenu.stop.prevent="onContextMenu($event, item)"
           >
             <BaseIcon 
-              :name="item.isFolder ? 'folder_icon' : getFileIcon(item.name)" 
-              :color="item.isFolder ? '#FFCA28' : '#FF5252'"
+              :name="getItemIcon(item)" 
+              :color="getItemIconColor(item)"
               class="node-icon"
             />
             <span class="node-name" v-html="highlightMatch(item.name)"></span>
@@ -62,7 +62,9 @@
 import { ref, onMounted, watch } from 'vue'
 import BaseIcon from '../icons/BaseIcon.vue'
 import ContextMenu from '../ContextMenu/ContextMenu.vue'
-import { getFileIcon } from '@/utils/fileIcons'
+
+// Импортируем из централизованной конфигурации
+import { getFileIcon } from '@/config/icons.config'
 
 import { useDirectoryTree } from '@/composables/useDirectoryTree'
 import { useTreeSearch } from '@/composables/useTreeSearch'
@@ -95,7 +97,41 @@ const {
 const { searchQuery, filteredItems, highlightMatch } = useTreeSearch(items)
 const { contextMenuRef, show: showContextMenu } = useContextMenu()
 
-// Контекстное меню
+// ====================== ИКОНКИ ======================
+const getItemIcon = (item: any): string => {
+  if (item.isFolder) return 'folder_icon'
+  return getFileIcon(item.name)
+}
+
+const getItemIconColor = (item: any): string => {
+  if (item.isFolder) return '#FFCA28'
+
+  const ext = item.name.toLowerCase().split('.').pop() || ''
+
+  switch (ext) {
+    case 'sn': return '#FF5252'
+    case 'cs': return '#00B4FF'
+    case 'html':
+    case 'htm': return '#FF6B6B'
+    case 'css':
+    case 'scss':
+    case 'less': return '#00C4B4'
+    case 'png':
+    case 'jpg':
+    case 'jpeg':
+    case 'gif':
+    case 'webp': return '#FF9F1C'
+    case 'mp3':
+    case 'wav':
+    case 'ogg':
+    case 'm4a':
+    case 'flac': return '#9B59B6'
+    case 'dll': return '#8E44AD'
+    default: return '#A0A0A0'
+  }
+}
+
+// ====================== КОНТЕКСТНОЕ МЕНЮ ======================
 const onContextMenu = (e: MouseEvent, item: any) => {
   selectedItem.value = item
 
@@ -130,6 +166,7 @@ const refresh = () => loadDirectory()
 onMounted(loadDirectory)
 watch(() => props.basePath, loadDirectory)
 </script>
+
 <style scoped>
 .directory-tree-container {
   display: flex;

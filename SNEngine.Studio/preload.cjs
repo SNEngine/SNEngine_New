@@ -5,11 +5,12 @@ contextBridge.exposeInMainWorld('electron', {
   readDirectory: (path) => ipcRenderer.invoke('read-directory', path),
   readFile: (path) => ipcRenderer.invoke('read-file', path),
 
-  // === Манипуляции с файлами (новое для контекстного меню) ===
+  // === Манипуляции с файлами ===
   createFile: (path) => ipcRenderer.invoke('create-file', path),
   createDirectory: (path) => ipcRenderer.invoke('create-directory', path),
   renameItem: (oldPath, newName) => ipcRenderer.invoke('rename-item', oldPath, newName),
   deleteItem: (path) => ipcRenderer.invoke('delete-item', path),
+  duplicateItem: (path) => ipcRenderer.invoke('duplicate-item', path),
   writeFile: (path, content) => ipcRenderer.invoke('write-file', path, content),
   showInExplorer: (path) => ipcRenderer.invoke('show-in-explorer', path),
 

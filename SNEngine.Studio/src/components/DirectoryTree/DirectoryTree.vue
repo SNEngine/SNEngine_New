@@ -8,7 +8,7 @@
           class="search-input"
         />
       </div>
-      <button class="refresh-btn" @click="refresh" title="Обновить">⟳</button>
+      <button class="refresh-btn" @click="refresh" title="Обновить (F5)">⟳</button>
     </div>
 
     <div 
@@ -63,13 +63,16 @@ import { ref, onMounted, watch } from 'vue'
 import BaseIcon from '../icons/BaseIcon.vue'
 import ContextMenu from '../ContextMenu/ContextMenu.vue'
 
-// Импортируем из централизованной конфигурации
 import { getFileIcon } from '@/config/icons.config'
 
 import { useDirectoryTree } from '@/composables/useDirectoryTree'
 import { useTreeSearch } from '@/composables/useTreeSearch'
 import { useContextMenu } from '@/composables/useContextMenu'
-import { useMessageBox } from '@/composables/useMessageBox'   // ← Добавили
+
+// Новые composables
+import { useFileCrud } from '@/composables/useFileCrud'
+import { useFileUtils } from '@/composables/useFileUtils'
+import { useKeyboard } from '@/composables/useKeyboard'   // ← НОВОЕ
 
 const props = defineProps<{
   basePath: string
@@ -83,22 +86,24 @@ const emit = defineEmits<{
 
 const isRoot = !props.isSubTree
 
-// Composables
-const { showMessageBox } = useMessageBox()   // ← Теперь доступен
-
+// Основной tree state
 const {
   items,
   loading,
   selectedItem,
   loadDirectory,
-  createItem,
-  renameItem,
-  deleteItem,
   toggleOpen
 } = useDirectoryTree(props.basePath, isRoot)
 
+// Операции с файлами
+const { createItem, renameItem, deleteItem } = useFileCrud()
+const { showInExplorer, copyPath, copyName, duplicateItem } = useFileUtils()
+
 const { searchQuery, filteredItems, highlightMatch } = useTreeSearch(items)
 const { contextMenuRef, show: showContextMenu } = useContextMenu()
+
+// ====================== ГОРЯЧИЕ КЛАВИШИ ======================
+const { add } = useKeyboard()
 
 // ====================== ИКОНКИ ======================
 const getItemIcon = (item: any): string => {
@@ -114,21 +119,10 @@ const getItemIconColor = (item: any): string => {
   switch (ext) {
     case 'sn': return '#FF5252'
     case 'cs': return '#00B4FF'
-    case 'html':
-    case 'htm': return '#FF6B6B'
-    case 'css':
-    case 'scss':
-    case 'less': return '#00C4B4'
-    case 'png':
-    case 'jpg':
-    case 'jpeg':
-    case 'gif':
-    case 'webp': return '#FF9F1C'
-    case 'mp3':
-    case 'wav':
-    case 'ogg':
-    case 'm4a':
-    case 'flac': return '#9B59B6'
+    case 'html': case 'htm': return '#FF6B6B'
+    case 'css': case 'scss': case 'less': return '#00C4B4'
+    case 'png': case 'jpg': case 'jpeg': case 'gif': case 'webp': return '#FF9F1C'
+    case 'mp3': case 'wav': case 'ogg': case 'm4a': case 'flac': return '#9B59B6'
     case 'dll': return '#8E44AD'
     default: return '#A0A0A0'
   }
@@ -139,42 +133,27 @@ const onContextMenu = (e: MouseEvent, item: any) => {
   selectedItem.value = item
 
   const menuItems = [
-    { label: 'Создать файл', icon: 'file_icon', action: () => createItem(false) },
-    { label: 'Создать папку', icon: 'folder_icon', action: () => createItem(true) },
+    { label: 'Создать файл', icon: 'file_icon', action: () => createItem(props.basePath, false, item) },
+    { label: 'Создать папку', icon: 'folder_icon', action: () => createItem(props.basePath, true, item) },
   ]
 
   if (item) {
     menuItems.push(
       { type: 'separator' },
-      { label: 'Переименовать', icon: 'edit_icon', action: renameItem },
-      { 
-        label: 'Удалить', 
-        icon: 'error_icon', 
-        action: deleteItem, 
-        danger: true 
-      },
+      { label: 'Переименовать', icon: 'edit_icon', action: () => renameItem(item) },
+      { label: 'Дублировать', icon: 'copy_icon', action: () => duplicateItem(item.path) },
+      { label: 'Удалить', icon: 'error_icon', action: () => deleteItem(item), danger: true },
       { type: 'separator' },
-      { 
-        label: 'Показать в проводнике', 
-        icon: 'explorer_icon', 
-        action: () => showInExplorer(item.path) 
-      }
+      { label: 'Показать в проводнике', icon: 'explorer_icon', action: () => showInExplorer(item.path) },
+      { label: 'Копировать путь', icon: 'info_icon', action: () => copyPath(item.path) },
+      { label: 'Копировать имя', icon: 'info_icon', action: () => copyName(item.path) }
     )
   }
 
   showContextMenu(e, menuItems)
 }
 
-// ====================== ПОКАЗАТЬ В ПРОВОДНИКЕ ======================
-const showInExplorer = (path: string) => {
-  if ((window as any).electron?.showInExplorer) {
-    (window as any).electron.showInExplorer(path)
-  } else {
-    console.warn('Метод showInExplorer не доступен')
-  }
-}
-
-// ====================== ОСТАЛЬНЫЕ ФУНКЦИИ ======================
+// ====================== ТОГГЛ + ЭМИТ ======================
 const toggleItem = (item: any) => {
   selectedItem.value = item
   if (!item.isFolder) {
@@ -187,11 +166,42 @@ const toggleItem = (item: any) => {
 const emitFileClick = (path: string) => emit('file-click', path)
 const refresh = () => loadDirectory()
 
-onMounted(loadDirectory)
+// ====================== LIFECYCLE + ШОРТКАТЫ ======================
+onMounted(() => {
+  loadDirectory()
+
+  // Горячие клавиши (работают глобально, но безопасно проверяют selectedItem)
+  add('f2', () => {
+    if (selectedItem.value) renameItem(selectedItem.value)
+  })
+
+  add('delete', () => {
+    if (selectedItem.value) deleteItem(selectedItem.value)
+  })
+
+  add('ctrl+d', () => {
+    if (selectedItem.value) duplicateItem(selectedItem.value.path)
+  })
+
+  add('f5', () => {
+    if (isRoot) refresh()
+  })
+
+  // Дополнительные удобные шорткаты
+  add('ctrl+c', () => {
+    if (selectedItem.value) copyName(selectedItem.value.path)
+  })
+
+  add('ctrl+shift+c', () => {
+    if (selectedItem.value) copyPath(selectedItem.value.path)
+  })
+})
+
 watch(() => props.basePath, loadDirectory)
 </script>
 
 <style scoped>
+/* (стили без изменений) */
 .directory-tree-container {
   display: flex;
   flex-direction: column;
@@ -272,7 +282,6 @@ watch(() => props.basePath, loadDirectory)
   text-align: center; 
 }
 
-/* Скроллбар */
 .tree-viewport::-webkit-scrollbar { width: 4px; }
 .tree-viewport::-webkit-scrollbar-thumb { background: #333; }
 .tree-viewport::-webkit-scrollbar-thumb:hover { background: #444; }

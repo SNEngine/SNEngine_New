@@ -3,13 +3,12 @@ process.env['ELECTRON_DISABLE_SECURITY_WARNINGS'] = 'true';
 
 const { app, BrowserWindow, Menu, ipcMain } = require('electron')
 const path = require('path')
-const fs = require('fs/promises')
+const fs = require('fs') // Используем обычный fs для доступа к sync методам и promises
 const chokidar = require('chokidar')
 
 let mainWindow;
 let watcher = null;
 
-// Находим правильный путь к preload в зависимости от того, упаковано приложение или нет
 const preloadPath = app.isPackaged 
     ? path.join(app.getAppPath(), 'preload.cjs')
     : path.join(__dirname, 'preload.cjs');
@@ -37,7 +36,6 @@ function createWindow() {
     mainWindow.loadFile(path.join(__dirname, 'dist/index.html'))
   }
 
-  // Открываем инструменты разработчика в отдельном окне
   mainWindow.webContents.openDevTools({ mode: 'detach' })
 }
 
@@ -49,7 +47,7 @@ ipcMain.handle('get-project-path', async () => {
   
   const projectDir = path.join(app.getAppPath(), '..', 'testBuild')
   try {
-    await fs.mkdir(projectDir, { recursive: true })
+    await fs.promises.mkdir(projectDir, { recursive: true })
   } catch (e) {
     console.error('Cannot create testBuild folder:', e)
   }
@@ -86,7 +84,7 @@ ipcMain.on('stop-watcher', () => {
 // ====================== FILE SYSTEM OPERATIONS ======================
 ipcMain.handle('read-directory', async (_, dirPath) => {
   try {
-    const entries = await fs.readdir(dirPath, { withFileTypes: true })
+    const entries = await fs.promises.readdir(dirPath, { withFileTypes: true })
     
     const sortedEntries = entries.map(entry => ({
       name: entry.name,
@@ -108,7 +106,7 @@ ipcMain.handle('read-directory', async (_, dirPath) => {
 
 ipcMain.handle('read-file', async (_, filePath) => {
   try {
-    return await fs.readFile(filePath, 'utf-8')
+    return await fs.promises.readFile(filePath, 'utf-8')
   } catch (err) {
     console.error('read-file error:', err)
     return ''
@@ -116,31 +114,53 @@ ipcMain.handle('read-file', async (_, filePath) => {
 })
 
 ipcMain.handle('create-directory', async (_, dirPath) => {
-  await fs.mkdir(dirPath, { recursive: true })
+  await fs.promises.mkdir(dirPath, { recursive: true })
 })
 
 ipcMain.handle('create-file', async (_, filePath) => {
-  await fs.writeFile(filePath, '', 'utf-8')
+  await fs.promises.writeFile(filePath, '', 'utf-8')
 })
 
 ipcMain.handle('rename-item', async (_, oldPath, newName) => {
   const dir = path.dirname(oldPath)
   const newPath = path.join(dir, newName)
-  await fs.rename(oldPath, newPath)
+  await fs.promises.rename(oldPath, newPath)
 })
 
 ipcMain.handle('delete-item', async (_, itemPath) => {
-  const stat = await fs.stat(itemPath)
+  const stat = await fs.promises.stat(itemPath)
   if (stat.isDirectory()) {
-    await fs.rm(itemPath, { recursive: true, force: true })
+    await fs.promises.rm(itemPath, { recursive: true, force: true })
   } else {
-    await fs.unlink(itemPath)
+    await fs.promises.unlink(itemPath)
+  }
+})
+
+ipcMain.handle('duplicate-item', async (event, originalPath) => {
+  try {
+    const dir = path.dirname(originalPath);
+    const ext = path.extname(originalPath);
+    const baseName = path.basename(originalPath, ext);
+
+    let counter = 1;
+    let newPath = path.join(dir, `${baseName} — копия${ext}`);
+
+    while (fs.existsSync(newPath)) {
+      counter++;
+      newPath = path.join(dir, `${baseName} — копия (${counter})${ext}`);
+    }
+
+    await fs.promises.copyFile(originalPath, newPath);
+    return newPath;
+  } catch (err) {
+    console.error('duplicate-item error:', err);
+    throw err;
   }
 })
 
 ipcMain.handle('write-file', async (_, filePath, content) => {
   try {
-    await fs.writeFile(filePath, content, 'utf-8')
+    await fs.promises.writeFile(filePath, content, 'utf-8')
     return { success: true }
   } catch (err) {
     console.error('write-file error:', err)

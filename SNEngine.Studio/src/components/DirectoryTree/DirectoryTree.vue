@@ -69,6 +69,7 @@ import { getFileIcon } from '@/config/icons.config'
 import { useDirectoryTree } from '@/composables/useDirectoryTree'
 import { useTreeSearch } from '@/composables/useTreeSearch'
 import { useContextMenu } from '@/composables/useContextMenu'
+import { useMessageBox } from '@/composables/useMessageBox'   // ← Добавили
 
 const props = defineProps<{
   basePath: string
@@ -83,6 +84,8 @@ const emit = defineEmits<{
 const isRoot = !props.isSubTree
 
 // Composables
+const { showMessageBox } = useMessageBox()   // ← Теперь доступен
+
 const {
   items,
   loading,
@@ -143,8 +146,13 @@ const onContextMenu = (e: MouseEvent, item: any) => {
   if (item) {
     menuItems.push(
       { type: 'separator' },
-      { label: 'Переименовать', action: renameItem },
-      { label: 'Удалить', icon: 'delete_icon', action: deleteItem, danger: true },
+      { label: 'Переименовать', icon: 'edit_icon', action: renameItem },
+      { 
+        label: 'Удалить', 
+        icon: 'error_icon', 
+        action: deleteItem, 
+        danger: true 
+      },
       { type: 'separator' },
       { 
         label: 'Показать в проводнике', 
@@ -157,15 +165,16 @@ const onContextMenu = (e: MouseEvent, item: any) => {
   showContextMenu(e, menuItems)
 }
 
-// Показать в проводнике
+// ====================== ПОКАЗАТЬ В ПРОВОДНИКЕ ======================
 const showInExplorer = (path: string) => {
   if ((window as any).electron?.showInExplorer) {
     (window as any).electron.showInExplorer(path)
   } else {
-    console.warn('showInExplorer не доступен')
+    console.warn('Метод showInExplorer не доступен')
   }
 }
 
+// ====================== ОСТАЛЬНЫЕ ФУНКЦИИ ======================
 const toggleItem = (item: any) => {
   selectedItem.value = item
   if (!item.isFolder) {
@@ -183,7 +192,6 @@ watch(() => props.basePath, loadDirectory)
 </script>
 
 <style scoped>
-/* Стили без изменений */
 .directory-tree-container {
   display: flex;
   flex-direction: column;

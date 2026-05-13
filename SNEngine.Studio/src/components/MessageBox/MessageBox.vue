@@ -7,7 +7,12 @@
         </div>
         
         <div class="messagebox-content">
-          <BaseIcon v-if="iconName" :name="iconName" class="message-icon" />
+          <BaseIcon 
+            v-if="iconName" 
+            :name="iconName" 
+            class="message-icon" 
+            :color="iconColor"
+          />
           <p class="message">{{ message }}</p>
         </div>
 
@@ -28,7 +33,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'          // ← Добавили computed
+import { ref, computed } from 'vue'
 import BaseIcon from '../icons/BaseIcon.vue'
 
 export type MessageBoxType = 'ok' | 'okcancel' | 'yesno' | 'yesnocancel'
@@ -37,7 +42,7 @@ export interface MessageBoxOptions {
   title?: string
   message: string
   type?: MessageBoxType
-  icon?: 'info' | 'warning' | 'error' | 'question'
+  icon?: 'info' | 'warning' | 'error' | 'success' | 'question'
 }
 
 const visible = ref(false)
@@ -46,16 +51,26 @@ const resolvePromise = ref<((value: string) => void) | null>(null)
 
 const title = computed(() => currentOptions.value.title || 'SNEngine Studio')
 const message = computed(() => currentOptions.value.message)
-const iconName = computed(() => {
-  const map: Record<string, string> = {
-    warning: 'unknown_icon',   // можно заменить на warning_icon позже
-    error: 'unknown_icon',
-    question: 'unknown_icon',
-    info: 'unknown_icon'
+
+// ==================== ИКОНКИ И ЦВЕТА ====================
+const iconConfig = computed(() => {
+  const icon = currentOptions.value.icon || 'info'
+  
+  const map: Record<string, { name: string; color: string }> = {
+    info:    { name: 'info_icon',    color: '#00B4FF' },
+    warning: { name: 'warning_icon', color: '#FFCA28' },
+    error:   { name: 'error_icon',   color: '#FF5252' },
+    success: { name: 'success_icon', color: '#4CAF50' },
+    question:{ name: 'info_icon',    color: '#00B4FF' },
   }
-  return map[currentOptions.value.icon || ''] || null
+
+  return map[icon] || { name: 'info_icon', color: '#00B4FF' }
 })
 
+const iconName = computed(() => iconConfig.value.name)
+const iconColor = computed(() => iconConfig.value.color)
+
+// ==================== ЛОГИКА ====================
 const show = (options: MessageBoxOptions): Promise<string> => {
   currentOptions.value = {
     title: 'SNEngine Studio',
@@ -84,26 +99,28 @@ const handleOverlayClick = () => {
 const buttons = computed(() => {
   const t = currentOptions.value.type || 'ok'
   
-  if (t === 'ok') return [{ key: 'ok', text: 'OK', type: 'primary' }]
-  if (t === 'okcancel') {
+  if (t === 'ok') 
+    return [{ key: 'ok', text: 'OK', type: 'primary' }]
+  
+  if (t === 'okcancel') 
     return [
       { key: 'ok', text: 'OK', type: 'primary' },
       { key: 'cancel', text: 'Отмена', type: 'secondary' }
     ]
-  }
-  if (t === 'yesno') {
+  
+  if (t === 'yesno') 
     return [
       { key: 'yes', text: 'Да', type: 'primary' },
       { key: 'no', text: 'Нет', type: 'secondary' }
     ]
-  }
-  if (t === 'yesnocancel') {
+  
+  if (t === 'yesnocancel') 
     return [
       { key: 'yes', text: 'Да', type: 'primary' },
       { key: 'no', text: 'Нет', type: 'secondary' },
       { key: 'cancel', text: 'Отмена', type: 'secondary' }
     ]
-  }
+
   return [{ key: 'ok', text: 'OK', type: 'primary' }]
 })
 
@@ -151,7 +168,6 @@ defineExpose({ show })
   width: 48px;
   height: 48px;
   flex-shrink: 0;
-  color: #FF5252;
 }
 
 .message {

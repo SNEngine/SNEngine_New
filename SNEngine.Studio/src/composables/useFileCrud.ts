@@ -1,18 +1,18 @@
 // src/composables/useFileCrud.ts
 import { useMessageBox } from './useMessageBox'
 import { useInputBox } from './useInputBox'
+import { useNotification } from './useNotification'
 import { lastUpdate } from '@/utils/watcherState'
 
 export function useFileCrud() {
   const { showMessageBox } = useMessageBox()
   const { showInputBox } = useInputBox()
+  const { success, error } = useNotification()
 
   // Создать файл или папку
   const createItem = async (basePath: string, isFolder: boolean, selectedItem?: any) => {
     let targetDir = basePath
-    if (selectedItem?.isFolder) {
-      targetDir = selectedItem.path
-    }
+    if (selectedItem?.isFolder) targetDir = selectedItem.path
 
     const name = await showInputBox({
       title: isFolder ? 'Новая папка' : 'Новый файл',
@@ -25,18 +25,23 @@ export function useFileCrud() {
     const fullPath = `${targetDir}/${name}`.replace(/\\/g, '/')
 
     try {
+      const electron = (window as any).electron
       if (isFolder) {
-        await (window as any).electron?.createDirectory?.(fullPath)
+        await electron?.createDirectory?.(fullPath)
       } else {
-        await (window as any).electron?.createFile?.(fullPath)
+        await electron?.createFile?.(fullPath)
       }
+
       lastUpdate.value = Date.now()
+      success(
+        isFolder ? 'Папка создана' : 'Файл создан',
+        name
+      )
     } catch (err) {
-      await showMessageBox({
-        title: 'Ошибка',
-        message: `Не удалось создать ${isFolder ? 'папку' : 'файл'}`,
-        icon: 'error'
-      })
+      error(
+        `Не удалось создать ${isFolder ? 'папку' : 'файл'}`,
+        name
+      )
     }
   }
 
@@ -55,12 +60,9 @@ export function useFileCrud() {
     try {
       await (window as any).electron?.renameItem?.(item.path, newName)
       lastUpdate.value = Date.now()
+      success('Переименовано', newName)
     } catch (err) {
-      await showMessageBox({
-        title: 'Ошибка переименования',
-        message: 'Не удалось переименовать элемент',
-        icon: 'error'
-      })
+      error('Ошибка переименования', item.name)
     }
   }
 
@@ -80,18 +82,11 @@ export function useFileCrud() {
     try {
       await (window as any).electron?.deleteItem?.(item.path)
       lastUpdate.value = Date.now()
+      success('Удалено', item.name)
     } catch (err) {
-      await showMessageBox({
-        title: 'Ошибка удаления',
-        message: 'Не удалось удалить элемент',
-        icon: 'error'
-      })
+      error('Не удалось удалить', item.name)
     }
   }
 
-  return {
-    createItem,
-    renameItem,
-    deleteItem
-  }
+  return { createItem, renameItem, deleteItem }
 }

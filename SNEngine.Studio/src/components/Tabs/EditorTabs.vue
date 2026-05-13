@@ -23,7 +23,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { lastUpdate } from '@/utils/watcherState'
 
 import ContextMenu from '../ContextMenu/ContextMenu.vue'
@@ -33,23 +33,26 @@ import TabContent from './TabContent.vue'
 import { useTabs } from '@/composables/useTabs'
 import { useFileType } from '@/composables/useFileType'
 import { useFileSave } from '@/composables/useFileSave'
-import { useKeyboard } from '@/composables/useKeyboard'   // ← интегрируем
+import { useKeyboard } from '@/composables/useKeyboard'
+import { useNotification } from '@/composables/useNotification'
 
 const { tabs, activeFilePath, activateTab, closeTab, markDirty, markClean } = useTabs()
 const { getFileHandler } = useFileType()
 const { saveFile, getContentFromEditor } = useFileSave()
-const { add: addShortcut } = useKeyboard()   // ← используем composable
+const { add: addShortcut } = useKeyboard()
+
+// Уведомления
+const { success, error } = useNotification()
 
 const tabContextMenuRef = ref<any>(null)
 const tabContentRef = ref<any>(null)
 
 const currentHandler = ref<any>(null)
 
-// Текущий компонент и пропсы (полностью через useFileType)
 const currentComponent = computed(() => currentHandler.value?.component || null)
 const currentProps = computed(() => currentHandler.value?.props || {})
 
-// Обновляем handler при смене активной вкладки
+// Обновление обработчика при смене активной вкладки
 watch(activeFilePath, async (newPath) => {
   if (!newPath) {
     currentHandler.value = null
@@ -58,17 +61,16 @@ watch(activeFilePath, async (newPath) => {
   currentHandler.value = await getFileHandler(newPath)
 })
 
-// ====================== LIVE RELOAD (внешнее изменение файла) ======================
+// ====================== LIVE RELOAD ======================
 watch(lastUpdate, async () => {
   for (const tab of tabs.value) {
-    if (tab.isDirty) continue // не трогаем файлы, которые пользователь редактирует
+    if (tab.isDirty) continue
 
     try {
       const freshContent = await (window as any).electron?.readFile?.(tab.filePath)
       if (freshContent !== undefined && freshContent !== tab.content) {
         tab.content = freshContent
 
-        // Обновляем Monaco, если вкладка активна
         if (tab.filePath === activeFilePath.value && tabContentRef.value?.activeEditorRef) {
           const editor = tabContentRef.value.activeEditorRef
           if (editor.editorRef?.value?.setValue) {
@@ -85,7 +87,7 @@ watch(lastUpdate, async () => {
 })
 
 // ====================== ОТКРЫТИЕ ФАЙЛА ======================
-const handleOpenFile = async (filePath: string) => {
+const openFile = async (filePath: string) => {
   const existing = tabs.value.find(t => t.filePath === filePath)
   if (existing) {
     activateTab(existing)
@@ -108,15 +110,7 @@ const handleOpenFile = async (filePath: string) => {
   activateTab(newTab)
 }
 
-// ====================== ИЗМЕНЕНИЕ + СОХРАНЕНИЕ ======================
-const handleContentUpdate = (newContent: string) => {
-  const tab = tabs.value.find(t => t.filePath === activeFilePath.value)
-  if (tab) {
-    tab.content = newContent
-    markDirty(tab.filePath)
-  }
-}
-
+// ====================== СОХРАНЕНИЕ ======================
 const saveCurrentFile = async () => {
   const activeTab = tabs.value.find(t => t.filePath === activeFilePath.value)
   if (!activeTab) return
@@ -127,22 +121,29 @@ const saveCurrentFile = async () => {
   if (!content && activeTab.content) content = activeTab.content
 
   const result = await saveFile(activeTab.filePath, content)
+
   if (result.success) {
     activeTab.content = content
     markClean(activeTab.filePath)
-    console.log('✅ Файл успешно сохранён:', activeTab.filePath)
+    success(`Файл сохранён`, activeTab.name)
   } else {
-    console.error('❌ Ошибка сохранения:', result.error)
+    error(`Не удалось сохранить файл`, activeTab.name)
+  }
+}
+
+const handleContentUpdate = (newContent: string) => {
+  const tab = tabs.value.find(t => t.filePath === activeFilePath.value)
+  if (tab) {
+    tab.content = newContent
+    markDirty(tab.filePath)
   }
 }
 
 const handleComponentSave = () => saveCurrentFile()
 
-// ====================== ГЛОБАЛЬНЫЙ Ctrl+S через useKeyboard ======================
+// ====================== ГОРЯЧИЕ КЛАВИШИ ======================
 onMounted(() => {
-  addShortcut('ctrl+s', () => {
-    saveCurrentFile()
-  }, true)
+  addShortcut('ctrl+s', saveCurrentFile, true)
 })
 
 // ====================== КОНТЕКСТНОЕ МЕНЮ ======================
@@ -169,7 +170,10 @@ const closeAllTabs = () => {
   currentHandler.value = null
 }
 
-defineExpose({ openFile: handleOpenFile })
+// Экспорт для внешнего использования (DirectoryTree и т.д.)
+defineExpose({
+  openFile
+})
 </script>
 
 <style scoped>

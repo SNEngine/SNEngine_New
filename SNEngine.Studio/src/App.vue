@@ -26,18 +26,35 @@
     <!-- Модальные окна -->
     <MessageBox ref="messageBoxRef" />
     <InputBox ref="inputBoxRef" />
+
+    <!-- === УВЕДОМЛЕНИЯ === -->
+    <Teleport to="body">
+      <div class="notifications-container">
+        <NotificationBox
+          v-for="notif in notifications"
+          :key="notif.id"
+          v-bind="notif"
+          @dismiss="remove"
+        />
+      </div>
+    </Teleport>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+
+// Основные компоненты
 import DirectoryTree from "./components/DirectoryTree/DirectoryTree.vue"
 import EditorTabs from "./components/Tabs/EditorTabs.vue"
 import MessageBox from "./components/MessageBox/MessageBox.vue"
 import InputBox from "./components/InputBox/InputBox.vue"
+import NotificationBox from "./components/NotificationBox/NotificationBox.vue"   // ← Новое
 
+// Composables
 import { useMessageBox } from './composables/useMessageBox'
 import { useInputBox } from './composables/useInputBox'
+import { useNotification } from './composables/useNotification'   // ← Новое
 
 const treeWidth = ref(320)
 let isResizing = false
@@ -47,6 +64,9 @@ const tabsRef = ref<any>(null)
 const messageBoxRef = ref<any>(null)
 const inputBoxRef = ref<any>(null)
 
+// Уведомления
+const { notifications, remove } = useNotification()
+
 const { messageBox } = useMessageBox()
 const { inputBox } = useInputBox()
 
@@ -55,13 +75,13 @@ onMounted(() => {
   inputBox.value = inputBoxRef.value
 })
 
-// Основная обработка клика по файлу
+// Обработка клика по файлу из дерева
 const handleFileClick = async (filePath: string) => {
   currentFile.value = filePath
 
   if (tabsRef.value?.openFile) {
     try {
-      await tabsRef.value.openFile(filePath)   // ← Только путь!
+      await tabsRef.value.openFile(filePath)
     } catch (e) {
       console.error('Failed to open file:', e)
     }
@@ -146,5 +166,21 @@ html, body {
   background: #1e1e1e; 
   display: flex;
   flex-direction: column;
+}
+
+/* ====================== УВЕДОМЛЕНИЯ ====================== */
+.notifications-container {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  z-index: 10000;
+  pointer-events: none;
+}
+
+.notifications-container > * {
+  pointer-events: auto;
 }
 </style>

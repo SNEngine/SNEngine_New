@@ -144,11 +144,26 @@ const onContextMenu = (e: MouseEvent, item: any) => {
     menuItems.push(
       { type: 'separator' },
       { label: 'Переименовать', action: renameItem },
-      { label: 'Удалить', icon: 'delete_icon', action: deleteItem, danger: true }
+      { label: 'Удалить', icon: 'delete_icon', action: deleteItem, danger: true },
+      { type: 'separator' },
+      { 
+        label: 'Показать в проводнике', 
+        icon: 'explorer_icon', 
+        action: () => showInExplorer(item.path) 
+      }
     )
   }
 
   showContextMenu(e, menuItems)
+}
+
+// Показать в проводнике
+const showInExplorer = (path: string) => {
+  if ((window as any).electron?.showInExplorer) {
+    (window as any).electron.showInExplorer(path)
+  } else {
+    console.warn('showInExplorer не доступен')
+  }
 }
 
 const toggleItem = (item: any) => {
@@ -168,6 +183,7 @@ watch(() => props.basePath, loadDirectory)
 </script>
 
 <style scoped>
+/* Стили без изменений */
 .directory-tree-container {
   display: flex;
   flex-direction: column;

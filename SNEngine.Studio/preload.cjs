@@ -11,6 +11,7 @@ contextBridge.exposeInMainWorld('electron', {
   renameItem: (oldPath, newName) => ipcRenderer.invoke('rename-item', oldPath, newName),
   deleteItem: (path) => ipcRenderer.invoke('delete-item', path),
   writeFile: (path, content) => ipcRenderer.invoke('write-file', path, content),
+  showInExplorer: (path) => ipcRenderer.invoke('show-in-explorer', path),
 
   // === Методы для File Watcher ===
   onFileChange: (callback) => {

@@ -148,6 +148,11 @@ ipcMain.handle('write-file', async (_, filePath, content) => {
   }
 })
 
+ipcMain.handle('show-in-explorer', async (_, filePath) => {
+  const { shell } = require('electron')
+  shell.showItemInFolder(filePath)
+})
+
 // ====================== APP LIFECYCLE ======================
 app.whenReady().then(() => {
   createWindow()

@@ -1,66 +1,66 @@
-// 1. ОТКЛЮЧАЕМ ВАРНИНГИ БЕЗОПАСНОСТИ
+// electron.cjs
 process.env['ELECTRON_DISABLE_SECURITY_WARNINGS'] = 'true';
 
-const { app, BrowserWindow, Menu, ipcMain } = require('electron')
-const path = require('path')
-const fs = require('fs') // Используем обычный fs для доступа к sync методам и promises
-const chokidar = require('chokidar')
+const { app, BrowserWindow, Menu, ipcMain, shell } = require('electron');
+const path = require('path');
+const fs = require('fs');
+const chokidar = require('chokidar');
 
-let mainWindow;
+let mainWindow = null;
 let watcher = null;
 
-const preloadPath = app.isPackaged 
-    ? path.join(app.getAppPath(), 'preload.cjs')
-    : path.join(__dirname, 'preload.cjs');
+// ====================== PRELOAD PATH ======================
+const getPreloadPath = () => {
+  if (app.isPackaged) {
+    return path.join(process.resourcesPath, 'app.asar', 'preload.cjs');
+  }
+  return path.join(__dirname, 'preload.cjs');
+};
+
+// ====================== ICON PATH (ИСПРАВЛЕНО) ======================
+const getIconPath = () => {
+  // Для Windows/Linux лучше всего использовать PNG или ICO. 
+  // Если вы добавили его в 'files', путь будет консистентным.
+  const iconPath = path.join(__dirname, 'build', 'icons', 'png', '512x512.png');
+  
+  if (fs.existsSync(iconPath)) {
+    return iconPath;
+  }
+  
+  // Резервный вариант (например, если в dist)
+  return path.join(__dirname, 'icon.png'); 
+};
 
 function createWindow() {
-  // Путь к иконке (работает и в dev, и в собранном приложении)
-  const iconPath = app.isPackaged
-    ? path.join(app.getAppPath(), '../build/icons/png/512x512.png')
-    : path.join(__dirname, 'build/icons/png/512x512.png')
-
   mainWindow = new BrowserWindow({
     width: 1400,
     height: 900,
     title: "SNEngine Studio",
     autoHideMenuBar: true,
-    
-    // ←←←←←←←←←←←←←←←←← ИКОНКА ЗДЕСЬ
-    icon: iconPath,
-    
+    icon: getIconPath(),   // ← теперь надёжно
+
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
-      preload: preloadPath,
+      preload: getPreloadPath(),
       webSecurity: false,
     }
-  })
+  });
 
-  mainWindow.setTitle("SNEngine Studio")
-  Menu.setApplicationMenu(null)
+  Menu.setApplicationMenu(null);
 
   if (!app.isPackaged) {
-    mainWindow.loadURL('http://localhost:5173')
+    mainWindow.loadURL('http://localhost:5173');
+    mainWindow.webContents.openDevTools({ mode: 'detach' });
   } else {
-    mainWindow.loadFile(path.join(__dirname, 'dist/index.html'))
+    mainWindow.loadFile(path.join(__dirname, 'dist', 'index.html'));
+    // mainWindow.webContents.openDevTools({ mode: 'detach' });
   }
-
-  mainWindow.webContents.openDevTools({ mode: 'detach' })
 }
 
 // ====================== PROJECT PATH ======================
 ipcMain.handle('get-project-path', async () => {
-  if (!app.isPackaged) {
-    return 'C:/Users/Siphome/Desktop/testBuild'
-  }
-  
-  const projectDir = path.join(app.getAppPath(), '..', 'testBuild')
-  try {
-    await fs.promises.mkdir(projectDir, { recursive: true })
-  } catch (e) {
-    console.error('Cannot create testBuild folder:', e)
-  }
-  return projectDir
+  return 'C:/Users/Siphome/Desktop/testBuild';
 });
 
 // ====================== FILE WATCHER ======================
@@ -90,12 +90,11 @@ ipcMain.on('stop-watcher', () => {
   }
 });
 
-// ====================== FILE SYSTEM OPERATIONS ======================
+// ====================== FILE OPERATIONS ======================
 ipcMain.handle('read-directory', async (_, dirPath) => {
   try {
-    const entries = await fs.promises.readdir(dirPath, { withFileTypes: true })
-    
-    const sortedEntries = entries.map(entry => ({
+    const entries = await fs.promises.readdir(dirPath, { withFileTypes: true });
+    return entries.map(entry => ({
       name: entry.name,
       path: path.join(dirPath, entry.name),
       isFolder: entry.isDirectory(),
@@ -105,47 +104,45 @@ ipcMain.handle('read-directory', async (_, dirPath) => {
       if (!a.isFolder && b.isFolder) return 1;
       return a.name.localeCompare(b.name);
     });
-
-    return sortedEntries;
   } catch (err) {
-    console.error('read-directory error:', err)
-    return []
+    console.error('read-directory error:', err);
+    return [];
   }
-})
+});
 
 ipcMain.handle('read-file', async (_, filePath) => {
   try {
-    return await fs.promises.readFile(filePath, 'utf-8')
+    return await fs.promises.readFile(filePath, 'utf-8');
   } catch (err) {
-    console.error('read-file error:', err)
-    return ''
+    console.error('read-file error:', err);
+    return '';
   }
-})
+});
 
 ipcMain.handle('create-directory', async (_, dirPath) => {
-  await fs.promises.mkdir(dirPath, { recursive: true })
-})
+  await fs.promises.mkdir(dirPath, { recursive: true });
+});
 
 ipcMain.handle('create-file', async (_, filePath) => {
-  await fs.promises.writeFile(filePath, '', 'utf-8')
-})
+  await fs.promises.writeFile(filePath, '', 'utf-8');
+});
 
 ipcMain.handle('rename-item', async (_, oldPath, newName) => {
-  const dir = path.dirname(oldPath)
-  const newPath = path.join(dir, newName)
-  await fs.promises.rename(oldPath, newPath)
-})
+  const dir = path.dirname(oldPath);
+  const newPath = path.join(dir, newName);
+  await fs.promises.rename(oldPath, newPath);
+});
 
 ipcMain.handle('delete-item', async (_, itemPath) => {
-  const stat = await fs.promises.stat(itemPath)
+  const stat = await fs.promises.stat(itemPath);
   if (stat.isDirectory()) {
-    await fs.promises.rm(itemPath, { recursive: true, force: true })
+    await fs.promises.rm(itemPath, { recursive: true, force: true });
   } else {
-    await fs.promises.unlink(itemPath)
+    await fs.promises.unlink(itemPath);
   }
-})
+});
 
-ipcMain.handle('duplicate-item', async (event, originalPath) => {
+ipcMain.handle('duplicate-item', async (_, originalPath) => {
   try {
     const dir = path.dirname(originalPath);
     const ext = path.extname(originalPath);
@@ -165,32 +162,31 @@ ipcMain.handle('duplicate-item', async (event, originalPath) => {
     console.error('duplicate-item error:', err);
     throw err;
   }
-})
+});
 
 ipcMain.handle('write-file', async (_, filePath, content) => {
   try {
-    await fs.promises.writeFile(filePath, content, 'utf-8')
-    return { success: true }
+    await fs.promises.writeFile(filePath, content, 'utf-8');
+    return { success: true };
   } catch (err) {
-    console.error('write-file error:', err)
-    return { success: false, error: err.message }
+    console.error('write-file error:', err);
+    return { success: false, error: err.message };
   }
-})
+});
 
 ipcMain.handle('show-in-explorer', async (_, filePath) => {
-  const { shell } = require('electron')
-  shell.showItemInFolder(filePath)
-})
+  shell.showItemInFolder(filePath);
+});
 
 // ====================== APP LIFECYCLE ======================
 app.whenReady().then(() => {
-  createWindow()
+  createWindow();
 
   app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow()
-  })
-})
+    if (BrowserWindow.getAllWindows().length === 0) createWindow();
+  });
+});
 
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') app.quit()
-})
+  if (process.platform !== 'darwin') app.quit();
+});

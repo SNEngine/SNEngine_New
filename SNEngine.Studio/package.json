@@ -50,14 +50,15 @@
     "files": [
       "dist/**/*",
       "electron.cjs",
-      "package.json"
+      "package.json",
+      "preload.cjs",
+      "build/icons/png/512x512.png"
     ],
     "icon": "build/icons/icon",
 
     "win": {
       "target": "nsis",
-      "icon": "build/icons/win/icon.ico",
-      "signAndEditExecutable": false
+      "icon": "build/icons/win/icon.ico"
     },
 
     "mac": {

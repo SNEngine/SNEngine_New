@@ -27,9 +27,12 @@
           :item="item"
           :active-path="activePath"
           :search-query="searchQuery"
+          :selected-item="selectedItem"
+          :drag-handlers="dragHandlers"
           @toggle="toggleOpen"
           @file-click="emitFileClick"
           @contextmenu="onContextMenu"
+          @select="onSelectItem"
         />
       </div>
     </div>
@@ -84,6 +87,19 @@ const { openWith } = useOpenWith()
 
 // ====================== DRAG & DROP ======================
 const { isDragOver, handleDragOver, handleDragLeave, handleDrop } = useDragDrop()
+
+// ====================== DRAG HANDLERS ДЛЯ ПЕРЕДАЧИ В TreeNode ======================
+const dragHandlers = {
+  isDragOver,
+  handleDragOver,
+  handleDragLeave,
+  handleDrop
+}
+
+// ====================== ВЫБОР ЭЛЕМЕНТА (новое) ======================
+const onSelectItem = (item: any) => {
+  selectedItem.value = item
+}
 
 // ====================== СОРТИРОВКА ======================
 const sortField = ref<'name' | 'modified' | 'type'>('name')

@@ -6,7 +6,6 @@
       :hide-delay="300"
       :offset="8"
     >
-      <!-- Контент тултипа через слот -->
       <template #content>
         <div class="tooltip-inner">
           <BaseIcon 
@@ -31,16 +30,20 @@
         </div>
       </template>
 
-      <!-- Сам элемент дерева -->
       <div 
         class="tree-node"
         :class="{ 
           'is-folder': item.isFolder, 
           'is-open': item.isOpen,
-          'is-active': isActive 
+          'is-active': isActive,
+          'is-selected': props.selectedItem?.path === props.item.path,
+          'drag-over': item.isFolder && dragHandlers?.isDragOver
         }"
         @click.stop="handleClick"
         @contextmenu.stop.prevent="handleContextMenu"
+        @dragover.prevent="handleDragOver"
+        @dragleave="handleDragLeave"
+        @drop.prevent="handleFolderDrop"
       >
         <BaseIcon 
           :name="iconName" 
@@ -51,7 +54,6 @@
       </div>
     </Tooltip>
 
-    <!-- Дочерние элементы -->
     <div v-if="item.isFolder && item.isOpen" class="tree-children">
       <div v-if="item.isLoadingChildren" class="loading-children">Загрузка...</div>
       <TreeNode
@@ -61,9 +63,12 @@
         :item="child"
         :active-path="activePath"
         :search-query="searchQuery"
+        :selected-item="selectedItem"
+        :drag-handlers="dragHandlers"
         @toggle="$emit('toggle', $event)"
         @file-click="$emit('file-click', $event)"
         @contextmenu="handleContextMenu"
+        @select="$emit('select', $event)"
       />
     </div>
   </div>
@@ -88,15 +93,42 @@ const props = defineProps<{
   item: TreeItem
   activePath?: string
   searchQuery?: string
+  selectedItem?: TreeItem | null
+  dragHandlers?: {
+    isDragOver: boolean
+    handleDragOver: (e: DragEvent) => void
+    handleDragLeave: (e: DragEvent) => void
+    handleDrop: (e: DragEvent, targetDir: string) => Promise<boolean>
+  }
 }>()
 
 const emit = defineEmits<{
   (e: 'toggle', item: TreeItem): void
   (e: 'file-click', path: string): void
   (e: 'contextmenu', event: MouseEvent, item: TreeItem): void
+  (e: 'select', item: TreeItem): void
 }>()
 
 const isActive = computed(() => props.activePath === props.item.path)
+
+// ==================== DRAG & DROP ====================
+const handleDragOver = (e: DragEvent) => {
+  if (props.item.isFolder && props.dragHandlers) {
+    props.dragHandlers.handleDragOver(e)
+  }
+}
+
+const handleDragLeave = (e: DragEvent) => {
+  if (props.item.isFolder && props.dragHandlers) {
+    props.dragHandlers.handleDragLeave(e)
+  }
+}
+
+const handleFolderDrop = (e: DragEvent) => {
+  if (props.item.isFolder && props.dragHandlers) {
+    props.dragHandlers.handleDrop(e, props.item.path)
+  }
+}
 
 const iconName = computed(() => props.item.isFolder ? 'folder_icon' : getFileIcon(props.item.name))
 
@@ -123,6 +155,7 @@ const highlightedName = computed(() => {
 })
 
 const handleClick = async () => {
+  emit('select', props.item)                    // ← ВАЖНО: выбираем элемент
   if (props.item.isFolder) {
     await emit('toggle', props.item)
   } else {
@@ -130,8 +163,8 @@ const handleClick = async () => {
   }
 }
 
-const handleContextMenu = (e: MouseEvent) => {
-  emit('contextmenu', e, props.item)
+const handleContextMenu = (e: MouseEvent, item?: TreeItem) => {
+  emit('contextmenu', e, item || props.item)
 }
 </script>
 

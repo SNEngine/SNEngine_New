@@ -7,6 +7,7 @@
     @drop.prevent="handleRootDrop"
     @dragover.prevent="handleRootDragOver"
     @dragleave="handleRootDragLeave"
+    @paste="handlePaste"
   >
     <TreeHeader
       v-if="isRoot"
@@ -103,6 +104,40 @@ const onSelectItem = (item: any) => {
   selectedItem.value = item
 }
 
+// ====================== PASTE (Ctrl + V) ======================
+const handlePaste = async (e: ClipboardEvent) => {
+  // 1. Файлы из внешнего источника (Проводник)
+  const files = Array.from(e.clipboardData?.files || [])
+  if (files.length > 0) {
+    const targetPath = selectedItem.value?.isFolder ? selectedItem.value.path : props.basePath
+    const filePaths = files.map((f: any) => (window as any).electron.getFilePath(f)).filter(Boolean)
+
+    if (filePaths.length > 0) {
+      const success = await handleDropFromClipboard(targetPath, filePaths)
+      if (success) refresh()
+    }
+    return
+  }
+
+  // 2. Текст из буфера (Ctrl+C внутри студии) — считаем, что это путь
+  const text = e.clipboardData?.getData('text/plain')?.trim()
+  if (text && text.startsWith(props.basePath)) {  // простая проверка, что это путь проекта
+    const targetPath = selectedItem.value?.isFolder ? selectedItem.value.path : props.basePath
+    const success = await copyItem(text, targetPath)
+    if (success) refresh()
+  }
+}
+
+const handleDropFromClipboard = async (targetDir: string, filePaths: string[]) => {
+  try {
+    const result = await (window as any).electron?.copyFiles?.(targetDir, filePaths)
+    return result?.success || false
+  } catch (err) {
+    console.error('Paste error:', err)
+    return false
+  }
+}
+
 // ====================== ДРОП В КОРЕНЬ ======================
 const handleRootDragOver = (e: DragEvent) => {
   if (treeDrag.draggedItem.value) {
@@ -123,7 +158,6 @@ const handleRootDrop = (e: DragEvent) => {
     if (payload) handleInternalDrop(payload)
     return
   }
-  // Внешний drag из ОС
   handleDrop(e, props.basePath, refresh)
 }
 
@@ -140,9 +174,7 @@ const handleInternalDrop = async (payload: any) => {
     success = await moveItem(source.path, target.path)
   }
 
-  if (success) {
-    refresh()
-  }
+  if (success) refresh()
 }
 
 // ====================== СОРТИРОВКА ======================
@@ -219,19 +251,21 @@ const onContextMenu = (e: MouseEvent, item: any) => {
 const emitFileClick = (path: string) => emit('file-click', path)
 const refresh = () => loadDirectory()
 
+// ====================== КЛАВИАТУРА ======================
 const setupKeyboardShortcuts = () => {
   add('f2', () => selectedItem.value && renameItem(selectedItem.value))
   add('delete', () => selectedItem.value && deleteItem(selectedItem.value))
+
   add('ctrl+d', () => selectedItem.value && duplicateItem(selectedItem.value.path))
+  add('ctrl+c', () => selectedItem.value && copyPath(selectedItem.value.path))
+  add('ctrl+shift+c', () => selectedItem.value && copyName(selectedItem.value.path))
+
   add('f5', () => isRoot && refresh())
-  add('ctrl+c', () => selectedItem.value && copyName(selectedItem.value.path))
-  add('ctrl+shift+c', () => selectedItem.value && copyPath(selectedItem.value.path))
 }
 
 watch(() => props.basePath, loadDirectory, { immediate: true })
 setupKeyboardShortcuts()
 </script>
-
 <style scoped>
 .directory-tree-container {
   display: flex;

@@ -1,35 +1,59 @@
 <template>
   <div class="tree-item">
-    <!-- Сам узел -->
-    <div 
-      class="tree-node"
-      :class="{ 
-        'is-folder': item.isFolder, 
-        'is-open': item.isOpen,
-        'is-active': isActive 
-      }"
-      @click.stop="handleClick"
-      @contextmenu.stop.prevent="handleContextMenu"
+    <Tooltip 
+      position="bottom"
+      :delay="500"
+      :hide-delay="180"
+      :offset="8"
     >
-      <BaseIcon 
-        :name="iconName" 
-        :color="iconColor"
-        class="node-icon"
-      />
-      <span 
-        class="node-name" 
-        v-html="highlightedName"
-      ></span>
-    </div>
+      <!-- Контент тултипа через слот -->
+      <template #content>
+        <div class="tooltip-inner">
+          <BaseIcon 
+            :name="iconName" 
+            :color="iconColor"
+            style="width: 20px; height: 20px; flex-shrink: 0;"
+          />
+          <div class="tooltip-info">
+            <div class="tooltip-type">
+              {{ item.isFolder ? 'ПАПКА' : 'ФАЙЛ' }}
+            </div>
+            <div class="tooltip-name">{{ item.name }}</div>
+            <div class="tooltip-path">{{ item.path }}</div>
+            
+            <div v-if="!item.isFolder" class="tooltip-ext">
+              .{{ item.name.split('.').pop()?.toUpperCase() }}
+            </div>
+            <div v-else-if="item.children?.length" class="tooltip-ext">
+              Элементов: {{ item.children.length }}
+            </div>
+          </div>
+        </div>
+      </template>
 
-    <!-- Дочерние элементы (только для открытых папок) -->
-    <div 
-      v-if="item.isFolder && item.isOpen" 
-      class="tree-children"
-    >
-      <div v-if="item.isLoadingChildren" class="loading-children">
-        Загрузка...
+      <!-- Сам элемент дерева -->
+      <div 
+        class="tree-node"
+        :class="{ 
+          'is-folder': item.isFolder, 
+          'is-open': item.isOpen,
+          'is-active': isActive 
+        }"
+        @click.stop="handleClick"
+        @contextmenu.stop.prevent="handleContextMenu"
+      >
+        <BaseIcon 
+          :name="iconName" 
+          :color="iconColor"
+          class="node-icon"
+        />
+        <span class="node-name" v-html="highlightedName"></span>
       </div>
+    </Tooltip>
+
+    <!-- Дочерние элементы -->
+    <div v-if="item.isFolder && item.isOpen" class="tree-children">
+      <div v-if="item.isLoadingChildren" class="loading-children">Загрузка...</div>
       <TreeNode
         v-else
         v-for="child in item.children"
@@ -48,6 +72,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import BaseIcon from '../icons/BaseIcon.vue'
+import Tooltip from '../Tooltip/Tooltip.vue'
 import { getFileIcon } from '@/config/icons.config'
 
 export interface TreeItem {
@@ -71,47 +96,32 @@ const emit = defineEmits<{
   (e: 'contextmenu', event: MouseEvent, item: TreeItem): void
 }>()
 
-// Вычисляем активное состояние
-const isActive = computed(() => 
-  props.activePath === props.item.path
-)
+const isActive = computed(() => props.activePath === props.item.path)
 
-// Иконка
-const iconName = computed(() => {
-  if (props.item.isFolder) return 'folder_icon'
-  return getFileIcon(props.item.name)
-})
+const iconName = computed(() => props.item.isFolder ? 'folder_icon' : getFileIcon(props.item.name))
 
-// Цвет иконки
 const iconColor = computed(() => {
   if (props.item.isFolder) return '#FFCA28'
-
   const ext = props.item.name.toLowerCase().split('.').pop() || ''
-  
   switch (ext) {
     case 'sn': return '#FF5252'
-    case 'cs': return '#00B4FF'
+    case 'js': case 'ts': return '#00B4FF'
     case 'html': case 'htm': return '#FF6B6B'
-    case 'css': case 'scss': case 'less': return '#00C4B4'
-    case 'png': case 'jpg': case 'jpeg': case 'gif': case 'webp': return '#FF9F1C'
-    case 'mp3': case 'wav': case 'ogg': case 'm4a': case 'flac': return '#9B59B6'
-    case 'dll': return '#8E44AD'
+    case 'css': return '#00C4B4'
+    case 'png': case 'jpg': case 'jpeg': case 'webp': return '#FF9F1C'
+    case 'mp3': case 'wav': return '#9B59B6'
     default: return '#A0A0A0'
   }
 })
 
-// Подсветка совпадений при поиске
 const highlightedName = computed(() => {
   const name = props.item.name
   const query = props.searchQuery?.trim().toLowerCase()
-
   if (!query) return name
-
   const regex = new RegExp(`(${query})`, 'gi')
   return name.replace(regex, '<mark>$1</mark>')
 })
 
-// Обработчики
 const handleClick = async () => {
   if (props.item.isFolder) {
     await emit('toggle', props.item)
@@ -126,9 +136,7 @@ const handleContextMenu = (e: MouseEvent) => {
 </script>
 
 <style scoped>
-.tree-item {
-  user-select: none;
-}
+.tree-item { user-select: none; }
 
 .tree-node {
   display: flex;
@@ -141,10 +149,7 @@ const handleContextMenu = (e: MouseEvent) => {
   border-radius: 3px;
 }
 
-.tree-node:hover {
-  background: #2a2d2e;
-}
-
+.tree-node:hover { background: #2a2d2e; }
 .tree-node.is-active {
   background: #37373d;
   color: #FF5252;
@@ -182,5 +187,45 @@ mark {
   color: #888;
   font-size: 12px;
   font-style: italic;
+}
+
+/* Стили тултипа */
+.tooltip-inner {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.tooltip-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.tooltip-type {
+  color: #FF5252;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+.tooltip-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #ffffff;
+  margin: 2px 0 6px;
+  word-break: break-all;
+}
+
+.tooltip-path {
+  font-size: 11.5px;
+  color: #aaaaaa;
+  line-height: 1.3;
+  word-break: break-all;
+}
+
+.tooltip-ext {
+  margin-top: 6px;
+  font-size: 11px;
+  color: #888;
 }
 </style>

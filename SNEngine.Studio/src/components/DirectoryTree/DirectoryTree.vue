@@ -9,7 +9,7 @@
     <div 
       class="tree-viewport"
       @contextmenu.prevent="onContextMenu($event, null)"
-      @click="selectedItem = null"
+      @click="handleViewportClick"
     >
       <div v-if="loading && items.length === 0" class="loading">Загрузка...</div>
 
@@ -72,8 +72,16 @@ const { searchQuery, filteredItems } = useTreeSearch(items)
 const { contextMenuRef, show: showContextMenu } = useContextMenu()
 const { add } = useKeyboard()
 
-// ====================== СВОЙСТВА (КАСТОМНОЕ ОКНО) ======================
+// Свойства файла
 const { showProperties, isOpen, currentFile, close } = useFileProperties()
+
+// ====================== КЛИК ПО ПУСТОМУ МЕСТУ ======================
+const handleViewportClick = (e: MouseEvent) => {
+  if (!(e.target as HTMLElement).closest('.tree-node')) {
+    showInExplorer(props.basePath)
+  }
+  selectedItem.value = null
+}
 
 // ====================== КОНТЕКСТНОЕ МЕНЮ ======================
 const onContextMenu = (e: MouseEvent, item: any) => {
@@ -95,6 +103,10 @@ const onContextMenu = (e: MouseEvent, item: any) => {
       { label: 'Показать в проводнике', icon: 'explorer_icon', action: () => showInExplorer(item.path) },
       { label: 'Копировать путь', icon: 'info_icon', action: () => copyPath(item.path) },
       { label: 'Копировать имя', icon: 'info_icon', action: () => copyName(item.path) }
+    )
+  } else {
+    menuItems.push(
+      { label: 'Открыть в проводнике', icon: 'explorer_icon', action: () => showInExplorer(props.basePath) }
     )
   }
 

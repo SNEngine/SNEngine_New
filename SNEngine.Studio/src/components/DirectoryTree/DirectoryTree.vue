@@ -1,6 +1,5 @@
 <template>
   <div class="directory-tree-container">
-    <!-- Шапка (только для корневого дерева) -->
     <TreeHeader
       v-if="isRoot"
       v-model="searchQuery"
@@ -29,6 +28,13 @@
     </div>
 
     <ContextMenu ref="contextMenuRef" />
+
+    <!-- КАСТОМНОЕ ОКНО СВОЙСТВ -->
+    <FileProperties 
+      v-if="isOpen && currentFile"
+      :file="currentFile"
+      @close="close"
+    />
   </div>
 </template>
 
@@ -37,6 +43,7 @@ import { ref, watch } from 'vue'
 import TreeHeader from './TreeHeader.vue'
 import TreeNode from './TreeNode.vue'
 import ContextMenu from '../ContextMenu/ContextMenu.vue'
+import FileProperties from '../FileProperties/FileProperties.vue'
 
 import { useDirectoryTree } from '@/composables/useDirectoryTree'
 import { useTreeSearch } from '@/composables/useTreeSearch'
@@ -44,6 +51,7 @@ import { useContextMenu } from '@/composables/useContextMenu'
 import { useFileCrud } from '@/composables/useFileCrud'
 import { useFileUtils } from '@/composables/useFileUtils'
 import { useKeyboard } from '@/composables/useKeyboard'
+import { useFileProperties } from '@/composables/useFileProperties'
 
 const props = defineProps<{
   basePath: string
@@ -57,27 +65,15 @@ const emit = defineEmits<{
 
 const isRoot = !props.isSubTree
 
-// Основной state дерева
-const {
-  items,
-  loading,
-  selectedItem,
-  loadDirectory,
-  toggleOpen
-} = useDirectoryTree(props.basePath, isRoot)
-
-// Операции с файлами
+const { items, loading, selectedItem, loadDirectory, toggleOpen } = useDirectoryTree(props.basePath, isRoot)
 const { createItem, renameItem, deleteItem } = useFileCrud()
 const { showInExplorer, copyPath, copyName, duplicateItem } = useFileUtils()
-
-// Поиск
 const { searchQuery, filteredItems } = useTreeSearch(items)
-
-// Контекстное меню
 const { contextMenuRef, show: showContextMenu } = useContextMenu()
-
-// Горячие клавиши
 const { add } = useKeyboard()
+
+// ====================== СВОЙСТВА (КАСТОМНОЕ ОКНО) ======================
+const { showProperties, isOpen, currentFile, close } = useFileProperties()
 
 // ====================== КОНТЕКСТНОЕ МЕНЮ ======================
 const onContextMenu = (e: MouseEvent, item: any) => {
@@ -93,6 +89,7 @@ const onContextMenu = (e: MouseEvent, item: any) => {
       { type: 'separator' },
       { label: 'Переименовать', icon: 'edit_icon', action: () => renameItem(item) },
       { label: 'Дублировать', icon: 'copy_icon', action: () => duplicateItem(item.path) },
+      { label: 'Свойства', icon: 'info_icon', action: () => showProperties(item) },
       { label: 'Удалить', icon: 'error_icon', action: () => deleteItem(item), danger: true },
       { type: 'separator' },
       { label: 'Показать в проводнике', icon: 'explorer_icon', action: () => showInExplorer(item.path) },
@@ -104,11 +101,9 @@ const onContextMenu = (e: MouseEvent, item: any) => {
   showContextMenu(e, menuItems)
 }
 
-// ====================== ЭМИТЫ ======================
 const emitFileClick = (path: string) => emit('file-click', path)
 const refresh = () => loadDirectory()
 
-// ====================== ГОРЯЧИЕ КЛАВИШИ ======================
 const setupKeyboardShortcuts = () => {
   add('f2', () => selectedItem.value && renameItem(selectedItem.value))
   add('delete', () => selectedItem.value && deleteItem(selectedItem.value))
@@ -118,9 +113,7 @@ const setupKeyboardShortcuts = () => {
   add('ctrl+shift+c', () => selectedItem.value && copyPath(selectedItem.value.path))
 }
 
-// ====================== LIFECYCLE ======================
 watch(() => props.basePath, loadDirectory, { immediate: true })
-
 setupKeyboardShortcuts()
 </script>
 

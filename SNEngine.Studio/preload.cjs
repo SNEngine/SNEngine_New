@@ -13,6 +13,8 @@ contextBridge.exposeInMainWorld('electron', {
   duplicateItem: (path) => ipcRenderer.invoke('duplicate-item', path),
   writeFile: (path, content) => ipcRenderer.invoke('write-file', path, content),
   showInExplorer: (path) => ipcRenderer.invoke('show-in-explorer', path),
+  showFileProperties: (path) => ipcRenderer.invoke('show-file-properties', path),
+  getFileStats: (path) => ipcRenderer.invoke('get-file-stats', path),
 
   // === Методы для File Watcher ===
   onFileChange: (callback) => {

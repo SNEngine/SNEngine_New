@@ -2,8 +2,8 @@
   <div class="tree-item">
     <Tooltip 
       position="bottom"
-      :delay="500"
-      :hide-delay="180"
+      :delay="800"
+      :hide-delay="300"
       :offset="8"
     >
       <!-- Контент тултипа через слот -->

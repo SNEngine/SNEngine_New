@@ -178,6 +178,40 @@ ipcMain.handle('show-in-explorer', async (_, filePath) => {
   shell.showItemInFolder(filePath);
 });
 
+// ====================== FILE PROPERTIES (нативное окно Windows) ======================
+ipcMain.handle('show-file-properties', async (_, filePath) => {
+  try {
+    const { exec } = require('child_process');
+    
+    // Самый надёжный способ открыть окно "Свойства" в Windows
+    // explorer /select, — выделяет файл + показывает контекстное меню "Свойства"
+    exec(`explorer.exe /select,"${filePath}"`, (error) => {
+      if (error) {
+        console.error('show-file-properties error:', error);
+        // Фоллбэк
+        shell.showItemInFolder(filePath);
+      }
+    });
+  } catch (err) {
+    console.error('show-file-properties failed:', err);
+    shell.showItemInFolder(filePath);
+  }
+});
+
+ipcMain.handle('get-file-stats', async (_, filePath) => {
+  try {
+    const stats = await fs.promises.stat(filePath);
+    return {
+      size: stats.size,
+      created: stats.birthtime,
+      modified: stats.mtime
+    };
+  } catch (err) {
+    console.error('get-file-stats error:', err);
+    return { size: 0, created: null, modified: null };
+  }
+});
+
 // ====================== APP LIFECYCLE ======================
 app.whenReady().then(() => {
   createWindow();

@@ -3,6 +3,8 @@
     <TreeHeader
       v-if="isRoot"
       v-model="searchQuery"
+      v-model:sortField="sortField"
+      v-model:sortOrder="sortOrder"
       @refresh="refresh"
     />
 
@@ -15,7 +17,7 @@
 
       <div class="tree-content">
         <TreeNode
-          v-for="item in filteredItems"
+          v-for="item in finalItems"
           :key="item.path"
           :item="item"
           :active-path="activePath"
@@ -29,7 +31,6 @@
 
     <ContextMenu ref="contextMenuRef" />
 
-    <!-- КАСТОМНОЕ ОКНО СВОЙСТВ -->
     <FileProperties 
       v-if="isOpen && currentFile"
       :file="currentFile"
@@ -39,7 +40,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { ref, watch, computed } from 'vue'
 import TreeHeader from './TreeHeader.vue'
 import TreeNode from './TreeNode.vue'
 import ContextMenu from '../ContextMenu/ContextMenu.vue'
@@ -71,9 +72,49 @@ const { showInExplorer, copyPath, copyName, duplicateItem } = useFileUtils()
 const { searchQuery, filteredItems } = useTreeSearch(items)
 const { contextMenuRef, show: showContextMenu } = useContextMenu()
 const { add } = useKeyboard()
-
-// Свойства файла
 const { showProperties, isOpen, currentFile, close } = useFileProperties()
+
+// ====================== СОРТИРОВКА ======================
+const sortField = ref<'name' | 'modified' | 'type'>('name')
+const sortOrder = ref<'asc' | 'desc'>('asc')
+
+const finalItems = computed(() => {
+  let arr = [...filteredItems.value]
+
+  // 1. Папки ВСЕГДА сверху
+  arr.sort((a, b) => {
+    if (a.isFolder && !b.isFolder) return -1
+    if (!a.isFolder && b.isFolder) return 1
+    return 0
+  })
+
+  // 2. Основная сортировка
+  if (sortField.value === 'name') {
+    arr.sort((a, b) => a.name.localeCompare(b.name))
+  } 
+  else if (sortField.value === 'modified') {
+    arr.sort((a, b) => {
+      const dateA = a.modified ? new Date(a.modified).getTime() : 0
+      const dateB = b.modified ? new Date(b.modified).getTime() : 0
+      return dateA - dateB
+    })
+  } 
+  else if (sortField.value === 'type') {
+    // Сортировка по типу (расширению)
+    arr.sort((a, b) => {
+      const extA = a.name.includes('.') ? a.name.split('.').pop()?.toLowerCase() || '' : ''
+      const extB = b.name.includes('.') ? b.name.split('.').pop()?.toLowerCase() || '' : ''
+      return extA.localeCompare(extB) || a.name.localeCompare(b.name)
+    })
+  }
+
+  // 3. Применяем порядок (asc/desc)
+  if (sortOrder.value === 'desc') {
+    arr.reverse()
+  }
+
+  return arr
+})
 
 // ====================== КЛИК ПО ПУСТОМУ МЕСТУ ======================
 const handleViewportClick = (e: MouseEvent) => {
@@ -105,9 +146,7 @@ const onContextMenu = (e: MouseEvent, item: any) => {
       { label: 'Копировать имя', icon: 'info_icon', action: () => copyName(item.path) }
     )
   } else {
-    menuItems.push(
-      { label: 'Открыть в проводнике', icon: 'explorer_icon', action: () => showInExplorer(props.basePath) }
-    )
+    menuItems.push({ label: 'Открыть в проводнике', icon: 'explorer_icon', action: () => showInExplorer(props.basePath) })
   }
 
   showContextMenu(e, menuItems)

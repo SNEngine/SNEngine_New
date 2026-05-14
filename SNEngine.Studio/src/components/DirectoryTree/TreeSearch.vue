@@ -46,28 +46,33 @@ const clear = () => {
 
 <style scoped>
 .tree-search {
-  flex: 1;
+  display: block;
+  width: 100%; /* Занимает всю ширину отведенного flex-контейнера */
 }
 
 .search-wrapper {
   position: relative;
   width: 100%;
+  display: flex;
+  align-items: center;
 }
 
 .search-input {
   width: 100%;
+  height: 28px; /* Фиксированная высота для выравнивания с кнопками */
   background: #252526;
   border: 1px solid #3c3c3c;
   color: #ccc;
-  padding: 5px 28px 5px 10px;
+  padding: 0 28px 0 10px; /* Отступ справа под кнопку очистки */
   border-radius: 4px;
   font-size: 12px;
   outline: none;
+  box-sizing: border-box; /* Чтобы padding не раздувал ширину */
   transition: border-color 0.2s;
 }
 
 .search-input:focus {
-  border-color: #FF5252;
+  border-color: #FF5252; /* Акцентный цвет при фокусе */
 }
 
 .clear-btn {
@@ -83,6 +88,9 @@ const clear = () => {
   padding: 2px 5px;
   border-radius: 3px;
   line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .clear-btn:hover {

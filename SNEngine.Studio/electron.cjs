@@ -71,15 +71,25 @@ ipcMain.on('start-watcher', (event, dirPath) => {
   watcher = chokidar.watch(dirPath, {
     ignored: /(^|[\/\\])\../,
     persistent: true,
-    ignoreInitial: true
+    ignoreInitial: true,
+    awaitWriteFinish: true
   });
 
   watcher.on('all', (eventName, filePath) => {
+    console.log(`[Watcher] ${eventName}: ${filePath}`);
+
     if (mainWindow) {
       mainWindow.webContents.send('file-change', { 
         type: eventName, 
         path: filePath 
       });
+    }
+
+    // Уведомляем Vue о удалении
+    if (['unlink', 'unlinkDir'].includes(eventName)) {
+      if (mainWindow) {
+        mainWindow.webContents.send('notify-unlink', filePath);
+      }
     }
   });
 });

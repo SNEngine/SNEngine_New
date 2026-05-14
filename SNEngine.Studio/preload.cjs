@@ -24,9 +24,9 @@ contextBridge.exposeInMainWorld('electron', {
 getFilePath: (file) => webUtils.getPathForFile(file), // Теперь это заработает
   copyFiles: (targetDir, filePaths) => ipcRenderer.invoke('copy-files', targetDir, filePaths),
   // === Методы для File Watcher ===
-  onFileChange: (callback) => {
-    ipcRenderer.on('file-change', callback)
-  },
+  // === Watcher Events ===
+  onFileChange: (callback) => ipcRenderer.on('file-change', (_, data) => callback(data)),
+  onUnlink: (callback) => ipcRenderer.on('notify-unlink', (_, path) => callback(path)),
   offFileChange: (callback) => {
     ipcRenderer.removeListener('file-change', callback)
   },

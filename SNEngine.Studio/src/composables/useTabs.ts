@@ -9,28 +9,31 @@ export function useTabs() {
     content?: string
     language?: string
     isDirty: boolean
+    isDeleted?: boolean
   }>>([])
 
   const activeFilePath = ref<string | null>(null)
 
-  // ====================== ОТКРЫТИЕ ФАЙЛА ======================
   const openFile = async (filePath: string, getFileHandler: any) => {
     const existing = tabs.value.find(t => t.filePath === filePath)
     if (existing) {
+      // Если файл был ранее "удален", но мы его снова открываем (например, создали заново)
+      if (existing.isDeleted) existing.isDeleted = false
       activateTab(existing)
       return
     }
 
-    const { component, type, props, language } = await getFileHandler(filePath)
+    const { type, props, language } = await getFileHandler(filePath)
 
     const newTab = {
       id: Date.now().toString(),
       filePath,
-      name: filePath.split(/[/\\]/).pop() || filePath,
+      name: filePath.split(/[/\\\\]/).pop() || filePath,
       type,
       content: props.modelValue || props.initialHtml || '',
       language,
-      isDirty: false
+      isDirty: false,
+      isDeleted: false
     }
 
     tabs.value.push(newTab)
@@ -66,6 +69,13 @@ export function useTabs() {
     if (tab) tab.isDirty = false
   }
 
+  const markAsDeleted = (filePath: string) => {
+    const tab = tabs.value.find(t => t.filePath === filePath)
+    if (tab) {
+      tab.isDeleted = true
+    }
+  }
+
   return {
     tabs,
     activeFilePath,
@@ -73,6 +83,7 @@ export function useTabs() {
     activateTab,
     closeTab,
     markDirty,
-    markClean
+    markClean,
+    markAsDeleted
   }
 }

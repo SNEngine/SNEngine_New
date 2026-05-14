@@ -1,6 +1,5 @@
 <template>
   <div class="editor-tabs">
-    <!-- Панель вкладок -->
     <TabBar
       :tabs="tabs"
       :active-file-path="activeFilePath"
@@ -9,7 +8,6 @@
       @context-menu="showTabContextMenu"
     />
 
-    <!-- Основной контент редактора -->
     <TabContent
       :current-component="currentComponent"
       :current-props="currentProps"
@@ -41,8 +39,6 @@ const { tabs, activeFilePath, activateTab, closeTab, markDirty, markClean } = us
 const { getFileHandler } = useFileType()
 const { saveFile, getContentFromEditor } = useFileSave()
 const { add: addShortcut } = useKeyboard()
-
-// Уведомления
 const { success, error } = useNotification()
 
 const tabContextMenuRef = ref<any>(null)
@@ -53,38 +49,45 @@ const currentHandler = ref<any>(null)
 const currentComponent = computed(() => currentHandler.value?.component || null)
 const currentProps = computed(() => currentHandler.value?.props || {})
 
-// Обновление обработчика при смене активной вкладки
+// Нормализация пути (чтобы сравнивать корректно)
+const normalizePath = (p) => p ? p.replace(/\\/g, '/').toLowerCase() : ''
+
+// ====================== ЗАКРЫТИЕ ВКЛАДКИ ПРИ УДАЛЕНИИ ======================
+watch(lastUpdate, (update) => {
+  if (!update || !update.path) return
+
+  console.log('📡 lastUpdate получен:', update)
+
+  const activePath = activeFilePath.value
+  if (!activePath) return
+
+  const normalizedActive = normalizePath(activePath)
+  const normalizedUpdate = normalizePath(update.path)
+
+  if (normalizedActive === normalizedUpdate && 
+      (update.type === 'unlink' || update.type === 'unlinkDir')) {
+    
+    const tabToClose = tabs.value.find(t => normalizePath(t.filePath) === normalizedActive)
+    if (tabToClose) {
+      console.log('🗑️ Закрываем вкладку удалённого файла:', activePath)
+      closeTab(tabToClose)
+      success('Вкладка закрыта', 'Файл был удалён')
+    }
+  }
+})
+
+// ====================== СМЕНА АКТИВНОЙ ВКЛАДКИ ======================
 watch(activeFilePath, async (newPath) => {
   if (!newPath) {
     currentHandler.value = null
     return
   }
-  currentHandler.value = await getFileHandler(newPath)
-})
 
-// ====================== LIVE RELOAD (только для редактируемых файлов) ======================
-watch(lastUpdate, async () => {
-  for (const tab of tabs.value) {
-    if (tab.isDirty) continue
-    if (!['code', 'web'].includes(tab.type)) continue // не обновляем превью
-
-    try {
-      const freshContent = await (window as any).electron?.readFile?.(tab.filePath)
-      if (freshContent !== undefined && freshContent !== tab.content) {
-        tab.content = freshContent
-
-        if (tab.filePath === activeFilePath.value && tabContentRef.value?.activeEditorRef) {
-          const editor = tabContentRef.value.activeEditorRef
-          if (editor.editorRef?.value?.setValue) {
-            editor.editorRef.value.setValue(freshContent)
-          } else if (typeof editor.setValue === 'function') {
-            editor.setValue(freshContent)
-          }
-        }
-      }
-    } catch (e) {
-      console.warn('Не удалось обновить файл извне:', tab.filePath)
-    }
+  try {
+    currentHandler.value = await getFileHandler(newPath)
+  } catch (err) {
+    console.warn('File handler error:', err)
+    currentHandler.value = null
   }
 })
 
@@ -117,10 +120,7 @@ const saveCurrentFile = async () => {
   const activeTab = tabs.value.find(t => t.filePath === activeFilePath.value)
   if (!activeTab) return
 
-  // Пропускаем не редактируемые типы (изображения, видео, аудио и т.д.)
-  if (!['code', 'web'].includes(activeTab.type)) {
-    return
-  }
+  if (!['code', 'web'].includes(activeTab.type)) return
 
   const editor = tabContentRef.value?.activeEditorRef
   let content = getContentFromEditor(editor, activeTab.content || '')
@@ -148,12 +148,11 @@ const handleContentUpdate = (newContent: string) => {
 
 const handleComponentSave = () => saveCurrentFile()
 
-// ====================== ГОРЯЧИЕ КЛАВИШИ ======================
 onMounted(() => {
   addShortcut('ctrl+s', saveCurrentFile, true)
 })
 
-// ====================== КОНТЕКСТНОЕ МЕНЮ ======================
+// Контекстное меню
 const showTabContextMenu = (e: MouseEvent, tab: any) => {
   const i = tabs.value.findIndex(t => t.id === tab.id)
   const menu = [
@@ -177,10 +176,7 @@ const closeAllTabs = () => {
   currentHandler.value = null
 }
 
-// Экспорт для внешнего использования
-defineExpose({
-  openFile
-})
+defineExpose({ openFile })
 </script>
 
 <style scoped>

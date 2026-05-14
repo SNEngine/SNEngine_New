@@ -1,58 +1,68 @@
 <template>
   <div class="tab-content">
+    <!-- Удалённый файл -->
+    <DeletedFile 
+      v-if="isDeleted"
+      :filePath="currentProps.filePath || ''"
+      @close-tab="emitCloseTab"
+    />
+
+    <!-- Пустое состояние -->
+    <div v-else-if="!currentComponent" class="empty-state">
+      <span class="empty-icon">📂</span>
+      <p>Выберите файл в дереве проекта</p>
+    </div>
+
+    <!-- Обычный контент -->
     <component 
-      v-if="currentComponent"
+      v-else
       :is="currentComponent"
       v-bind="currentProps"
       ref="activeEditorRef"
       v-on="editorEvents"
     />
-    
-    <div v-else class="empty-state">
-      <span class="empty-icon">📂</span>
-      <p>Выберите файл в дереве проекта</p>
-    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, type Component } from 'vue'
+import { ref, computed } from 'vue'
+import DeletedFile from '../DeletedFile/DeletedFile.vue'
 
 const props = defineProps<{
-  currentComponent: Component | null
+  currentComponent: any
   currentProps: Record<string, any>
-  isEditable?: boolean   // ← Новый пропс
+  isEditable?: boolean
 }>()
 
 const emit = defineEmits<{
   (e: 'update:modelValue', value: string): void
   (e: 'save'): void
+  (e: 'close-tab'): void
 }>()
 
 const activeEditorRef = ref<any>(null)
 
-// Определяем, нужно ли подключать события сохранения
-const shouldHandleEvents = computed(() => {
-  // Приоритет: используем явный пропс, если передан
-  if (props.isEditable !== undefined) return props.isEditable
+const isDeleted = computed(() => props.currentProps?.isDeleted === true)
 
-  // Fallback по имени компонента
+const emitCloseTab = () => {
+  emit('close-tab')
+}
+
+const shouldHandleEvents = computed(() => {
+  if (props.isEditable !== undefined) return props.isEditable
   const name = props.currentComponent?.__name || ''
   return ['CodeEditor', 'WebEditor'].includes(name)
 })
 
 const editorEvents = computed(() => {
   if (!shouldHandleEvents.value) return {}
-
   return {
     'update:modelValue': (value: string) => emit('update:modelValue', value),
     'save': () => emit('save')
   }
 })
 
-defineExpose({
-  activeEditorRef
-})
+defineExpose({ activeEditorRef })
 </script>
 
 <style scoped>

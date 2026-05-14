@@ -15,6 +15,7 @@
       ref="tabContentRef"
       @update:model-value="handleContentUpdate"
       @save="handleComponentSave"
+      @close-tab="handleCloseActiveTab"
     />
 
     <ContextMenu ref="tabContextMenuRef" />
@@ -28,6 +29,7 @@ import { lastUpdate } from '@/utils/watcherState'
 import ContextMenu from '../ContextMenu/ContextMenu.vue'
 import TabBar from './TabBar.vue'
 import TabContent from './TabContent.vue'
+import DeletedFile from '../DeletedFile/DeletedFile.vue'
 
 import { useTabs } from '@/composables/useTabs'
 import { useFileType } from '@/composables/useFileType'
@@ -49,29 +51,20 @@ const currentHandler = ref<any>(null)
 const currentComponent = computed(() => currentHandler.value?.component || null)
 const currentProps = computed(() => currentHandler.value?.props || {})
 
-// Нормализация пути (чтобы сравнивать корректно)
-const normalizePath = (p) => p ? p.replace(/\\/g, '/').toLowerCase() : ''
-
-// ====================== ЗАКРЫТИЕ ВКЛАДКИ ПРИ УДАЛЕНИИ ======================
+// ====================== ОБРАБОТКА УДАЛЕНИЯ ======================
 watch(lastUpdate, (update) => {
-  if (!update || !update.path) return
-
-  console.log('📡 lastUpdate получен:', update)
+  if (!update) return
 
   const activePath = activeFilePath.value
-  if (!activePath) return
-
-  const normalizedActive = normalizePath(activePath)
-  const normalizedUpdate = normalizePath(update.path)
-
-  if (normalizedActive === normalizedUpdate && 
+  if (activePath && update.path === activePath && 
       (update.type === 'unlink' || update.type === 'unlinkDir')) {
     
-    const tabToClose = tabs.value.find(t => normalizePath(t.filePath) === normalizedActive)
-    if (tabToClose) {
-      console.log('🗑️ Закрываем вкладку удалённого файла:', activePath)
-      closeTab(tabToClose)
-      success('Вкладка закрыта', 'Файл был удалён')
+    currentHandler.value = {
+      component: DeletedFile,
+      props: { 
+        filePath: activePath,
+        isDeleted: true 
+      }
     }
   }
 })
@@ -83,11 +76,30 @@ watch(activeFilePath, async (newPath) => {
     return
   }
 
+  const tab = tabs.value.find(t => t.filePath === newPath)
+  if (tab?.isDeleted) {
+    currentHandler.value = {
+      component: DeletedFile,
+      props: { 
+        filePath: newPath,
+        isDeleted: true 
+      }
+    }
+    return
+  }
+
   try {
-    currentHandler.value = await getFileHandler(newPath)
+    const handler = await getFileHandler(newPath)
+    currentHandler.value = handler
   } catch (err) {
     console.warn('File handler error:', err)
-    currentHandler.value = null
+    currentHandler.value = {
+      component: DeletedFile,
+      props: { 
+        filePath: newPath,
+        isDeleted: true 
+      }
+    }
   }
 })
 
@@ -95,6 +107,7 @@ watch(activeFilePath, async (newPath) => {
 const openFile = async (filePath: string) => {
   const existing = tabs.value.find(t => t.filePath === filePath)
   if (existing) {
+    if (existing.isDeleted) existing.isDeleted = false
     activateTab(existing)
     return
   }
@@ -118,7 +131,7 @@ const openFile = async (filePath: string) => {
 // ====================== СОХРАНЕНИЕ ======================
 const saveCurrentFile = async () => {
   const activeTab = tabs.value.find(t => t.filePath === activeFilePath.value)
-  if (!activeTab) return
+  if (!activeTab || activeTab.isDeleted) return
 
   if (!['code', 'web'].includes(activeTab.type)) return
 
@@ -147,6 +160,11 @@ const handleContentUpdate = (newContent: string) => {
 }
 
 const handleComponentSave = () => saveCurrentFile()
+
+const handleCloseActiveTab = () => {
+  const activeTab = tabs.value.find(t => t.filePath === activeFilePath.value)
+  if (activeTab) closeTab(activeTab)
+}
 
 onMounted(() => {
   addShortcut('ctrl+s', saveCurrentFile, true)

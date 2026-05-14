@@ -1,0 +1,24 @@
+<svg width="128" height="128" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Файл -->
+  <path
+    d="M6 3C4.89543 3 4 3.89543 4 5V19C4 20.1046 4.89543 21 6 21H18C19.1046 21 20 20.1046 20 19V9L14 3H6Z"
+    fill="currentColor"
+  />
+
+  <!-- Загнутый угол -->
+  <path
+    d="M14 3V9H20"
+    fill="none"
+    stroke="#222222"
+    stroke-width="1.5"
+    stroke-linejoin="round"
+  />
+
+  <!-- Крестик удаления -->
+  <path
+    d="M9 11L15 17M15 11L9 17"
+    stroke="#222222"
+    stroke-width="2"
+    stroke-linecap="round"
+  />
+</svg>

@@ -15,92 +15,107 @@ export function useDirectoryTree(basePath: string, isRoot = true) {
   const loading = ref(true)
   const selectedItem = ref<TreeItem | null>(null)
 
-  // ====================== ЗАГРУЗКА ======================
+  const normalizePath = (p: string) => p.replace(/\\/g, '/')
+  const openFolders = new Set<string>()
+
+  // Сохраняем текущее состояние открытых папок перед обновлением
+  const saveOpenState = () => {
+    const collect = (list: TreeItem[]) => {
+      for (const item of list) {
+        if (item.isFolder && item.isOpen) {
+          openFolders.add(normalizePath(item.path))
+        }
+        if (item.children) collect(item.children)
+      }
+    }
+    collect(items.value)
+  }
+
+  // Рекурсивная загрузка папки и всех её открытых подпапок
+  const fetchDirectoryRecursive = async (path: string): Promise<TreeItem[]> => {
+    try {
+      const result = await (window as any).electron?.readDirectory?.(path) || []
+      
+      const loadedItems = await Promise.all(result.map(async (item: any) => {
+        const normPath = normalizePath(item.path)
+        const isOpen = openFolders.has(normPath)
+        
+        const treeItem: TreeItem = {
+          ...item,
+          isOpen: isOpen,
+          children: undefined
+        }
+
+        // Если папка должна быть открыта, загружаем её детей немедленно
+        if (item.isFolder && isOpen) {
+          treeItem.children = await fetchDirectoryRecursive(item.path)
+        }
+
+        return treeItem
+      }))
+
+      return loadedItems
+    } catch (err) {
+      console.error(`Error loading directory ${path}:`, err)
+      return []
+    }
+  }
+
   const loadDirectory = async () => {
     loading.value = true
     try {
-      const result = await (window as any).electron?.readDirectory?.(basePath) || []
-      
-      items.value = result.map((item: any) => ({
-        ...item,
-        isOpen: false
-      })).sort((a: any, b: any) => {
-        if (a.isFolder && !b.isFolder) return -1
-        if (!a.isFolder && b.isFolder) return 1
-        return a.name.localeCompare(b.name)
-      })
-    } catch (err) {
-      console.error('Directory read error:', err)
+      // Запускаем рекурсивное восстановление всей структуры от корня
+      items.value = await fetchDirectoryRecursive(basePath)
     } finally {
       loading.value = false
     }
   }
 
-  // ====================== WATCHER ======================
-  const startWatcher = () => {
-    if (!isRoot) return
-    try {
-      if ((window as any).electron?.startWatcher) {
-        (window as any).electron.startWatcher(basePath)
-      }
-    } catch (e) {
-      console.warn('Не удалось запустить watcher:', e)
-    }
-  }
-
-  const stopWatcher = () => {
-    if (!isRoot) return
-    try {
-      if ((window as any).electron?.stopWatcher) {
-        (window as any).electron.stopWatcher()
-      }
-    } catch (e) {
-      // ignore
-    }
-  }
-
-  const handleFileChange = () => {
-    if (isRoot) {
-      loadDirectory()
-    }
-  }
-
-  // ====================== УПРАВЛЕНИЕ ПАПКАМИ ======================
+  // ====================== TOGGLE ======================
   const toggleOpen = async (item: TreeItem) => {
     if (!item.isFolder) return
 
     if (!item.isOpen) {
-      // Открываем папку
+      // Загружаем детей только если их еще нет
       if (!item.children || item.children.length === 0) {
-        // Загружаем детей только один раз
         item.isLoadingChildren = true
         try {
-          const result = await (window as any).electron?.readDirectory?.(item.path) || []
-          item.children = result.map((child: any) => ({
-            ...child,
-            isOpen: false,
-            children: undefined
-          })).sort((a: any, b: any) => {
-            if (a.isFolder && !b.isFolder) return -1
-            if (!a.isFolder && b.isFolder) return 1
-            return a.name.localeCompare(b.name)
-          })
-        } catch (err) {
-          console.error('Failed to load children:', err)
+          item.children = await fetchDirectoryRecursive(item.path)
         } finally {
           item.isLoadingChildren = false
         }
       }
     }
+
     item.isOpen = !item.isOpen
+
+    const normPath = normalizePath(item.path)
+    if (item.isOpen) openFolders.add(normPath)
+    else openFolders.delete(normPath)
+  }
+
+  // ====================== WATCHER ======================
+  const startWatcher = () => {
+    if (!isRoot) return
+    (window as any).electron?.startWatcher?.(basePath)
+  }
+
+  const stopWatcher = () => {
+    if (!isRoot) return
+    (window as any).electron?.stopWatcher?.()
+  }
+
+  const handleFileChange = () => {
+    if (isRoot) {
+      saveOpenState()
+      loadDirectory()
+    }
   }
 
   // ====================== LIFECYCLE ======================
   onMounted(() => {
     loadDirectory()
     startWatcher()
-
-    // Подписка на изменения от Electron
     ;(window as any).electron?.onFileChange?.(handleFileChange)
   })
 
@@ -109,9 +124,11 @@ export function useDirectoryTree(basePath: string, isRoot = true) {
     ;(window as any).electron?.offFileChange?.(handleFileChange)
   })
 
-  // Fallback обновление при внешних изменениях
   watch(lastUpdate, () => {
-    if (isRoot) loadDirectory()
+    if (isRoot) {
+      saveOpenState()
+      loadDirectory()
+    }
   })
 
   return {

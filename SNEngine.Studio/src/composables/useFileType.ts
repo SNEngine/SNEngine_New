@@ -4,7 +4,7 @@ import { markRaw, type Component } from 'vue'
 import CodeEditor from '../components/CodeEditor/CodeEditor.vue'
 import ImagePreview from '../components/ImagePreview/ImagePreview.vue'
 import AudioPreview from '../components/AudioPreview/AudioPreview.vue'
-import VideoPreview from '../components/VideoPreview/VideoPreview.vue'   // ← Новый
+import VideoPreview from '../components/VideoPreview/VideoPreview.vue'
 import WebEditor from '../components/WebEditor/WebEditor.vue'
 import UnknownFile from '../components/UnknownFile/UnknownFile.vue'
 
@@ -16,13 +16,14 @@ export interface FileHandlerResult {
   props: Record<string, any>
   language?: string
   icon?: string
+  isEditable?: boolean   // ← Новый флаг
 }
 
 // ==================== КОНФИГУРАЦИЯ РАСШИРЕНИЙ ====================
 
 const TEXT_EXTENSIONS = new Set([
-  'sn', 'ts', 'js', 'json', 'txt', 'xml', 'cs', 'csproj', 
-  'log', 'md', 'markdown', 'vue', 'html', 'htm', 'css', 'scss', 
+  'sn', 'ts', 'js', 'json', 'txt', 'xml', 'cs', 'csproj',
+  'log', 'md', 'markdown', 'vue', 'html', 'htm', 'css', 'scss',
   'less', 'yaml', 'yml', 'toml', 'ini', 'env', 'gitignore'
 ])
 
@@ -34,7 +35,7 @@ const AUDIO_EXTENSIONS = new Set([
   'mp3', 'wav', 'ogg', 'm4a', 'flac', 'aac', 'wma', 'opus'
 ])
 
-const VIDEO_EXTENSIONS = new Set([     // ← Новый блок
+const VIDEO_EXTENSIONS = new Set([
   'mp4', 'webm', 'mov', 'avi', 'mkv', 'm4v', 'ogv', 'flv', 'wmv'
 ])
 
@@ -67,48 +68,52 @@ export function useFileType() {
     const name = filePath.split(/[/\\]/).pop() || filePath
     const ext = name.split('.').pop()?.toLowerCase() || ''
 
-    // HTML (WebEditor)
+    // === HTML (WebEditor) ===
     if (ext === 'html' || ext === 'htm') {
       return {
         component: markRaw(WebEditor),
         type: 'web',
         props: { filePath, initialHtml: await safeReadFile(filePath) },
         language: 'html',
-        icon: 'html_icon'
+        icon: 'html_icon',
+        isEditable: true
       }
     }
 
-    // Видео (Новый обработчик)
+    // === Видео ===
     if (VIDEO_EXTENSIONS.has(ext)) {
       return {
         component: markRaw(VideoPreview),
         type: 'video',
         props: { videoPath: filePath },
-        icon: 'video_icon'
+        icon: 'video_icon',
+        isEditable: false
       }
     }
 
-    // Аудио
+    // === Аудио ===
     if (AUDIO_EXTENSIONS.has(ext)) {
       return {
         component: markRaw(AudioPreview),
         type: 'audio',
         props: { audioPath: filePath },
-        icon: 'audio_icon'
+        icon: 'audio_icon',
+        isEditable: false
       }
     }
 
-    // Изображения
+    // === Изображения ===
     if (IMAGE_EXTENSIONS.has(ext)) {
       return {
         component: markRaw(ImagePreview),
         type: 'image',
         props: { imagePath: filePath },
-        icon: 'image_icon'
+        icon: 'image_icon',
+        isEditable: false
       }
     }
 
-    // Текстовые файлы
+    // === Текстовые / редактируемые файлы ===
     if (TEXT_EXTENSIONS.has(ext)) {
       const content = await safeReadFile(filePath)
       const language = LANGUAGE_MAP[ext] || 'plaintext'
@@ -122,16 +127,18 @@ export function useFileType() {
           theme: 'snengine-dark' 
         },
         language,
-        icon: ext === 'sn' ? 'sn_script_icon' : 'code_icon'
+        icon: ext === 'sn' ? 'sn_script_icon' : 'code_icon',
+        isEditable: true
       }
     }
 
-    // Неизвестный файл
+    // === Неизвестный файл ===
     return {
       component: markRaw(UnknownFile),
       type: 'unknown',
       props: { filePath },
-      icon: 'unknown_icon'
+      icon: 'unknown_icon',
+      isEditable: false
     }
   }
 
@@ -161,6 +168,6 @@ export function useFileType() {
     TEXT_EXTENSIONS,
     IMAGE_EXTENSIONS,
     AUDIO_EXTENSIONS,
-    VIDEO_EXTENSIONS   // ← добавлено
+    VIDEO_EXTENSIONS
   }
 }

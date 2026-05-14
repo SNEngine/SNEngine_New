@@ -13,6 +13,7 @@
     <TabContent
       :current-component="currentComponent"
       :current-props="currentProps"
+      :is-editable="currentHandler?.isEditable ?? false"
       ref="tabContentRef"
       @update:model-value="handleContentUpdate"
       @save="handleComponentSave"
@@ -61,10 +62,11 @@ watch(activeFilePath, async (newPath) => {
   currentHandler.value = await getFileHandler(newPath)
 })
 
-// ====================== LIVE RELOAD ======================
+// ====================== LIVE RELOAD (только для редактируемых файлов) ======================
 watch(lastUpdate, async () => {
   for (const tab of tabs.value) {
     if (tab.isDirty) continue
+    if (!['code', 'web'].includes(tab.type)) continue // не обновляем превью
 
     try {
       const freshContent = await (window as any).electron?.readFile?.(tab.filePath)
@@ -114,6 +116,11 @@ const openFile = async (filePath: string) => {
 const saveCurrentFile = async () => {
   const activeTab = tabs.value.find(t => t.filePath === activeFilePath.value)
   if (!activeTab) return
+
+  // Пропускаем не редактируемые типы (изображения, видео, аудио и т.д.)
+  if (!['code', 'web'].includes(activeTab.type)) {
+    return
+  }
 
   const editor = tabContentRef.value?.activeEditorRef
   let content = getContentFromEditor(editor, activeTab.content || '')
@@ -170,7 +177,7 @@ const closeAllTabs = () => {
   currentHandler.value = null
 }
 
-// Экспорт для внешнего использования (DirectoryTree и т.д.)
+// Экспорт для внешнего использования
 defineExpose({
   openFile
 })

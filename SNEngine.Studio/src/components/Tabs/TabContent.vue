@@ -21,25 +21,32 @@ import { ref, computed, type Component } from 'vue'
 const props = defineProps<{
   currentComponent: Component | null
   currentProps: Record<string, any>
+  isEditable?: boolean   // ← Новый пропс
 }>()
 
 const emit = defineEmits<{
   (e: 'update:modelValue', value: string): void
-  (e: 'save', content: string): void
+  (e: 'save'): void
 }>()
 
 const activeEditorRef = ref<any>(null)
 
-// Передаём события ТОЛЬКО редактируемым компонентам
-const editorEvents = computed(() => {
-  const name = props.currentComponent?.__name || ''
-  const isEditable = ['CodeEditor', 'WebEditor'].includes(name)
+// Определяем, нужно ли подключать события сохранения
+const shouldHandleEvents = computed(() => {
+  // Приоритет: используем явный пропс, если передан
+  if (props.isEditable !== undefined) return props.isEditable
 
-  if (!isEditable) return {}
+  // Fallback по имени компонента
+  const name = props.currentComponent?.__name || ''
+  return ['CodeEditor', 'WebEditor'].includes(name)
+})
+
+const editorEvents = computed(() => {
+  if (!shouldHandleEvents.value) return {}
 
   return {
     'update:modelValue': (value: string) => emit('update:modelValue', value),
-    'save': (content: string) => emit('save', content)
+    'save': () => emit('save')
   }
 })
 

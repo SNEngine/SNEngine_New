@@ -1,0 +1,10 @@
+{
+  "id": "empty",
+  "name": "Empty File",
+  "description": "Blank file with no content",
+  "icon": "file",
+  "extension": ".sn",
+  "category": "General",
+  "defaultName": "NewFile",
+  "type": "Text File"
+}

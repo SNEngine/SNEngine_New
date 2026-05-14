@@ -1,6 +1,9 @@
 const { contextBridge, ipcRenderer, webUtils } = require('electron')
 
 contextBridge.exposeInMainWorld('electron', {
+  // === PROJECT ===
+  getProjectPath: () => ipcRenderer.invoke('get-project-path'),
+
   // === Чтение данных ===
   readDirectory: (path) => ipcRenderer.invoke('read-directory', path),
   readFile: (path) => ipcRenderer.invoke('read-file', path),
@@ -16,14 +19,19 @@ contextBridge.exposeInMainWorld('electron', {
   showFileProperties: (path) => ipcRenderer.invoke('show-file-properties', path),
   getFileStats: (path) => ipcRenderer.invoke('get-file-stats', path),
   openWith: (filePath) => ipcRenderer.invoke('open-with', filePath),
-    // Внутренний Drag & Drop
+
+  // === Внутренний Drag & Drop ===
   moveItem: (sourcePath, targetDir) => ipcRenderer.invoke('move-item', sourcePath, targetDir),
   copyItem: (sourcePath, targetDir) => ipcRenderer.invoke('copy-item', sourcePath, targetDir),
 
-  // === Drag & Drop ===
-getFilePath: (file) => webUtils.getPathForFile(file), // Теперь это заработает
+  // === Drag & Drop из ОС ===
+  getFilePath: (file) => webUtils.getPathForFile(file),
   copyFiles: (targetDir, filePaths) => ipcRenderer.invoke('copy-files', targetDir, filePaths),
-  // === Методы для File Watcher ===
+
+  // === TEMPLATES ===
+  getAllTemplates: () => ipcRenderer.invoke('get-all-templates'),
+  getTemplate: (id) => ipcRenderer.invoke('get-template', id),
+
   // === Watcher Events ===
   onFileChange: (callback) => ipcRenderer.on('file-change', (_, data) => callback(data)),
   onUnlink: (callback) => ipcRenderer.on('notify-unlink', (_, path) => callback(path)),

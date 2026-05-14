@@ -1,0 +1,10 @@
+{
+  "id": "sn",
+  "name": "SN Scene",
+  "description": "Standard scene template for visual novel",
+  "icon": "sn",
+  "extension": ".sn",
+  "category": "Script",
+  "defaultName": "scene",
+  "type": "SN Script"
+}

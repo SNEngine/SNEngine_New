@@ -1,0 +1,10 @@
+{
+  "id": "html",
+  "name": "HTML Page",
+  "description": "Basic HTML file for web preview",
+  "icon": "html",
+  "extension": ".html",
+  "category": "Web",
+  "defaultName": "page",
+  "type": "HTML"
+}

@@ -349,6 +349,76 @@ async function copyDir(src, dest) {
   }
 }
 
+// ====================== SCRIPT TEMPLATES ======================
+
+const getTemplatesPath = () => {
+  if (!app.isPackaged) {
+    // Разработка: должен быть E:\repos\SNEngine\SNEngine.Studio\ScriptTemplates
+    return path.join(__dirname, 'ScriptTemplates');
+  }
+  // Production (после сборки)
+  return path.join(process.resourcesPath, 'app.asar', 'ScriptTemplates');
+};
+
+// Чтение всех шаблонов
+ipcMain.handle('get-all-templates', async () => {
+  try {
+    const templatesRoot = getTemplatesPath();
+    console.log(`[Templates] Looking in: ${templatesRoot}`);
+
+    if (!fs.existsSync(templatesRoot)) {
+      console.warn('⚠️ ScriptTemplates folder not found at:', templatesRoot);
+      return [];
+    }
+
+    const categories = await fs.promises.readdir(templatesRoot, { withFileTypes: true });
+    const templates = [];
+
+    for (const category of categories) {
+      if (!category.isDirectory()) continue;
+
+      const catPath = path.join(templatesRoot, category.name);
+      const files = await fs.promises.readdir(catPath);
+
+      const metadataFile = files.find(f => f === 'metadata.json');
+      const templateFile = files.find(f => f.startsWith('template.'));
+
+      if (!metadataFile || !templateFile) {
+        console.warn(`⚠️ Template folder "${category.name}" is incomplete`);
+        continue;
+      }
+
+      const metadataPath = path.join(catPath, metadataFile);
+      const templatePath = path.join(catPath, templateFile);
+
+      const metadata = JSON.parse(await fs.promises.readFile(metadataPath, 'utf-8'));
+      const content = await fs.promises.readFile(templatePath, 'utf-8');
+
+      templates.push({
+        ...metadata,
+        content: content
+      });
+    }
+
+    console.log(`✅ Successfully loaded ${templates.length} templates`);
+    return templates.sort((a, b) => a.name.localeCompare(b.name));
+  } catch (err) {
+    console.error('❌ get-all-templates error:', err);
+    return [];
+  }
+});
+
+// Получить один шаблон по id
+ipcMain.handle('get-template', async (_, templateId) => {
+  try {
+    const all = await ipcMain.handlers['get-all-templates']?.() || [];
+    return all.find(t => t.id === templateId);
+  } catch (err) {
+    console.error('get-template error:', err);
+    return null;
+  }
+});
+
 // ====================== APP LIFECYCLE ======================
 app.whenReady().then(() => {
   createWindow();

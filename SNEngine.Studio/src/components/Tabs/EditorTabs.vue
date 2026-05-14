@@ -76,12 +76,13 @@ watch(activeFilePath, async (newPath) => {
     return
   }
 
-  const tab = tabs.value.find(t => t.filePath === newPath)
+  const normalizedNew = newPath.replace(/\\+/g, '/').replace(/\/+$/, '')
+  const tab = tabs.value.find(t => t.filePath.replace(/\\+/g, '/').replace(/\/+$/, '') === normalizedNew)
   if (tab?.isDeleted) {
     currentHandler.value = {
       component: DeletedFile,
       props: { 
-        filePath: newPath,
+        filePath: normalizedNew,
         isDeleted: true 
       }
     }
@@ -96,7 +97,7 @@ watch(activeFilePath, async (newPath) => {
     currentHandler.value = {
       component: DeletedFile,
       props: { 
-        filePath: newPath,
+        filePath: normalizedNew,
         isDeleted: true 
       }
     }
@@ -104,8 +105,11 @@ watch(activeFilePath, async (newPath) => {
 })
 
 // ====================== ОТКРЫТИЕ ФАЙЛА ======================
-const openFile = async (filePath: string) => {
-  const existing = tabs.value.find(t => t.filePath === filePath)
+const openFile = async (rawPath: string) => {
+  // Нормализуем путь всегда в один формат (forward slashes)
+  const filePath = rawPath.replace(/\\+/g, '/').replace(/\/+$/, '')
+
+  const existing = tabs.value.find(t => t.filePath.replace(/\\+/g, '/').replace(/\/+$/, '') === filePath)
   if (existing) {
     if (existing.isDeleted) existing.isDeleted = false
     activateTab(existing)
@@ -116,7 +120,7 @@ const openFile = async (filePath: string) => {
 
   const newTab = {
     id: Date.now().toString(),
-    filePath,
+    filePath, // сохраняем нормализованный путь
     name: filePath.split(/[/\\]/).pop() || filePath,
     type: handler.type,
     content: handler.props.modelValue || handler.props.initialHtml || '',

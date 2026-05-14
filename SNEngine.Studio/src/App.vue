@@ -5,6 +5,13 @@
         <h1>SNEngine Studio</h1>
         <span class="version">v0.0.1-dev</span>
       </div>
+
+      <div class="header-actions">
+        <button class="new-file-btn" @click="showNewFileDialog = true" title="Create New File">
+          <span class="plus">+</span>
+          New File
+        </button>
+      </div>
     </header>
 
     <div class="workspace">
@@ -13,6 +20,7 @@
           base-path="C:/Users/Siphome/Desktop/testBuild"
           :active-path="currentFile || ''"
           @file-click="handleFileClick"
+          ref="directoryTreeRef"
         />
       </div>
 
@@ -23,11 +31,14 @@
       </div>
     </div>
 
-    <!-- Модальные окна -->
     <MessageBox ref="messageBoxRef" />
     <InputBox ref="inputBoxRef" />
 
-    <!-- === УВЕДОМЛЕНИЯ === -->
+    <NewFileDialog 
+      v-model:visible="showNewFileDialog"
+      @create="handleCreateFile"
+    />
+
     <Teleport to="body">
       <div class="notifications-container">
         <NotificationBox
@@ -42,31 +53,32 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, nextTick } from 'vue'
 
-// Основные компоненты
 import DirectoryTree from "./components/DirectoryTree/DirectoryTree.vue"
 import EditorTabs from "./components/Tabs/EditorTabs.vue"
 import MessageBox from "./components/MessageBox/MessageBox.vue"
 import InputBox from "./components/InputBox/InputBox.vue"
-import NotificationBox from "./components/NotificationBox/NotificationBox.vue"   // ← Новое
+import NotificationBox from "./components/NotificationBox/NotificationBox.vue"
+import NewFileDialog from "./components/NewFileDialog/NewFileDialog.vue"
 
-// Composables
 import { useMessageBox } from './composables/useMessageBox'
 import { useInputBox } from './composables/useInputBox'
-import { useNotification } from './composables/useNotification'   // ← Новое
+import { useNotification } from './composables/useNotification'
 
 const treeWidth = ref(320)
 let isResizing = false
 const currentFile = ref<string | null>(null)
+
 const tabsRef = ref<any>(null)
+const directoryTreeRef = ref<any>(null)
 
 const messageBoxRef = ref<any>(null)
 const inputBoxRef = ref<any>(null)
 
-// Уведомления
-const { notifications, remove } = useNotification()
+const showNewFileDialog = ref(false)
 
+const { notifications, remove } = useNotification()
 const { messageBox } = useMessageBox()
 const { inputBox } = useInputBox()
 
@@ -75,19 +87,53 @@ onMounted(() => {
   inputBox.value = inputBoxRef.value
 })
 
-// Обработка клика по файлу из дерева
-const handleFileClick = async (filePath: string) => {
-  currentFile.value = filePath
+// ====================== ЕДИНАЯ ФУНКЦИЯ ОТКРЫТИЯ ======================
+const openFileSafely = async (filePath: string, retries = 8) => {
+  await nextTick()
 
-  if (tabsRef.value?.openFile) {
-    try {
+  for (let i = 0; i < retries; i++) {
+    if (tabsRef.value?.openFile) {
       await tabsRef.value.openFile(filePath)
-    } catch (e) {
-      console.error('Failed to open file:', e)
+      return
     }
+    await new Promise(r => setTimeout(r, 40))
+  }
+
+  console.warn('[App] EditorTabs still not ready after retries for', filePath)
+}
+
+// ====================== CREATE NEW FILE ======================
+const handleCreateFile = async (data: { name: string; content: string; templateId: string }) => {
+  try {
+    const projectPath = await window.electron.getProjectPath()
+    // Нормализуем путь (getProjectPath возвращает с /)
+    const normalized = projectPath.replace(/\\+/g, '/').replace(/\/+$/, '')
+    const fullPath = `${normalized}/${data.name}`
+
+    const result = await window.electron.writeFile(fullPath, data.content)
+
+    if (result.success) {
+      console.log(`✅ File created: ${fullPath}`)
+
+      if (directoryTreeRef.value?.refresh) {
+        await directoryTreeRef.value.refresh()
+      }
+
+      await nextTick()
+      await openFileSafely(fullPath)
+    }
+  } catch (err) {
+    console.error('Error creating file:', err)
   }
 }
 
+// ====================== FILE CLICK ======================
+const handleFileClick = async (filePath: string) => {
+  currentFile.value = filePath
+  await openFileSafely(filePath)
+}
+
+// ====================== RESIZING ======================
 const startResizing = (e: MouseEvent) => {
   isResizing = true
   document.addEventListener('mousemove', onMouseMove)
@@ -95,9 +141,7 @@ const startResizing = (e: MouseEvent) => {
 }
 
 const onMouseMove = (e: MouseEvent) => {
-  if (isResizing) {
-    treeWidth.value = Math.max(200, Math.min(e.clientX, 600))
-  }
+  if (isResizing) treeWidth.value = Math.max(200, Math.min(e.clientX, 600))
 }
 
 const stopResizing = () => {
@@ -121,6 +165,7 @@ html, body {
   background: #252526; 
   display: flex; 
   align-items: center; 
+  justify-content: space-between;
   padding: 0 16px; 
   border-bottom: 1px solid #333; 
   flex-shrink: 0;
@@ -143,6 +188,39 @@ html, body {
   border-radius: 4px;
 }
 
+/* Header Actions */
+.header-actions {
+  display: flex;
+  align-items: center;
+}
+
+.new-file-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: #FF5252;
+  color: white;
+  border: none;
+  padding: 6px 14px;
+  border-radius: 4px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.new-file-btn:hover {
+  background: #ff6b6b;
+  transform: translateY(-1px);
+}
+
+.plus {
+  font-size: 18px;
+  line-height: 1;
+  font-weight: bold;
+}
+
+/* Workspace */
 .workspace { flex: 1; display: flex; overflow: hidden; }
 
 .left-panel { 
@@ -168,7 +246,7 @@ html, body {
   flex-direction: column;
 }
 
-/* ====================== УВЕДОМЛЕНИЯ ====================== */
+/* Notifications */
 .notifications-container {
   position: fixed;
   bottom: 24px;

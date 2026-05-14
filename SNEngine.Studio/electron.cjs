@@ -212,6 +212,17 @@ ipcMain.handle('get-file-stats', async (_, filePath) => {
   }
 });
 
+ipcMain.handle('open-with', async (event, filePath) => {
+  try {
+    const { shell } = require('electron')
+    await shell.openPath(filePath)
+    return { success: true }
+  } catch (err) {
+    console.error('open-with error:', err)
+    return { success: false, error: err.message }
+  }
+});
+
 // ====================== APP LIFECYCLE ======================
 app.whenReady().then(() => {
   createWindow();

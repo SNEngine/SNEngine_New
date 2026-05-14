@@ -15,6 +15,7 @@ contextBridge.exposeInMainWorld('electron', {
   showInExplorer: (path) => ipcRenderer.invoke('show-in-explorer', path),
   showFileProperties: (path) => ipcRenderer.invoke('show-file-properties', path),
   getFileStats: (path) => ipcRenderer.invoke('get-file-stats', path),
+  openWith: (filePath) => ipcRenderer.invoke('open-with', filePath),
 
   // === Методы для File Watcher ===
   onFileChange: (callback) => {

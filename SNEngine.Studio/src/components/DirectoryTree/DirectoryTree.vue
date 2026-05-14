@@ -53,6 +53,7 @@ import { useFileCrud } from '@/composables/useFileCrud'
 import { useFileUtils } from '@/composables/useFileUtils'
 import { useKeyboard } from '@/composables/useKeyboard'
 import { useFileProperties } from '@/composables/useFileProperties'
+import { useOpenWith } from '@/composables/useOpenWith'   // ← новый
 
 const props = defineProps<{
   basePath: string
@@ -73,6 +74,7 @@ const { searchQuery, filteredItems } = useTreeSearch(items)
 const { contextMenuRef, show: showContextMenu } = useContextMenu()
 const { add } = useKeyboard()
 const { showProperties, isOpen, currentFile, close } = useFileProperties()
+const { openWith } = useOpenWith()   // ← новый
 
 // ====================== СОРТИРОВКА ======================
 const sortField = ref<'name' | 'modified' | 'type'>('name')
@@ -81,26 +83,21 @@ const sortOrder = ref<'asc' | 'desc'>('asc')
 const finalItems = computed(() => {
   let arr = [...filteredItems.value]
 
-  // 1. Папки ВСЕГДА сверху
   arr.sort((a, b) => {
     if (a.isFolder && !b.isFolder) return -1
     if (!a.isFolder && b.isFolder) return 1
     return 0
   })
 
-  // 2. Основная сортировка
   if (sortField.value === 'name') {
     arr.sort((a, b) => a.name.localeCompare(b.name))
-  } 
-  else if (sortField.value === 'modified') {
+  } else if (sortField.value === 'modified') {
     arr.sort((a, b) => {
       const dateA = a.modified ? new Date(a.modified).getTime() : 0
       const dateB = b.modified ? new Date(b.modified).getTime() : 0
       return dateA - dateB
     })
-  } 
-  else if (sortField.value === 'type') {
-    // Сортировка по типу (расширению)
+  } else if (sortField.value === 'type') {
     arr.sort((a, b) => {
       const extA = a.name.includes('.') ? a.name.split('.').pop()?.toLowerCase() || '' : ''
       const extB = b.name.includes('.') ? b.name.split('.').pop()?.toLowerCase() || '' : ''
@@ -108,10 +105,7 @@ const finalItems = computed(() => {
     })
   }
 
-  // 3. Применяем порядок (asc/desc)
-  if (sortOrder.value === 'desc') {
-    arr.reverse()
-  }
+  if (sortOrder.value === 'desc') arr.reverse()
 
   return arr
 })
@@ -139,6 +133,11 @@ const onContextMenu = (e: MouseEvent, item: any) => {
       { label: 'Переименовать', icon: 'edit_icon', action: () => renameItem(item) },
       { label: 'Дублировать', icon: 'copy_icon', action: () => duplicateItem(item.path) },
       { label: 'Свойства', icon: 'info_icon', action: () => showProperties(item) },
+      { 
+        label: 'Открыть с помощью...', 
+        icon: 'open_with_icon', 
+        action: () => openWith(item.path) 
+      },
       { label: 'Удалить', icon: 'error_icon', action: () => deleteItem(item), danger: true },
       { type: 'separator' },
       { label: 'Показать в проводнике', icon: 'explorer_icon', action: () => showInExplorer(item.path) },

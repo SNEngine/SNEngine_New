@@ -1,4 +1,4 @@
-const { contextBridge, ipcRenderer } = require('electron')
+const { contextBridge, ipcRenderer, webUtils } = require('electron')
 
 contextBridge.exposeInMainWorld('electron', {
   // === Чтение данных ===
@@ -17,6 +17,9 @@ contextBridge.exposeInMainWorld('electron', {
   getFileStats: (path) => ipcRenderer.invoke('get-file-stats', path),
   openWith: (filePath) => ipcRenderer.invoke('open-with', filePath),
 
+  // === Drag & Drop ===
+getFilePath: (file) => webUtils.getPathForFile(file), // Теперь это заработает
+  copyFiles: (targetDir, filePaths) => ipcRenderer.invoke('copy-files', targetDir, filePaths),
   // === Методы для File Watcher ===
   onFileChange: (callback) => {
     ipcRenderer.on('file-change', callback)
@@ -25,7 +28,7 @@ contextBridge.exposeInMainWorld('electron', {
     ipcRenderer.removeListener('file-change', callback)
   },
 
-  // Управление жизненным циклом watcher
+  // Управление watcher
   startWatcher: (path) => ipcRenderer.send('start-watcher', path),
   stopWatcher: () => ipcRenderer.send('stop-watcher')
 })

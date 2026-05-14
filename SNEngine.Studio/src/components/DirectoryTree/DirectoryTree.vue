@@ -1,5 +1,14 @@
 <template>
-  <div class="directory-tree-container">
+  <div 
+    class="directory-tree-container"
+    :class="{ 'drag-over': isDragOver }"
+    @contextmenu.prevent="onContextMenu($event, null)"
+    @click="handleViewportClick"
+    @drop.prevent="(e) => handleDrop(e, props.basePath, refresh)"
+    @dragover.prevent="handleDragOver"
+    @dragenter.prevent="handleDragOver"
+    @dragleave="handleDragLeave"
+  >
     <TreeHeader
       v-if="isRoot"
       v-model="searchQuery"
@@ -8,11 +17,7 @@
       @refresh="refresh"
     />
 
-    <div 
-      class="tree-viewport"
-      @contextmenu.prevent="onContextMenu($event, null)"
-      @click="handleViewportClick"
-    >
+    <div class="tree-viewport">
       <div v-if="loading && items.length === 0" class="loading">Загрузка...</div>
 
       <div class="tree-content">
@@ -53,7 +58,8 @@ import { useFileCrud } from '@/composables/useFileCrud'
 import { useFileUtils } from '@/composables/useFileUtils'
 import { useKeyboard } from '@/composables/useKeyboard'
 import { useFileProperties } from '@/composables/useFileProperties'
-import { useOpenWith } from '@/composables/useOpenWith'   // ← новый
+import { useOpenWith } from '@/composables/useOpenWith'
+import { useDragDrop } from '@/composables/useDragDrop'
 
 const props = defineProps<{
   basePath: string
@@ -74,7 +80,10 @@ const { searchQuery, filteredItems } = useTreeSearch(items)
 const { contextMenuRef, show: showContextMenu } = useContextMenu()
 const { add } = useKeyboard()
 const { showProperties, isOpen, currentFile, close } = useFileProperties()
-const { openWith } = useOpenWith()   // ← новый
+const { openWith } = useOpenWith()
+
+// ====================== DRAG & DROP ======================
+const { isDragOver, handleDragOver, handleDragLeave, handleDrop } = useDragDrop()
 
 // ====================== СОРТИРОВКА ======================
 const sortField = ref<'name' | 'modified' | 'type'>('name')
@@ -176,10 +185,12 @@ setupKeyboardShortcuts()
   user-select: none;
   width: 100%;
   height: 100%;
+  transition: background 0.15s, border 0.15s;
 }
 
-:not(.tree-children) > .directory-tree-container {
-  height: 100%;
+.directory-tree-container.drag-over {
+  background: #2a2a3a;
+  border: 2px dashed #FF5252;
 }
 
 .tree-viewport {

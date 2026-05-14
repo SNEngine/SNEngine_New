@@ -42,6 +42,7 @@ function createWindow() {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
+      sandbox: false,
       preload: getPreloadPath(),
       webSecurity: false,
     }
@@ -222,6 +223,66 @@ ipcMain.handle('open-with', async (event, filePath) => {
     return { success: false, error: err.message }
   }
 });
+
+// ====================== DRAG & DROP: Копирование файлов из ОС ======================
+ipcMain.handle('copy-files', async (_, targetDir, sourcePaths) => {
+  try {
+    const results = [];
+    let copiedCount = 0;
+
+    for (const sourcePath of sourcePaths) {
+      const sourceName = path.basename(sourcePath);
+      let destPath = path.join(targetDir, sourceName);
+
+      // Авто-нумерация при конфликте имени
+      if (fs.existsSync(destPath)) {
+        const ext = path.extname(sourceName);
+        const baseName = path.basename(sourceName, ext);
+        let counter = 1;
+
+        do {
+          destPath = path.join(targetDir, `${baseName} — копия (${counter})${ext}`);
+          counter++;
+        } while (fs.existsSync(destPath));
+      }
+
+      const stats = await fs.promises.stat(sourcePath);
+
+      if (stats.isDirectory()) {
+        await copyDir(sourcePath, destPath);
+      } else {
+        await fs.promises.copyFile(sourcePath, destPath);
+      }
+
+      results.push({ source: sourcePath, dest: destPath });
+      copiedCount++;
+    }
+
+    console.log(`✅ Drag & Drop: скопировано ${copiedCount} элемент(ов) в ${targetDir}`);
+    return { success: true, copied: copiedCount, items: results };
+
+  } catch (err) {
+    console.error('copy-files error:', err);
+    return { success: false, error: err.message };
+  }
+});
+
+// ====================== Рекурсивное копирование папок ======================
+async function copyDir(src, dest) {
+  await fs.promises.mkdir(dest, { recursive: true });
+  const entries = await fs.promises.readdir(src, { withFileTypes: true });
+
+  for (const entry of entries) {
+    const srcPath = path.join(src, entry.name);
+    const destPath = path.join(dest, entry.name);
+
+    if (entry.isDirectory()) {
+      await copyDir(srcPath, destPath);
+    } else {
+      await fs.promises.copyFile(srcPath, destPath);
+    }
+  }
+}
 
 // ====================== APP LIFECYCLE ======================
 app.whenReady().then(() => {

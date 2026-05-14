@@ -7,6 +7,8 @@ export function useFileUtils() {
   const { showMessageBox } = useMessageBox()
   const { success, error } = useNotification()
 
+  // ====================== СУЩЕСТВУЮЩИЕ МЕТОДЫ ======================
+
   const duplicateItem = async (path: string) => {
     if (!path) return
 
@@ -14,17 +16,7 @@ export function useFileUtils() {
 
     try {
       const electron = (window as any).electron
-      
-      if (electron?.duplicateItem) {
-        await electron.duplicateItem(path)
-      } else {
-        // Fallback
-        const content = await electron?.readFile?.(path)
-        if (content !== undefined) {
-          const newPath = path.replace(name, `Копия ${name}`)
-          await electron?.writeFile?.(newPath, content)
-        }
-      }
+      await electron?.duplicateItem?.(path)
 
       lastUpdate.value = Date.now()
       success('Файл дублирован', name)
@@ -56,10 +48,53 @@ export function useFileUtils() {
     (window as any).electron?.showInExplorer?.(path)
   }
 
+  // ====================== НОВЫЕ МЕТОДЫ ДЛЯ DRAG & DROP ======================
+
+  const moveItem = async (sourcePath: string, targetDir: string) => {
+    try {
+      const electron = (window as any).electron
+      const result = await electron?.moveItem?.(sourcePath, targetDir)
+
+      if (result?.success) {
+        lastUpdate.value = Date.now()
+        success('Файл перемещён', result.newPath.split(/[/\\]/).pop())
+        return true
+      } else {
+        throw new Error(result?.error || 'Неизвестная ошибка')
+      }
+    } catch (err: any) {
+      error('Не удалось переместить файл', err.message)
+      return false
+    }
+  }
+
+  const copyItem = async (sourcePath: string, targetDir: string) => {
+    try {
+      const electron = (window as any).electron
+      const result = await electron?.copyItem?.(sourcePath, targetDir)
+
+      if (result?.success) {
+        lastUpdate.value = Date.now()
+        success('Файл скопирован', result.newPath.split(/[/\\]/).pop())
+        return true
+      } else {
+        throw new Error(result?.error || 'Неизвестная ошибка')
+      }
+    } catch (err: any) {
+      error('Не удалось скопировать файл', err.message)
+      return false
+    }
+  }
+
   return {
+    // Старые
     duplicateItem,
     copyPath,
     copyName,
-    showInExplorer
+    showInExplorer,
+
+    // Новые для Drag & Drop
+    moveItem,
+    copyItem,
   }
 }

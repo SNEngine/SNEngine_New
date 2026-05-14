@@ -16,6 +16,9 @@ contextBridge.exposeInMainWorld('electron', {
   showFileProperties: (path) => ipcRenderer.invoke('show-file-properties', path),
   getFileStats: (path) => ipcRenderer.invoke('get-file-stats', path),
   openWith: (filePath) => ipcRenderer.invoke('open-with', filePath),
+    // Внутренний Drag & Drop
+  moveItem: (sourcePath, targetDir) => ipcRenderer.invoke('move-item', sourcePath, targetDir),
+  copyItem: (sourcePath, targetDir) => ipcRenderer.invoke('copy-item', sourcePath, targetDir),
 
   // === Drag & Drop ===
 getFilePath: (file) => webUtils.getPathForFile(file), // Теперь это заработает

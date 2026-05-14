@@ -267,6 +267,61 @@ ipcMain.handle('copy-files', async (_, targetDir, sourcePaths) => {
   }
 });
 
+// ====================== ВНУТРЕННИЙ DRAG & DROP (MOVE / COPY) ======================
+
+ipcMain.handle('move-item', async (_, sourcePath, targetDir) => {
+  try {
+    const fileName = path.basename(sourcePath);
+    let destPath = path.join(targetDir, fileName);
+
+    // Если файл уже существует — добавляем (1), (2) и т.д.
+    if (fs.existsSync(destPath)) {
+      const ext = path.extname(fileName);
+      const base = path.basename(fileName, ext);
+      let counter = 1;
+      do {
+        destPath = path.join(targetDir, `${base} (${counter})${ext}`);
+        counter++;
+      } while (fs.existsSync(destPath));
+    }
+
+    await fs.promises.rename(sourcePath, destPath);
+    return { success: true, newPath: destPath };
+  } catch (err) {
+    console.error('move-item error:', err);
+    return { success: false, error: err.message };
+  }
+});
+
+ipcMain.handle('copy-item', async (_, sourcePath, targetDir) => {
+  try {
+    const fileName = path.basename(sourcePath);
+    let destPath = path.join(targetDir, fileName);
+
+    if (fs.existsSync(destPath)) {
+      const ext = path.extname(fileName);
+      const base = path.basename(fileName, ext);
+      let counter = 1;
+      do {
+        destPath = path.join(targetDir, `${base} — копия (${counter})${ext}`);
+        counter++;
+      } while (fs.existsSync(destPath));
+    }
+
+    const stats = await fs.promises.stat(sourcePath);
+    if (stats.isDirectory()) {
+      await copyDir(sourcePath, destPath);
+    } else {
+      await fs.promises.copyFile(sourcePath, destPath);
+    }
+
+    return { success: true, newPath: destPath };
+  } catch (err) {
+    console.error('copy-item error:', err);
+    return { success: false, error: err.message };
+  }
+});
+
 // ====================== Рекурсивное копирование папок ======================
 async function copyDir(src, dest) {
   await fs.promises.mkdir(dest, { recursive: true });

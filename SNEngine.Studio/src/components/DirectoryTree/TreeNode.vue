@@ -30,17 +30,23 @@
         </div>
       </template>
 
+      <!-- Основной узел с поддержкой drag & drop -->
       <div 
         class="tree-node"
+        draggable="true"
         :class="{ 
           'is-folder': item.isFolder, 
           'is-open': item.isOpen,
           'is-active': isActive,
-          'is-selected': props.selectedItem?.path === props.item.path,
+          'is-selected': selectedItem?.path === item.path,
+          'is-dragging': isDragging,
+          'drop-target': isDropTarget,
           'drag-over': item.isFolder && dragHandlers?.isDragOver
         }"
         @click.stop="handleClick"
         @contextmenu.stop.prevent="handleContextMenu"
+        @dragstart="handleDragStart"
+        @dragend="handleDragEnd"
         @dragover.prevent="handleDragOver"
         @dragleave="handleDragLeave"
         @drop.prevent="handleFolderDrop"
@@ -54,6 +60,7 @@
       </div>
     </Tooltip>
 
+    <!-- Дочерние элементы -->
     <div v-if="item.isFolder && item.isOpen" class="tree-children">
       <div v-if="item.isLoadingChildren" class="loading-children">Загрузка...</div>
       <TreeNode
@@ -65,6 +72,7 @@
         :search-query="searchQuery"
         :selected-item="selectedItem"
         :drag-handlers="dragHandlers"
+        :tree-drag="treeDrag"
         @toggle="$emit('toggle', $event)"
         @file-click="$emit('file-click', $event)"
         @contextmenu="handleContextMenu"
@@ -94,12 +102,8 @@ const props = defineProps<{
   activePath?: string
   searchQuery?: string
   selectedItem?: TreeItem | null
-  dragHandlers?: {
-    isDragOver: boolean
-    handleDragOver: (e: DragEvent) => void
-    handleDragLeave: (e: DragEvent) => void
-    handleDrop: (e: DragEvent, targetDir: string) => Promise<boolean>
-  }
+  dragHandlers?: any
+  treeDrag?: any
 }>()
 
 const emit = defineEmits<{
@@ -110,11 +114,55 @@ const emit = defineEmits<{
 }>()
 
 const isActive = computed(() => props.activePath === props.item.path)
+const isDragging = computed(() => props.treeDrag?.draggedItem?.path === props.item.path)
+const isDropTarget = computed(() => props.treeDrag?.dragOverItem?.path === props.item.path)
 
-// ==================== DRAG & DROP ====================
+// ==================== ВНУТРЕННИЙ DRAG & DROP ====================
+const handleDragStart = (e: DragEvent) => {
+  if (props.treeDrag) {
+    props.treeDrag.startDrag(props.item, e)
+  }
+
+  // Кастомный ghost (чтобы тащился только один элемент)
+  if (e.dataTransfer) {
+    const ghost = document.createElement('div')
+    ghost.style.cssText = `
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 12px;
+      background: #252526;
+      border: 1px solid #FF5252;
+      border-radius: 4px;
+      color: #fff;
+      font-size: 13px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+      pointer-events: none;
+      position: absolute;
+      top: -1000px;
+    `
+    ghost.innerHTML = `
+      <span style="font-size:16px;">${props.item.isFolder ? '📁' : '📄'}</span>
+      <span>${props.item.name}</span>
+    `
+    document.body.appendChild(ghost)
+    e.dataTransfer.setDragImage(ghost, 20, 20)
+    setTimeout(() => document.body.removeChild(ghost), 0)
+  }
+}
+
+const handleDragEnd = () => {
+  if (props.treeDrag) {
+    props.treeDrag.endDrag()
+  }
+}
+
 const handleDragOver = (e: DragEvent) => {
   if (props.item.isFolder && props.dragHandlers) {
     props.dragHandlers.handleDragOver(e)
+  }
+  if (props.treeDrag) {
+    props.treeDrag.onDragOver(props.item, e)
   }
 }
 
@@ -122,14 +170,28 @@ const handleDragLeave = (e: DragEvent) => {
   if (props.item.isFolder && props.dragHandlers) {
     props.dragHandlers.handleDragLeave(e)
   }
-}
-
-const handleFolderDrop = (e: DragEvent) => {
-  if (props.item.isFolder && props.dragHandlers) {
-    props.dragHandlers.handleDrop(e, props.item.path)
+  if (props.treeDrag) {
+    props.treeDrag.onDragLeave(props.item)
   }
 }
 
+const handleFolderDrop = (e: DragEvent) => {
+  if (props.item.isFolder) {
+    // Внешний drag & drop из ОС
+    if (props.dragHandlers) {
+      props.dragHandlers.handleDrop(e, props.item.path)
+    }
+    // Внутренний drag & drop
+    if (props.treeDrag) {
+      const payload = props.treeDrag.onDrop(props.item, e)
+      if (payload) {
+        emit('internal-drop', payload)
+      }
+    }
+  }
+}
+
+// ==================== ИКОНКИ И ПОДСВЕТКА ====================
 const iconName = computed(() => props.item.isFolder ? 'folder_icon' : getFileIcon(props.item.name))
 
 const iconColor = computed(() => {
@@ -155,7 +217,7 @@ const highlightedName = computed(() => {
 })
 
 const handleClick = async () => {
-  emit('select', props.item)                    // ← ВАЖНО: выбираем элемент
+  emit('select', props.item)
   if (props.item.isFolder) {
     await emit('toggle', props.item)
   } else {
@@ -163,8 +225,8 @@ const handleClick = async () => {
   }
 }
 
-const handleContextMenu = (e: MouseEvent, item?: TreeItem) => {
-  emit('contextmenu', e, item || props.item)
+const handleContextMenu = (e: MouseEvent) => {
+  emit('contextmenu', e, props.item)
 }
 </script>
 

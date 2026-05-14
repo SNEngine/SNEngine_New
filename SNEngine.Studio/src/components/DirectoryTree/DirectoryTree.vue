@@ -4,10 +4,9 @@
     :class="{ 'drag-over': isDragOver }"
     @contextmenu.prevent="onContextMenu($event, null)"
     @click="handleViewportClick"
-    @drop.prevent="(e) => handleDrop(e, props.basePath, refresh)"
-    @dragover.prevent="handleDragOver"
-    @dragenter.prevent="handleDragOver"
-    @dragleave="handleDragLeave"
+    @drop.prevent="handleRootDrop"
+    @dragover.prevent="handleRootDragOver"
+    @dragleave="handleRootDragLeave"
   >
     <TreeHeader
       v-if="isRoot"
@@ -29,10 +28,12 @@
           :search-query="searchQuery"
           :selected-item="selectedItem"
           :drag-handlers="dragHandlers"
+          :tree-drag="treeDrag"
           @toggle="toggleOpen"
           @file-click="emitFileClick"
           @contextmenu="onContextMenu"
           @select="onSelectItem"
+          @internal-drop="handleInternalDrop"
         />
       </div>
     </div>
@@ -63,6 +64,7 @@ import { useKeyboard } from '@/composables/useKeyboard'
 import { useFileProperties } from '@/composables/useFileProperties'
 import { useOpenWith } from '@/composables/useOpenWith'
 import { useDragDrop } from '@/composables/useDragDrop'
+import { useTreeDragDrop } from '@/composables/useTreeDragDrop'
 
 const props = defineProps<{
   basePath: string
@@ -78,7 +80,7 @@ const isRoot = !props.isSubTree
 
 const { items, loading, selectedItem, loadDirectory, toggleOpen } = useDirectoryTree(props.basePath, isRoot)
 const { createItem, renameItem, deleteItem } = useFileCrud()
-const { showInExplorer, copyPath, copyName, duplicateItem } = useFileUtils()
+const { showInExplorer, copyPath, copyName, duplicateItem, moveItem, copyItem } = useFileUtils()
 const { searchQuery, filteredItems } = useTreeSearch(items)
 const { contextMenuRef, show: showContextMenu } = useContextMenu()
 const { add } = useKeyboard()
@@ -87,8 +89,8 @@ const { openWith } = useOpenWith()
 
 // ====================== DRAG & DROP ======================
 const { isDragOver, handleDragOver, handleDragLeave, handleDrop } = useDragDrop()
+const treeDrag = useTreeDragDrop()
 
-// ====================== DRAG HANDLERS ДЛЯ ПЕРЕДАЧИ В TreeNode ======================
 const dragHandlers = {
   isDragOver,
   handleDragOver,
@@ -96,9 +98,51 @@ const dragHandlers = {
   handleDrop
 }
 
-// ====================== ВЫБОР ЭЛЕМЕНТА (новое) ======================
+// ====================== ВЫБОР ЭЛЕМЕНТА ======================
 const onSelectItem = (item: any) => {
   selectedItem.value = item
+}
+
+// ====================== ДРОП В КОРЕНЬ ======================
+const handleRootDragOver = (e: DragEvent) => {
+  if (treeDrag.draggedItem.value) {
+    e.preventDefault()
+    e.dataTransfer!.dropEffect = e.ctrlKey ? 'copy' : 'move'
+  } else {
+    handleDragOver(e)
+  }
+}
+
+const handleRootDragLeave = (e: DragEvent) => {
+  handleDragLeave(e)
+}
+
+const handleRootDrop = (e: DragEvent) => {
+  if (treeDrag.draggedItem.value) {
+    const payload = treeDrag.onDrop({ path: props.basePath, isFolder: true }, e)
+    if (payload) handleInternalDrop(payload)
+    return
+  }
+  // Внешний drag из ОС
+  handleDrop(e, props.basePath, refresh)
+}
+
+// ====================== ВНУТРЕННИЙ DRAG & DROP ======================
+const handleInternalDrop = async (payload: any) => {
+  if (!payload?.source || !payload?.target) return
+
+  const { source, target, isCopy } = payload
+
+  let success = false
+  if (isCopy) {
+    success = await copyItem(source.path, target.path)
+  } else {
+    success = await moveItem(source.path, target.path)
+  }
+
+  if (success) {
+    refresh()
+  }
 }
 
 // ====================== СОРТИРОВКА ======================
@@ -158,11 +202,7 @@ const onContextMenu = (e: MouseEvent, item: any) => {
       { label: 'Переименовать', icon: 'edit_icon', action: () => renameItem(item) },
       { label: 'Дублировать', icon: 'copy_icon', action: () => duplicateItem(item.path) },
       { label: 'Свойства', icon: 'info_icon', action: () => showProperties(item) },
-      { 
-        label: 'Открыть с помощью...', 
-        icon: 'open_with_icon', 
-        action: () => openWith(item.path) 
-      },
+      { label: 'Открыть с помощью...', icon: 'open_with_icon', action: () => openWith(item.path) },
       { label: 'Удалить', icon: 'error_icon', action: () => deleteItem(item), danger: true },
       { type: 'separator' },
       { label: 'Показать в проводнике', icon: 'explorer_icon', action: () => showInExplorer(item.path) },

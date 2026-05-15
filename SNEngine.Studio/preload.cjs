@@ -32,6 +32,8 @@ contextBridge.exposeInMainWorld('electron', {
   getAllTemplates: () => ipcRenderer.invoke('get-all-templates'),
   getTemplate: (id) => ipcRenderer.invoke('get-template', id),
 
+  getAppVersion: () => ipcRenderer.invoke('get-app-version'),
+
   // === Watcher Events ===
   onFileChange: (callback) => ipcRenderer.on('file-change', (_, data) => callback(data)),
   onUnlink: (callback) => ipcRenderer.on('notify-unlink', (_, path) => callback(path)),

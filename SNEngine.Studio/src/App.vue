@@ -3,7 +3,7 @@
     <header class="header">
       <div class="logo-section">
         <h1>SNEngine Studio</h1>
-        <span class="version">v0.0.1-dev</span>
+        <span class="version">v{{ appVersion }}</span>
       </div>
 
       <div class="header-actions">
@@ -69,6 +69,7 @@ import { useNotification } from './composables/useNotification'
 const treeWidth = ref(320)
 let isResizing = false
 const currentFile = ref<string | null>(null)
+const appVersion = ref('0.0.1')   // ← добавили
 
 const tabsRef = ref<any>(null)
 const directoryTreeRef = ref<any>(null)
@@ -82,9 +83,18 @@ const { notifications, remove } = useNotification()
 const { messageBox } = useMessageBox()
 const { inputBox } = useInputBox()
 
-onMounted(() => {
+onMounted(async () => {
   messageBox.value = messageBoxRef.value
   inputBox.value = inputBoxRef.value
+
+  // Загружаем реальную версию из package.json
+  try {
+    if (window.electron?.getAppVersion) {
+      appVersion.value = await window.electron.getAppVersion()
+    }
+  } catch (e) {
+    console.warn('Не удалось получить версию приложения')
+  }
 })
 
 // ====================== ЕДИНАЯ ФУНКЦИЯ ОТКРЫТИЯ ======================
@@ -106,7 +116,6 @@ const openFileSafely = async (filePath: string, retries = 8) => {
 const handleCreateFile = async (data: { name: string; content: string; templateId: string }) => {
   try {
     const projectPath = await window.electron.getProjectPath()
-    // Нормализуем путь (getProjectPath возвращает с /)
     const normalized = projectPath.replace(/\\+/g, '/').replace(/\/+$/, '')
     const fullPath = `${normalized}/${data.name}`
 

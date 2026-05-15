@@ -419,6 +419,11 @@ ipcMain.handle('get-template', async (_, templateId) => {
   }
 });
 
+// ====================== APP VERSION ======================
+ipcMain.handle('get-app-version', () => {
+  return app.getVersion();
+});
+
 // ====================== APP LIFECYCLE ======================
 app.whenReady().then(() => {
   createWindow();

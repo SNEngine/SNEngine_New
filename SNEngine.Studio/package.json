@@ -1,6 +1,6 @@
 {
   "name": "snengine-studio",
-  "version": "0.0.1",
+  "version": "0.0.4",
   "description": "SNEngine Studio - Visual Novel Editor",
   "author": "SNEngine Team",
   "private": true,
@@ -14,7 +14,7 @@
     "electron:build-win": "vite build && electron-builder --win",
     "electron:build-mac": "vite build && electron-builder --mac",
     "electron:build-linux": "vite build && electron-builder --linux",
-    "electron:dev:all": "concurrently \"npm run dev\" \"npm run electron:dev\""
+    "electron:dev:all": "npm version --no-git-tag-version patch && concurrently \"npm run dev\" \"npm run electron:dev\""
   },
   "dependencies": {
     "chokidar": "^5.0.0",
@@ -55,22 +55,21 @@
       "build/icons/png/512x512.png"
     ],
     "icon": "build/icons/icon",
-
     "win": {
       "target": "nsis",
       "icon": "build/icons/win/icon.ico"
     },
-
     "mac": {
       "icon": "build/icons/mac/icon.icns",
       "category": "public.app-category.developer-tools"
     },
-
     "linux": {
       "icon": "build/icons/png/512x512.png",
-      "target": ["AppImage", "deb"]
+      "target": [
+        "AppImage",
+        "deb"
+      ]
     },
-
     "forceCodeSigning": false,
     "npmRebuild": false,
     "electronDownload": {

@@ -225,8 +225,9 @@ const handleClick = async () => {
   }
 }
 
-const handleContextMenu = (e: MouseEvent) => {
-  emit('contextmenu', e, props.item)
+const handleContextMenu = (e: MouseEvent, passedItem?: any) => {
+  const targetItem = passedItem || props.item
+  emit('contextmenu', e, targetItem)
 }
 </script>
 

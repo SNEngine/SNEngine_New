@@ -19,8 +19,9 @@
       <!-- Видео контейнер -->
       <div class="video-wrapper">
         <video 
+          :key="normalizedSrc"
           ref="videoPlayer" 
-          :src="videoSrc"
+          :src="normalizedSrc"
           @timeupdate="onTimeUpdate"
           @loadedmetadata="onLoadedMetadata"
           @ended="onEnded"
@@ -36,6 +37,14 @@
         >
           ▶
         </button>
+
+        <!-- Спиннер по центру -->
+        <LoadingSpinner 
+          v-if="isLoading"
+          size="64"
+          accent
+          class="video-loader"
+        />
       </div>
 
       <!-- Прогресс-бар -->
@@ -88,31 +97,47 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, watch, computed } from 'vue'
+import { ref, watch } from 'vue'
+import { useFilePreview } from '@/composables/useFilePreview'
+import LoadingSpinner from '../LoadingSpinner/LoadingSpinner.vue'
 import BaseIcon from '../icons/BaseIcon.vue'
 
-const props = defineProps<{ videoPath: string }>()
+const props = defineProps<{
+  videoPath: string
+}>()
 
 const videoPlayer = ref<HTMLVideoElement | null>(null)
-const isPlaying = ref(false)
-const isRepeat = ref(false)
-const currentTime = ref(0)
-const duration = ref(0)
-const volume = ref(0.8)
-const progress = ref(0)
 
-const fileName = props.videoPath.split(/[/\\]/).pop() || 'video'
-const videoSrc = `file://${props.videoPath.replace(/\\/g, '/')}`
+// Общий composable
+const {
+  normalizedSrc,
+  fileName,
+  isLoading,
+  isPlaying,
+  isRepeat,
+  currentTime,
+  duration,
+  progress,
+  remainingTime,
+  volume,
+  togglePlay,
+  toggleRepeat,
+  formatTime,
+  onTimeUpdate,
+  onLoadedMetadata,
+  onEnded,
+  setVolume
+} = useFilePreview(props.videoPath, videoPlayer)
 
-const remainingTime = computed(() => Math.max(0, duration.value - currentTime.value))
-
-const togglePlay = () => {
+// Полноэкранный режим
+const toggleFullscreen = () => {
   if (!videoPlayer.value) return
-  isPlaying.value ? videoPlayer.value.pause() : videoPlayer.value.play()
-  isPlaying.value = !isPlaying.value
+  if (document.fullscreenElement) {
+    document.exitFullscreen()
+  } else {
+    videoPlayer.value.requestFullscreen()
+  }
 }
-
-const toggleRepeat = () => isRepeat.value = !isRepeat.value
 
 const seek = (e: MouseEvent) => {
   if (!videoPlayer.value) return
@@ -121,53 +146,16 @@ const seek = (e: MouseEvent) => {
   videoPlayer.value.currentTime = percent * duration.value
 }
 
-const onTimeUpdate = () => {
-  if (!videoPlayer.value) return
-  currentTime.value = videoPlayer.value.currentTime
-  progress.value = duration.value ? (currentTime.value / duration.value) * 100 : 0
-}
-
-const onLoadedMetadata = () => {
-  if (videoPlayer.value) duration.value = videoPlayer.value.duration
-}
-
-const onEnded = () => {
-  isPlaying.value = false
-  progress.value = 0
-}
-
-const setVolume = () => {
-  if (videoPlayer.value) videoPlayer.value.volume = volume.value
-}
-
-const toggleFullscreen = () => {
-  if (!videoPlayer.value) return
-  document.fullscreenElement 
-    ? document.exitFullscreen() 
-    : videoPlayer.value.requestFullscreen()
-}
-
-const formatTime = (time: number) => {
-  const min = Math.floor(time / 60)
-  const sec = Math.floor(time % 60)
-  return `${min}:${sec.toString().padStart(2, '0')}`
-}
-
-onMounted(() => {
-  if (videoPlayer.value) videoPlayer.value.volume = volume.value
-})
-
+// Принудительный reload при смене файла
 watch(() => props.videoPath, () => {
   if (videoPlayer.value) {
     videoPlayer.value.load()
-    isPlaying.value = false
-    currentTime.value = 0
-    progress.value = 0
   }
-})
+}, { immediate: true })
 </script>
 
 <style scoped>
+/* Стили без изменений */
 .video-preview {
   height: 100%;
   background: #0a0a0a;
@@ -198,7 +186,6 @@ watch(() => props.videoPath, () => {
 
 .video-info {
   flex: 1;
-  text-align: left;
   min-width: 0;
 }
 
@@ -223,12 +210,21 @@ watch(() => props.videoPath, () => {
   overflow: hidden;
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.7);
   margin-bottom: 16px;
+  min-height: 300px;
 }
 
 video {
   width: 100%;
   max-height: 65vh;
   display: block;
+}
+
+.video-loader {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 10;
 }
 
 .play-overlay {
@@ -247,7 +243,7 @@ video {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  z-index: 10;
+  z-index: 5;
   box-shadow: 0 8px 25px rgba(255, 82, 82, 0.4);
 }
 
@@ -256,7 +252,6 @@ video {
   pointer-events: none;
 }
 
-/* Прогресс и контролы */
 .progress-wrapper { margin: 12px 0; }
 .progress-container { 
   height: 6px; 

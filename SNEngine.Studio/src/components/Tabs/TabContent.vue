@@ -14,13 +14,13 @@
     </div>
 
     <!-- Обычный контент -->
-    <component 
-      v-else
-      :is="currentComponent"
-      v-bind="currentProps"
-      ref="activeEditorRef"
-      v-on="editorEvents"
-    />
+<component 
+  :is="currentComponent"
+  :key="currentProps.filePath || currentProps.videoPath || currentProps.imagePath || currentProps.audioPath"
+  v-bind="currentProps"
+  ref="activeEditorRef"
+  v-on="editorEvents"
+/>
   </div>
 </template>
 

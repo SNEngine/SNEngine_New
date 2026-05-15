@@ -16,18 +16,26 @@
         </div>
       </div>
 
-      <!-- Большая кнопка Play/Pause -->
-      <button class="play-button" @click="togglePlay">
-        <span v-if="!isPlaying">▶</span>
-        <span v-else>⏸</span>
-      </button>
+      <!-- Область с кнопкой Play + спиннер -->
+      <div class="play-area">
+        <!-- Спиннер по центру -->
+        <LoadingSpinner 
+          v-if="isLoading"
+          size="80"
+          accent
+          class="audio-loader"
+        />
 
-      <!-- Прогресс-бар (как в твоём примере) -->
+        <!-- Большая кнопка Play/Pause -->
+        <button class="play-button" @click="togglePlay" :disabled="isLoading">
+          <span v-if="!isPlaying">▶</span>
+          <span v-else>⏸</span>
+        </button>
+      </div>
+
+      <!-- Прогресс-бар -->
       <div class="progress-wrapper">
-        <div 
-          class="progress-container" 
-          @click="seek"
-        >
+        <div class="progress-container" @click="seek">
           <div class="progress-bar">
             <div class="progress-fill" :style="{ width: progress + '%' }"></div>
           </div>
@@ -39,13 +47,13 @@
         </div>
       </div>
 
-      <!-- Нижняя панель -->
+      <!-- Нижние контролы -->
       <div class="bottom-controls">
         <button class="repeat-btn" :class="{ active: isRepeat }" @click="toggleRepeat">
-<BaseIcon 
-  :name="isRepeat ? 'repeat_one_icon' : 'repeat_icon'" 
-  color="#FF5252" 
-/>
+          <BaseIcon 
+            :name="isRepeat ? 'repeat_one_icon' : 'repeat_icon'" 
+            color="#FF5252" 
+          />
         </button>
 
         <div class="volume-group">
@@ -61,92 +69,60 @@
           />
         </div>
       </div>
+
+      <!-- Аудио-элемент -->
+      <audio 
+        :key="normalizedSrc"
+        ref="audioPlayer" 
+        :src="normalizedSrc"
+        @timeupdate="onTimeUpdate"
+        @loadedmetadata="onLoadedMetadata"
+        @ended="onEnded"
+        :loop="isRepeat"
+      ></audio>
     </div>
   </div>
-
-  <audio 
-    ref="audioPlayer" 
-    :src="audioSrc" 
-    @timeupdate="onTimeUpdate"
-    @loadedmetadata="onLoadedMetadata"
-    @ended="onEnded"
-    :loop="isRepeat"
-  ></audio>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, watch, computed } from 'vue'
+import { ref, watch } from 'vue'
+import { useFilePreview } from '@/composables/useFilePreview'
+import LoadingSpinner from '../LoadingSpinner/LoadingSpinner.vue'
 import BaseIcon from '../icons/BaseIcon.vue'
 
-const props = defineProps<{ audioPath: string }>()
+const props = defineProps<{
+  audioPath: string
+}>()
 
 const audioPlayer = ref<HTMLAudioElement | null>(null)
-const isPlaying = ref(false)
-const isRepeat = ref(false)
-const currentTime = ref(0)
-const duration = ref(0)
-const volume = ref(0.8)
-const progress = ref(0)
 
-const fileName = props.audioPath.split(/[/\\]/).pop() || 'audio'
-const audioSrc = `file://${props.audioPath.replace(/\\/g, '/')}`
+// Общий composable
+const {
+  normalizedSrc,
+  fileName,
+  isLoading,
+  isPlaying,
+  isRepeat,
+  currentTime,
+  duration,
+  progress,
+  remainingTime,
+  volume,
+  togglePlay,
+  toggleRepeat,
+  formatTime,
+  onTimeUpdate,
+  onLoadedMetadata,
+  onEnded,
+  setVolume
+} = useFilePreview(props.audioPath, audioPlayer)
 
-const remainingTime = computed(() => Math.max(0, duration.value - currentTime.value))
-
-const togglePlay = () => {
-  if (!audioPlayer.value) return
-  isPlaying.value ? audioPlayer.value.pause() : audioPlayer.value.play()
-  isPlaying.value = !isPlaying.value
-}
-
-const toggleRepeat = () => {
-  isRepeat.value = !isRepeat.value
-}
-
-const seek = (e: MouseEvent) => {
-  if (!audioPlayer.value) return
-  const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
-  const percent = (e.clientX - rect.left) / rect.width
-  audioPlayer.value.currentTime = percent * duration.value
-}
-
-const onTimeUpdate = () => {
-  if (!audioPlayer.value) return
-  currentTime.value = audioPlayer.value.currentTime
-  progress.value = duration.value ? (currentTime.value / duration.value) * 100 : 0
-}
-
-const onLoadedMetadata = () => {
-  if (audioPlayer.value) duration.value = audioPlayer.value.duration
-}
-
-const onEnded = () => {
-  isPlaying.value = false
-  progress.value = 0
-}
-
-const setVolume = () => {
-  if (audioPlayer.value) audioPlayer.value.volume = volume.value
-}
-
-const formatTime = (time: number) => {
-  const min = Math.floor(time / 60)
-  const sec = Math.floor(time % 60)
-  return `${min}:${sec.toString().padStart(2, '0')}`
-}
-
-onMounted(() => {
-  if (audioPlayer.value) audioPlayer.value.volume = volume.value
-})
-
+// Принудительный reload при смене файла
 watch(() => props.audioPath, () => {
   if (audioPlayer.value) {
     audioPlayer.value.load()
-    isPlaying.value = false
-    currentTime.value = 0
-    progress.value = 0
   }
-})
+}, { immediate: true })
 </script>
 
 <style scoped>
@@ -178,7 +154,6 @@ watch(() => props.audioPath, () => {
 }
 
 .audio-icon { width: 64px; height: 64px; }
-.volume-icon { width: 28px; height: 28px; }
 
 .audio-name {
   font-size: 22px;
@@ -189,9 +164,17 @@ watch(() => props.audioPath, () => {
 
 .audio-meta { font-size: 14px; color: #777; }
 
-.play-button {
+/* Область кнопки + спиннер */
+.play-area {
+  position: relative;
   width: 96px;
   height: 96px;
+  margin: 0 auto 40px;
+}
+
+.play-button {
+  width: 100%;
+  height: 100%;
   border-radius: 50%;
   background: #FF5252;
   color: white;
@@ -200,10 +183,11 @@ watch(() => props.audioPath, () => {
   display: flex;
   align-items: center;
   justify-content: center;
-  margin: 0 auto 40px;
   cursor: pointer;
   box-shadow: 0 10px 40px rgba(255, 82, 82, 0.35);
   transition: all 0.2s ease;
+  position: relative;
+  z-index: 2;
 }
 
 .play-button:hover {
@@ -211,7 +195,20 @@ watch(() => props.audioPath, () => {
   box-shadow: 0 15px 50px rgba(255, 82, 82, 0.5);
 }
 
-/* === СТИЛЬ ПОЛЗУНКА КАК В ТВОЁМ ПРИМЕРЕ === */
+.play-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Спиннер строго по центру кнопки */
+.audio-loader {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 3;
+}
+
 .progress-wrapper { margin-bottom: 30px; }
 
 .progress-container {
@@ -258,7 +255,6 @@ watch(() => props.audioPath, () => {
 
 .remaining { color: #666; }
 
-/* Нижняя панель */
 .bottom-controls {
   display: flex;
   align-items: center;

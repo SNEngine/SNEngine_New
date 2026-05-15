@@ -56,13 +56,20 @@ watch(lastUpdate, (update) => {
   if (!update) return
 
   const activePath = activeFilePath.value
-  if (activePath && update.path === activePath && 
+  if (!activePath) return
+
+  // Нормализуем пути для сравнения (Windows vs Unix)
+// Стало (безопасно):
+const normalizedActive = String(activePath).replace(/\\+/g, '/').replace(/\/+$/, '')
+const normalizedUpdate = String(update.path || '').replace(/\\+/g, '/').replace(/\/+$/, '')
+
+  if (normalizedActive === normalizedUpdate && 
       (update.type === 'unlink' || update.type === 'unlinkDir')) {
     
     currentHandler.value = {
       component: DeletedFile,
       props: { 
-        filePath: activePath,
+        filePath: normalizedActive,
         isDeleted: true 
       }
     }

@@ -424,6 +424,50 @@ ipcMain.handle('get-app-version', () => {
   return app.getVersion();
 });
 
+// ====================== UNIQUE FILE NAME ======================
+ipcMain.handle('get-unique-path', async (_, desiredPath, isFolder = false) => {
+  try {
+    if (!fs.existsSync(desiredPath)) {
+      return desiredPath;
+    }
+
+    const lastSlash = Math.max(desiredPath.lastIndexOf('/'), desiredPath.lastIndexOf('\\'));
+    const dir = desiredPath.substring(0, lastSlash + 1);
+    const fileName = desiredPath.substring(lastSlash + 1);
+
+    let baseName = fileName;
+    let ext = '';
+
+    if (!isFolder && fileName.includes('.')) {
+      const dotIndex = fileName.lastIndexOf('.');
+      baseName = fileName.substring(0, dotIndex);
+      ext = fileName.substring(dotIndex);
+    }
+
+    baseName = baseName.replace(/\s*\(\d+\)$/, '');
+
+    let maxNumber = 0;
+    const entries = await fs.promises.readdir(dir || '.', { withFileTypes: true });
+
+    const escapedBase = baseName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const escapedExt = ext.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp(`^${escapedBase}\\s*\\((\\d+)\\)${escapedExt}$`, 'i');
+
+    entries.forEach(entry => {
+      const match = entry.name.match(regex);
+      if (match) {
+        const num = parseInt(match[1], 10);
+        if (num > maxNumber) maxNumber = num;
+      }
+    });
+
+    return `${dir}${baseName} (${maxNumber + 1})${ext}`;
+  } catch (err) {
+    console.error('get-unique-path error:', err);
+    return desiredPath;
+  }
+});
+
 // ====================== APP LIFECYCLE ======================
 app.whenReady().then(() => {
   createWindow();

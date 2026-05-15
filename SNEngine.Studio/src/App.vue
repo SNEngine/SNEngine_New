@@ -65,6 +65,7 @@ import NewFileDialog from "./components/NewFileDialog/NewFileDialog.vue"
 import { useMessageBox } from './composables/useMessageBox'
 import { useInputBox } from './composables/useInputBox'
 import { useNotification } from './composables/useNotification'
+import { useFileCreation } from './composables/useFileCreation'
 
 const treeWidth = ref(320)
 let isResizing = false
@@ -82,6 +83,7 @@ const showNewFileDialog = ref(false)
 const { notifications, remove } = useNotification()
 const { messageBox } = useMessageBox()
 const { inputBox } = useInputBox()
+const { createFromTemplate } = useFileCreation()
 
 onMounted(async () => {
   messageBox.value = messageBoxRef.value
@@ -115,21 +117,18 @@ const openFileSafely = async (filePath: string, retries = 8) => {
 // ====================== CREATE NEW FILE ======================
 const handleCreateFile = async (data: { name: string; content: string; templateId: string }) => {
   try {
-    const projectPath = await window.electron.getProjectPath()
-    const normalized = projectPath.replace(/\\+/g, '/').replace(/\/+$/, '')
-    const fullPath = `${normalized}/${data.name}`
+    // Используем централизованную логику (теперь с автоматическим уникальным именем)
+    const result = await createFromTemplate(data)
 
-    const result = await window.electron.writeFile(fullPath, data.content)
-
-    if (result.success) {
-      console.log(`✅ File created: ${fullPath}`)
+    if (result.success && result.path) {
+      console.log(`✅ File created: ${result.path}`)
 
       if (directoryTreeRef.value?.refresh) {
         await directoryTreeRef.value.refresh()
       }
 
       await nextTick()
-      await openFileSafely(fullPath)
+      await openFileSafely(result.path)
     }
   } catch (err) {
     console.error('Error creating file:', err)

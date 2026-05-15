@@ -27,6 +27,7 @@ contextBridge.exposeInMainWorld('electron', {
   // === Drag & Drop из ОС ===
   getFilePath: (file) => webUtils.getPathForFile(file),
   copyFiles: (targetDir, filePaths) => ipcRenderer.invoke('copy-files', targetDir, filePaths),
+  getUniquePath: (path, isFolder = false) => ipcRenderer.invoke('get-unique-path', path, isFolder),
 
   // === TEMPLATES ===
   getAllTemplates: () => ipcRenderer.invoke('get-all-templates'),

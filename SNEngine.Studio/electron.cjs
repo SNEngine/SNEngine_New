@@ -468,6 +468,42 @@ ipcMain.handle('get-unique-path', async (_, desiredPath, isFolder = false) => {
   }
 });
 
+// ====================== BATTERY STATUS (systeminformation) ======================
+ipcMain.handle('get-battery-status', async () => {
+  try {
+    const si = require('systeminformation');
+
+    const battery = await si.battery();
+
+    return {
+      exists: battery.hasBattery || false,
+      level: Math.round(battery.percent || 100),
+      charging: battery.isCharging || false,
+      timeRemaining: battery.timeRemaining || null,
+      isCritical: battery.isCritical || false
+    };
+  } catch (err) {
+    console.log('[Battery] systeminformation error:', err.message);
+    return {
+      exists: false,
+      level: 100,
+      charging: false,
+      timeRemaining: null,
+      isCritical: false
+    };
+  }
+});
+
+// ====================== FULL SCREEN ======================
+ipcMain.handle('toggle-fullscreen', async () => {
+  if (!mainWindow) return false;
+
+  const isFull = mainWindow.isFullScreen();
+  mainWindow.setFullScreen(!isFull);
+  
+  return !isFull; // возвращаем новое состояние
+});
+
 // ====================== APP LIFECYCLE ======================
 app.whenReady().then(() => {
   createWindow();

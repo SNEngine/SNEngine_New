@@ -6,8 +6,20 @@
         <span class="version">v{{ appVersion }}</span>
       </div>
 
+      <SystemStatus class="system-status" />
+
       <div class="header-actions">
-        <button class="new-file-btn" @click="showNewFileDialog = true" title="Create New File">
+        <button 
+          class="fullscreen-btn"
+          @click="toggleFullScreen"
+          :title="isFullScreen ? 'Выключить полноэкранный режим (F11)' : 'Полноэкранный режим (F11)'"
+        >
+          <BaseIcon 
+            :name="isFullScreen ? 'fullscreen_exit_icon' : 'fullscreen_icon'" 
+          />
+        </button>
+
+        <button class="new-file-btn" @click="showNewFileDialog = true" title="Создать новый файл">
           <span class="plus">+</span>
           New File
         </button>
@@ -54,6 +66,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, nextTick } from 'vue'
+import BaseIcon from "./components/icons/BaseIcon.vue"
 
 import DirectoryTree from "./components/DirectoryTree/DirectoryTree.vue"
 import EditorTabs from "./components/Tabs/EditorTabs.vue"
@@ -61,6 +74,7 @@ import MessageBox from "./components/MessageBox/MessageBox.vue"
 import InputBox from "./components/InputBox/InputBox.vue"
 import NotificationBox from "./components/NotificationBox/NotificationBox.vue"
 import NewFileDialog from "./components/NewFileDialog/NewFileDialog.vue"
+import SystemStatus from "./components/SystemStatus/SystemStatus.vue"
 
 import { useMessageBox } from './composables/useMessageBox'
 import { useInputBox } from './composables/useInputBox'
@@ -70,26 +84,36 @@ import { useFileCreation } from './composables/useFileCreation'
 const treeWidth = ref(320)
 let isResizing = false
 const currentFile = ref<string | null>(null)
-const appVersion = ref('0.0.1')   // ← добавили
+const appVersion = ref('0.0.1')
 
 const tabsRef = ref<any>(null)
 const directoryTreeRef = ref<any>(null)
-
 const messageBoxRef = ref<any>(null)
 const inputBoxRef = ref<any>(null)
 
 const showNewFileDialog = ref(false)
+const isFullScreen = ref(false)
 
 const { notifications, remove } = useNotification()
 const { messageBox } = useMessageBox()
 const { inputBox } = useInputBox()
 const { createFromTemplate } = useFileCreation()
 
+const toggleFullScreen = async () => {
+  try {
+    if (window.electron?.toggleFullScreen) {
+      const newState = await window.electron.toggleFullScreen()
+      isFullScreen.value = newState
+    }
+  } catch (err) {
+    console.error('Full screen toggle error:', err)
+  }
+}
+
 onMounted(async () => {
   messageBox.value = messageBoxRef.value
   inputBox.value = inputBoxRef.value
 
-  // Загружаем реальную версию из package.json
   try {
     if (window.electron?.getAppVersion) {
       appVersion.value = await window.electron.getAppVersion()
@@ -97,12 +121,19 @@ onMounted(async () => {
   } catch (e) {
     console.warn('Не удалось получить версию приложения')
   }
+
+  const handleKeyDown = (e: KeyboardEvent) => {
+    if (e.key === 'F11') {
+      e.preventDefault()
+      toggleFullScreen()
+    }
+  }
+
+  window.addEventListener('keydown', handleKeyDown)
 })
 
-// ====================== ЕДИНАЯ ФУНКЦИЯ ОТКРЫТИЯ ======================
 const openFileSafely = async (filePath: string, retries = 8) => {
   await nextTick()
-
   for (let i = 0; i < retries; i++) {
     if (tabsRef.value?.openFile) {
       await tabsRef.value.openFile(filePath)
@@ -110,23 +141,15 @@ const openFileSafely = async (filePath: string, retries = 8) => {
     }
     await new Promise(r => setTimeout(r, 40))
   }
-
-  console.warn('[App] EditorTabs still not ready after retries for', filePath)
 }
 
-// ====================== CREATE NEW FILE ======================
 const handleCreateFile = async (data: { name: string; content: string; templateId: string }) => {
   try {
-    // Используем централизованную логику (теперь с автоматическим уникальным именем)
     const result = await createFromTemplate(data)
-
     if (result.success && result.path) {
-      console.log(`✅ File created: ${result.path}`)
-
       if (directoryTreeRef.value?.refresh) {
         await directoryTreeRef.value.refresh()
       }
-
       await nextTick()
       await openFileSafely(result.path)
     }
@@ -135,13 +158,11 @@ const handleCreateFile = async (data: { name: string; content: string; templateI
   }
 }
 
-// ====================== FILE CLICK ======================
 const handleFileClick = async (filePath: string) => {
   currentFile.value = filePath
   await openFileSafely(filePath)
 }
 
-// ====================== RESIZING ======================
 const startResizing = (e: MouseEvent) => {
   isResizing = true
   document.addEventListener('mousemove', onMouseMove)
@@ -174,12 +195,19 @@ html, body {
   display: flex; 
   align-items: center; 
   justify-content: space-between;
-  padding: 0 16px; 
+  padding: 0 12px; 
   border-bottom: 1px solid #333; 
   flex-shrink: 0;
+  position: relative; /* Важно для центрирования SystemStatus */
 }
 
-.logo-section { display: flex; align-items: center; gap: 12px; }
+.logo-section { 
+  display: flex; 
+  align-items: center; 
+  gap: 12px;
+  z-index: 2; /* Чтобы логотип был поверх, если наползут */
+}
+
 .header h1 { 
   margin: 0; 
   font-size: 13px; 
@@ -188,6 +216,7 @@ html, body {
   text-transform: uppercase; 
   letter-spacing: 0.5px;
 }
+
 .version {
   font-size: 10px;
   color: #666;
@@ -196,10 +225,43 @@ html, body {
   border-radius: 4px;
 }
 
-/* Header Actions */
+/* Центрирование SystemStatus независимо от кнопок */
+.system-status {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  justify-content: center;
+  pointer-events: none; /* Пропускает клики под себя, если нужно */
+}
+
+.system-status > * {
+  pointer-events: auto; /* Возвращает клики самим элементам статуса */
+}
+
 .header-actions {
   display: flex;
   align-items: center;
+  gap: 20px;
+  z-index: 2;
+}
+
+.fullscreen-btn {
+  background: none;
+  border: none;
+  color: #aaaaaa;
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.fullscreen-btn:hover {
+  background: #333333;
+  color: #ffffff;
 }
 
 .new-file-btn {
@@ -228,7 +290,6 @@ html, body {
   font-weight: bold;
 }
 
-/* Workspace */
 .workspace { flex: 1; display: flex; overflow: hidden; }
 
 .left-panel { 
@@ -254,7 +315,6 @@ html, body {
   flex-direction: column;
 }
 
-/* Notifications */
 .notifications-container {
   position: fixed;
   bottom: 24px;

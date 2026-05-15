@@ -38,6 +38,8 @@ contextBridge.exposeInMainWorld('electron', {
   // === Watcher Events ===
   onFileChange: (callback) => ipcRenderer.on('file-change', (_, data) => callback(data)),
   onUnlink: (callback) => ipcRenderer.on('notify-unlink', (_, path) => callback(path)),
+  getBatteryStatus: () => ipcRenderer.invoke('get-battery-status'),
+  toggleFullScreen: () => ipcRenderer.invoke('toggle-fullscreen'),
   offFileChange: (callback) => {
     ipcRenderer.removeListener('file-change', callback)
   },

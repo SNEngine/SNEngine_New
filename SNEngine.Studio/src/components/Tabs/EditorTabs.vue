@@ -30,6 +30,7 @@ import ContextMenu from '../ContextMenu/ContextMenu.vue'
 import TabBar from './TabBar.vue'
 import TabContent from './TabContent.vue'
 import DeletedFile from '../DeletedFile/DeletedFile.vue'
+import GamePreview from '../GamePreview/GamePreview.vue'   // ← добавили
 
 import { useTabs } from '@/composables/useTabs'
 import { useFileType } from '@/composables/useFileType'
@@ -58,10 +59,8 @@ watch(lastUpdate, (update) => {
   const activePath = activeFilePath.value
   if (!activePath) return
 
-  // Нормализуем пути для сравнения (Windows vs Unix)
-// Стало (безопасно):
-const normalizedActive = String(activePath).replace(/\\+/g, '/').replace(/\/+$/, '')
-const normalizedUpdate = String(update.path || '').replace(/\\+/g, '/').replace(/\/+$/, '')
+  const normalizedActive = String(activePath).replace(/\\+/g, '/').replace(/\/+$/, '')
+  const normalizedUpdate = String(update.path || '').replace(/\\+/g, '/').replace(/\/+$/, '')
 
   if (normalizedActive === normalizedUpdate && 
       (update.type === 'unlink' || update.type === 'unlinkDir')) {
@@ -84,6 +83,19 @@ watch(activeFilePath, async (newPath) => {
   }
 
   const normalizedNew = newPath.replace(/\\+/g, '/').replace(/\/+$/, '')
+
+  // Специальная обработка для Game Preview
+  if (newPath === '::preview::') {
+    currentHandler.value = {
+      component: GamePreview,
+      props: { 
+        projectPath: 'C:/Users/Siphome/Desktop/testBuild' 
+      },
+      isEditable: false
+    }
+    return
+  }
+
   const tab = tabs.value.find(t => t.filePath.replace(/\\+/g, '/').replace(/\/+$/, '') === normalizedNew)
   if (tab?.isDeleted) {
     currentHandler.value = {
@@ -113,7 +125,6 @@ watch(activeFilePath, async (newPath) => {
 
 // ====================== ОТКРЫТИЕ ФАЙЛА ======================
 const openFile = async (rawPath: string) => {
-  // Нормализуем путь всегда в один формат (forward slashes)
   const filePath = rawPath.replace(/\\+/g, '/').replace(/\/+$/, '')
 
   const existing = tabs.value.find(t => t.filePath.replace(/\\+/g, '/').replace(/\/+$/, '') === filePath)
@@ -127,7 +138,7 @@ const openFile = async (rawPath: string) => {
 
   const newTab = {
     id: Date.now().toString(),
-    filePath, // сохраняем нормализованный путь
+    filePath,
     name: filePath.split(/[/\\]/).pop() || filePath,
     type: handler.type,
     content: handler.props.modelValue || handler.props.initialHtml || '',
@@ -137,6 +148,29 @@ const openFile = async (rawPath: string) => {
 
   tabs.value.push(newTab)
   activateTab(newTab)
+}
+
+// ====================== СПЕЦИАЛЬНЫЙ ТАБ ДЛЯ PREVIEW ======================
+const openPreviewTab = () => {
+  const previewPath = '::preview::'
+
+  const existing = tabs.value.find(t => t.filePath === previewPath)
+  if (existing) {
+    activateTab(existing)
+    return
+  }
+
+  const previewTab = {
+    id: 'preview-tab',
+    filePath: previewPath,
+    name: 'Game Preview',
+    type: 'preview',
+    isDirty: false,
+    icon: 'game_icon'
+  }
+
+  tabs.value.push(previewTab)
+  activateTab(previewTab)
 }
 
 // ====================== СОХРАНЕНИЕ ======================
@@ -205,7 +239,10 @@ const closeAllTabs = () => {
   currentHandler.value = null
 }
 
-defineExpose({ openFile })
+defineExpose({ 
+  openFile,
+  openPreviewTab   // ← новый метод
+})
 </script>
 
 <style scoped>

@@ -1,11 +1,10 @@
 <template>
   <div class="game-preview">
+    <!-- Минимальная шапка только с названием и статусом -->
     <div class="preview-header">
       <div class="header-left">
-        <BaseIcon name="game_icon" color="#FF5252" class="header-icon" />
-        <div>
-          <div class="title">Game Preview</div>
-          <div v-if="isRunning" class="status live">● LIVE • {{ fps }} FPS</div>
+        <div v-if="isRunning" class="status live">
+          ● LIVE • {{ fps }} FPS
         </div>
       </div>
 
@@ -15,7 +14,7 @@
           :disabled="isLoading"
           class="btn btn-primary"
         >
-          {{ isRunning ? '⏹ Stop Preview' : '▶ Start Preview' }}
+          {{ isRunning ? '⏹ Stop' : '▶ Start Preview' }}
         </button>
 
         <button 
@@ -25,18 +24,10 @@
         >
           ⟳ Reload
         </button>
-
-        <button 
-          v-if="isRunning"
-          @click="toggleFullscreen"
-          class="btn btn-secondary"
-          :class="{ active: isFullscreen }"
-        >
-          ⛶ {{ isFullscreen ? 'Exit' : 'Full' }}
-        </button>
       </div>
     </div>
 
+    <!-- Основная область превью -->
     <div class="canvas-container" ref="containerRef">
       <canvas
         ref="canvasRef"
@@ -44,23 +35,21 @@
         @dblclick="toggleFullscreen"
       />
 
+      <!-- Loading -->
       <div v-if="isLoading" class="overlay loading">
         <LoadingSpinner size="64" accent />
         <p>Launching SNEngine Runtime...</p>
       </div>
 
+      <!-- Пустое состояние -->
       <div v-else-if="!isRunning" class="overlay empty">
         <div class="empty-icon">
-          <BaseIcon name="game_icon" color="#444" size="96" />
+          <BaseIcon name="game_icon" color="#444" size="80" />
         </div>
         <div class="empty-title">Game Preview</div>
         <p class="empty-description">
-          Запустите превью, чтобы увидеть игру в реальном времени
+          Нажмите кнопку Start Preview, чтобы запустить игру
         </p>
-        <button @click="startPreview" class="btn btn-primary large">
-          <span class="play-icon">▶</span>
-          Start Preview
-        </button>
       </div>
     </div>
   </div>
@@ -130,24 +119,19 @@ const toggleFullscreen = async () => {
 document.addEventListener('fullscreenchange', () => {
   isFullscreen.value = !!document.fullscreenElement
 })
-
-onMounted(() => {
-})
 </script>
 
 <style scoped>
 .game-preview {
   display: flex;
   flex-direction: column;
-  width: 100%;
+  height: 100%;
   background: #1e1e1e;
-  border-radius: 8px;
   overflow: hidden;
-  border: 1px solid #333;
 }
 
 .preview-header {
-  height: 54px;
+  height: 48px;
   background: #252526;
   border-bottom: 1px solid #333;
   display: flex;
@@ -164,8 +148,8 @@ onMounted(() => {
 }
 
 .header-icon {
-  width: 28px;
-  height: 28px;
+  width: 24px;
+  height: 24px;
 }
 
 .title {
@@ -177,22 +161,22 @@ onMounted(() => {
 .status.live {
   font-size: 13px;
   color: #4ade80;
+  margin-left: 8px;
 }
 
 .controls {
   display: flex;
-  align-items: center;
   gap: 8px;
 }
 
 .btn {
-  padding: 6px 16px;
+  padding: 5px 14px;
   border: none;
-  border-radius: 6px;
+  border-radius: 4px;
   cursor: pointer;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 500;
-  transition: all 0.2s ease;
+  transition: all 0.2s;
 }
 
 .btn-primary {
@@ -202,59 +186,34 @@ onMounted(() => {
 
 .btn-primary:hover:not(:disabled) {
   background: #ff3333;
-  transform: translateY(-1px);
-}
-
-.btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-  transform: none !important;
 }
 
 .btn-secondary {
   background: #333;
   color: #ccc;
-  border: 1px solid #444;
-}
-
-.btn-secondary:hover {
-  background: #444;
-  color: #fff;
-}
-
-.btn-secondary.active {
-  background: #FF5252;
-  border-color: #ff3333;
-  color: #fff;
 }
 
 .canvas-container {
+  flex: 1;
   position: relative;
-  width: 100%;
-  aspect-ratio: 16 / 9;
   background: #0a0a0a;
   display: flex;
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  box-sizing: border-box;
 }
 
 .preview-canvas {
   image-rendering: pixelated;
-  width: 100%;
-  height: 100%;
+  max-width: 100%;
+  max-height: 100%;
   object-fit: contain;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.8);
 }
 
 .overlay {
   position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(10, 10, 10, 0.85);
+  inset: 0;
+  background: rgba(10, 10, 10, 0.9);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -262,71 +221,32 @@ onMounted(() => {
   z-index: 10;
 }
 
-.loading {
-  gap: 16px;
-}
-
-.loading p {
-  color: #aaa;
-  font-size: 14px;
-  margin: 0;
-}
-
 .empty {
-  gap: 16px;
+  gap: 20px;
   text-align: center;
-  padding: 24px;
 }
 
 .empty-icon {
-  opacity: 0.6;
-  margin-bottom: 4px;
-  display: flex;
-  justify-content: center;
+  opacity: 0.5;
 }
 
 .empty-title {
-  font-size: 22px;
+  font-size: 24px;
   font-weight: 600;
   color: #aaa;
-  margin: 0;
 }
 
 .empty-description {
   color: #666;
-  font-size: 15px;
-  max-width: 320px;
-  line-height: 1.4;
-  margin: 0 auto;
+  max-width: 340px;
 }
 
-.large {
-  padding: 12px 32px;
-  font-size: 16px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  margin: 8px auto 0 auto;
-}
-
-.play-icon {
-  font-size: 18px;
-}
-
-:fullscreen .canvas-container {
-  padding: 0;
-  width: 100vw;
+/* Fullscreen */
+:fullscreen .game-preview {
   height: 100vh;
-  aspect-ratio: auto;
 }
 
-:fullscreen .preview-canvas {
-  border-radius: 0;
-  border: none;
-  max-width: none;
-  max-height: none;
-  width: 100%;
-  height: 100%;
+:fullscreen .preview-header {
+  height: 52px;
 }
 </style>

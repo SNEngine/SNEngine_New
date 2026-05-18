@@ -42,6 +42,9 @@ defineEmits<{
 
 // Теперь используем единую функцию из icons.config.ts
 const getTabIconName = (tab: Tab): string => {
+  if (tab.filePath === '::preview::' || tab.type === 'preview') {
+    return 'game_icon'
+  }
   if (!tab.filePath) return 'unknown_icon'
   return getFileIcon(tab.filePath)
 }

@@ -10,14 +10,14 @@
 
       <div class="header-actions">
         <!-- Preview Button -->
-        <button 
-          class="preview-btn"
-          @click="openPreview"
-          title="Открыть Game Preview"
-        >
-          <BaseIcon name="preview_icon" class="btn-icon" />
-          <span>Preview</span>
-        </button>
+<button 
+  class="preview-btn"
+  @click="openPreviewTab"
+  title="Открыть Game Preview как вкладку"
+>
+  <BaseIcon name="preview_icon" class="btn-icon" />
+  <span>Preview</span>
+</button>
 
         <!-- Terminal Button -->
         <button 
@@ -139,7 +139,6 @@ import InputBox from "./components/InputBox/InputBox.vue"
 import NotificationBox from "./components/NotificationBox/NotificationBox.vue"
 import NewFileDialog from "./components/NewFileDialog/NewFileDialog.vue"
 import SystemStatus from "./components/SystemStatus/SystemStatus.vue"
-import GamePreview from "./components/GamePreview/GamePreview.vue"
 import Terminal from "./components/Terminal/Terminal.vue"
 import SystemTerminal from "./components/Terminal/SystemTerminal.vue"
 
@@ -161,7 +160,6 @@ const inputBoxRef = ref<any>(null)
 
 const showNewFileDialog = ref(false)
 const isFullScreen = ref(false)
-const showPreview = ref(false)
 const showTerminal = ref(false)
 const activeTerminal = ref<'runtime' | 'system'>('runtime')
 
@@ -169,6 +167,15 @@ const { notifications, remove } = useNotification()
 const { messageBox } = useMessageBox()
 const { inputBox } = useInputBox()
 const { createFromTemplate } = useFileCreation()
+
+// ====================== PREVIEW AS TAB ======================
+const openPreviewTab = () => {
+  if (tabsRef.value?.openPreviewTab) {
+    tabsRef.value.openPreviewTab()
+  } else {
+    console.error('openPreviewTab method not found on EditorTabs')
+  }
+}
 
 const toggleFullScreen = async () => {
   try {
@@ -181,20 +188,9 @@ const toggleFullScreen = async () => {
   }
 }
 
-const openPreview = () => {
-  showPreview.value = true
-}
-
-const closePreview = () => {
-  showPreview.value = false
-}
-
 const toggleTerminal = () => {
   showTerminal.value = !showTerminal.value
 }
-
-const onPreviewStarted = () => console.log('[App] Preview started')
-const onPreviewStopped = () => console.log('[App] Preview stopped')
 
 onMounted(async () => {
   messageBox.value = messageBoxRef.value

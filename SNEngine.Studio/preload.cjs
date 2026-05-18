@@ -52,6 +52,12 @@ preview: {
 
   getFrame: () => ipcRenderer.invoke('preview:get-frame'),
 
+  // === Новое: прослушка логов из C# ===
+  onLog: (callback) => ipcRenderer.on('preview:log', (_, log) => callback(log)),
+
+  // Очистка слушателя (рекомендуется)
+  offLog: (callback) => ipcRenderer.removeListener('preview:log', callback),
+
   onError: (callback) => ipcRenderer.on('preview:error', (_, msg) => callback(msg))
 },
 

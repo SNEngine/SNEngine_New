@@ -505,8 +505,13 @@ ipcMain.handle('toggle-fullscreen', async () => {
   return !isFull; // возвращаем новое состояние
 });
 
-const os = require('os');
+// ====================== GAME PREVIEW ======================
 
+let previewProcess = null;
+let previewFd = null;
+let previewBuffer = null;
+
+const os = require('os');
 const HEADER_SIZE = 32;
 const MAX_WIDTH = 1920;
 const MAX_HEIGHT = 1080;
@@ -514,61 +519,75 @@ const FULL_BUFFER_SIZE = HEADER_SIZE + (MAX_WIDTH * MAX_HEIGHT * 4) * 2;
 
 const MAP_NAME = path.join(os.tmpdir(), 'SNEngine_Preview_Frame_v1.dat');
 
-let previewProcess = null;
-let previewFd = null;
-let previewBuffer = null;
-
-
-
+// Запуск превью
 ipcMain.handle('preview:start', async (event, projectPath, width = 800, height = 450) => {
   if (previewProcess) {
-    if (previewProcess) {
-      previewProcess.kill();
-      previewProcess = null;
-    }
-    if (previewFd !== null) {
-      try { fs.closeSync(previewFd); } catch {}
-      previewFd = null;
-    }
-    previewBuffer = null;
-    try {
-      if (fs.existsSync(MAP_NAME)) {
-        fs.unlinkSync(MAP_NAME);
-      }
-    } catch {}
+    await ipcMain.handlers['preview:stop']();
   }
 
-const runtimePath = 'E:\\repos\\SNEngine\\SNEngine.Test\\bin\\Debug\\net9.0\\SNEngine.Test.exe';
-  const args = ['--preview', `--width=${width}`, `--height=${height}`, `--project=${projectPath}`];
+  // Путь к исполняемому файлу (можно сделать динамическим позже)
+  const runtimePath = path.join(__dirname, 'PlayerTemplates/Windows/SNEngine.Runtime.exe');
+  // const runtimePath = 'E:\\repos\\SNEngine\\SNEngine.Test\\bin\\Debug\\net9.0\\SNEngine.Test.exe';
+
+  const args = [
+    '--preview',
+    `--width=${width}`,
+    `--height=${height}`,
+    `--project=${projectPath}`
+  ];
 
   previewProcess = spawn(runtimePath, args, {
     cwd: projectPath,
-    stdio: 'ignore'
+    stdio: ['ignore', 'pipe', 'pipe']   // ← важно для логов
   });
 
-  previewProcess.on('error', (err) => {
-    mainWindow?.webContents.send('preview:error', err.message);
+  // ====================== ПЕРЕХВАТ КОНСОЛЬНОГО ВЫВОДА ======================
+  previewProcess.stdout?.on('data', (data) => {
+    const text = data.toString().trim();
+    if (text) {
+      console.log(`[Runtime] ${text}`);
+      mainWindow?.webContents.send('preview:log', { type: 'stdout', text });
+    }
   });
 
-  previewProcess.on('exit', () => {
+  previewProcess.stderr?.on('data', (data) => {
+    const text = data.toString().trim();
+    if (text) {
+      console.error(`[Runtime Error] ${text}`);
+      mainWindow?.webContents.send('preview:log', { type: 'stderr', text });
+    }
+  });
+
+  previewProcess.on('exit', (code) => {
+    console.log(`[Runtime] Process exited with code ${code}`);
+    mainWindow?.webContents.send('preview:log', { 
+      type: 'system', 
+      text: `Process exited with code ${code}` 
+    });
     previewProcess = null;
   });
 
+  console.log(`[Preview] SNEngine.Runtime started (PID: ${previewProcess.pid})`);
+
+  // ====================== ОЖИДАНИЕ SHARED MEMORY ======================
   let attempts = 0;
   const maxAttempts = 15;
 
   while (attempts < maxAttempts) {
-    await new Promise(r => setTimeout(r, 300));
+    await new Promise(r => setTimeout(r, 280));
     attempts++;
+
     try {
       if (fs.existsSync(MAP_NAME)) {
         previewFd = fs.openSync(MAP_NAME, 'r+');
         previewBuffer = Buffer.allocUnsafe(FULL_BUFFER_SIZE);
+        console.log(`[Preview] Shared Memory opened after ${attempts} attempts`);
         break;
       }
     } catch (err) {
       if (attempts === maxAttempts) {
-        mainWindow?.webContents.send('preview:error', err.message);
+        console.error('[Preview] Failed to open Shared Memory:', err.message);
+        mainWindow?.webContents.send('preview:error', 'Не удалось открыть Shared Memory');
       }
     }
   }
@@ -576,6 +595,7 @@ const runtimePath = 'E:\\repos\\SNEngine\\SNEngine.Test\\bin\\Debug\\net9.0\\SNE
   return { success: previewFd !== null };
 });
 
+// Остановка превью
 ipcMain.handle('preview:stop', async () => {
   if (previewProcess) {
     previewProcess.kill();
@@ -583,9 +603,7 @@ ipcMain.handle('preview:stop', async () => {
   }
 
   if (previewFd !== null) {
-    try { 
-      fs.closeSync(previewFd); 
-    } catch {}
+    try { fs.closeSync(previewFd); } catch {}
     previewFd = null;
   }
   previewBuffer = null;
@@ -594,11 +612,12 @@ ipcMain.handle('preview:stop', async () => {
     if (fs.existsSync(MAP_NAME)) {
       fs.unlinkSync(MAP_NAME);
     }
-  } catch {}
+  } catch (e) {}
 
   return { success: true };
 });
 
+// Получение кадра
 ipcMain.handle('preview:get-frame', async () => {
   if (previewFd === null || previewBuffer === null) return null;
 
@@ -607,8 +626,7 @@ ipcMain.handle('preview:get-frame', async () => {
 
     const width = previewBuffer.readInt32LE(0);
     const height = previewBuffer.readInt32LE(4);
-    // === ИСПРАВЛЕНО: правильный offset ===
-    const bufferIndex = previewBuffer.readInt32LE(28);
+    const bufferIndex = previewBuffer.readInt32LE(28);   // правильный offset
 
     if (width <= 0 || height <= 0 || (bufferIndex !== 0 && bufferIndex !== 1)) {
       return null;
@@ -621,11 +639,7 @@ ipcMain.handle('preview:get-frame', async () => {
 
     const frameData = Buffer.from(previewBuffer.slice(offset, offset + frameSize));
 
-    return {
-      width,
-      height,
-      data: frameData
-    };
+    return { width, height, data: frameData };
   } catch (e) {
     console.error('[Preview] get-frame error:', e);
     return null;

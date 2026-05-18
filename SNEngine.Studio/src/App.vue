@@ -9,13 +9,21 @@
       <SystemStatus class="system-status" />
 
       <div class="header-actions">
-        <!-- Кнопка Preview -->
         <button 
           class="preview-btn"
           @click="openPreview"
           title="Открыть Game Preview"
         >
           ▶ Preview
+        </button>
+
+        <button 
+          class="terminal-toggle-btn"
+          @click="toggleTerminal"
+          :class="{ active: showTerminal }"
+          title="Открыть/Закрыть Terminal (Ctrl+T)"
+        >
+          📟 Terminal
         </button>
 
         <button 
@@ -47,8 +55,13 @@
 
       <div class="splitter" @mousedown="startResizing" />
 
-      <div class="right-panel">
+      <div class="main-content">
         <EditorTabs ref="tabsRef" />
+
+        <!-- Нижняя панель терминала -->
+        <div v-if="showTerminal" class="terminal-panel">
+          <Terminal />
+        </div>
       </div>
     </div>
 
@@ -57,7 +70,7 @@
       <div v-if="showPreview" class="preview-modal">
         <div class="preview-modal-content">
           <div class="preview-modal-header">
-            <span>Game Preview</span>
+            <span>🎮 Game Preview</span>
             <button @click="closePreview" class="close-btn">✕</button>
           </div>
           <GamePreview 
@@ -102,6 +115,7 @@ import NotificationBox from "./components/NotificationBox/NotificationBox.vue"
 import NewFileDialog from "./components/NewFileDialog/NewFileDialog.vue"
 import SystemStatus from "./components/SystemStatus/SystemStatus.vue"
 import GamePreview from "./components/GamePreview/GamePreview.vue"
+import Terminal from "./components/Terminal/Terminal.vue"   // ← Новый компонент
 
 import { useMessageBox } from './composables/useMessageBox'
 import { useInputBox } from './composables/useInputBox'
@@ -122,6 +136,7 @@ const inputBoxRef = ref<any>(null)
 const showNewFileDialog = ref(false)
 const isFullScreen = ref(false)
 const showPreview = ref(false)
+const showTerminal = ref(false)        // ← Управление терминалом
 
 const { notifications, remove } = useNotification()
 const { messageBox } = useMessageBox()
@@ -147,13 +162,12 @@ const closePreview = () => {
   showPreview.value = false
 }
 
-const onPreviewStarted = () => {
-  console.log('[App] Preview started')
+const toggleTerminal = () => {
+  showTerminal.value = !showTerminal.value
 }
 
-const onPreviewStopped = () => {
-  console.log('[App] Preview stopped')
-}
+const onPreviewStarted = () => console.log('[App] Preview started')
+const onPreviewStopped = () => console.log('[App] Preview stopped')
 
 onMounted(async () => {
   messageBox.value = messageBoxRef.value
@@ -171,6 +185,10 @@ onMounted(async () => {
     if (e.key === 'F11') {
       e.preventDefault()
       toggleFullScreen()
+    }
+    if (e.ctrlKey && e.key.toLowerCase() === 't') {
+      e.preventDefault()
+      toggleTerminal()
     }
   }
 
@@ -375,7 +393,9 @@ html, body {
   pointer-events: auto;
 }
 
-/* === Preview Button === */
+/* ====================== NEW PREVIEW & TERMINAL STYLES ====================== */
+
+/* Кнопка Preview */
 .preview-btn {
   background: #22c55e;
   color: white;
@@ -396,11 +416,59 @@ html, body {
   transform: translateY(-1px);
 }
 
-/* === Preview Modal === */
+/* Кнопка Terminal */
+.terminal-toggle-btn {
+  background: #444;
+  color: #ccc;
+  border: 1px solid #555;
+  padding: 6px 14px;
+  border-radius: 4px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.terminal-toggle-btn:hover {
+  background: #555;
+  color: white;
+}
+
+.terminal-toggle-btn.active {
+  background: #22c55e;
+  color: white;
+  border-color: #16a34a;
+}
+
+/* Основная область контента (Editor + Terminal) */
+.main-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+}
+
+/* Панель терминала внизу */
+.terminal-panel {
+  height: 320px;
+  min-height: 200px;
+  border-top: 2px solid #FF5252;
+  background: #0c0c0c;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  z-index: 10;
+}
+
+/* Preview Modal Styles */
 .preview-modal {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.75);
+  background: rgba(0, 0, 0, 0.8);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -408,20 +476,20 @@ html, body {
 }
 
 .preview-modal-content {
-  width: 860px;
-  max-width: 95vw;
+  width: 920px;
+  max-width: 96vw;
   max-height: 92vh;
   background: #1e1e1e;
   border-radius: 10px;
-  border: 1px solid #333;
+  border: 1px solid #444;
   overflow: hidden;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+  box-shadow: 0 20px 70px rgba(0, 0, 0, 0.7);
   display: flex;
   flex-direction: column;
 }
 
 .preview-modal-header {
-  height: 42px;
+  height: 46px;
   background: #252526;
   display: flex;
   align-items: center;
@@ -437,15 +505,14 @@ html, body {
   background: none;
   border: none;
   color: #aaa;
-  font-size: 20px;
+  font-size: 22px;
   cursor: pointer;
-  line-height: 1;
-  padding: 4px 8px;
+  padding: 4px 10px;
   border-radius: 4px;
 }
 
 .close-btn:hover {
   background: #333;
-  color: white;
+  color: #fff;
 }
 </style>

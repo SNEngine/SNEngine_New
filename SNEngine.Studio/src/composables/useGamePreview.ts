@@ -12,9 +12,14 @@ export function useGamePreview() {
 
   let animationFrameId = 0
   let frameCount = 0
-  let lastFrameId = 0
+  let lastRenderTime = 0
 
-  // ========== Запуск превью ==========
+  const TARGET_FPS = 60
+  const FRAME_TIME = 1000 / TARGET_FPS
+
+  let currentImageData: ImageData | null = null
+  let flippedImageData: ImageData | null = null
+
   const startPreview = async (projectPath: string, width = 800, height = 450) => {
     if (isRunning.value) await stopPreview()
 
@@ -35,90 +40,76 @@ export function useGamePreview() {
     }
   }
 
-  // ========== Инициализация Canvas ==========
   const initCanvas = (width: number, height: number) => {
     if (!canvasRef.value) return
-
     canvasRef.value.width = width
     canvasRef.value.height = height
 
-    ctxRef.value = canvasRef.value.getContext('2d', { alpha: false })
-    if (ctxRef.value) {
-      ctxRef.value.imageSmoothingEnabled = false
-    }
+    ctxRef.value = canvasRef.value.getContext('2d', { alpha: false, willReadFrequently: false })
+    if (ctxRef.value) ctxRef.value.imageSmoothingEnabled = false
   }
 
-  // ========== Вертикальный flip ImageData (OpenGL → Canvas) ==========
-  const flipImageDataVertically = (imageData: ImageData): ImageData => {
-    const { width, height, data } = imageData
-    const flipped = ctxRef.value!.createImageData(width, height)
+  const flipImageDataVertically = (src: ImageData, dst: ImageData) => {
+    const { width, height, data } = src
     const stride = width * 4
-
     for (let y = 0; y < height; y++) {
-      const sourceY = height - 1 - y
-      const sourceRow = data.subarray(sourceY * stride, (sourceY + 1) * stride)
-      flipped.data.set(sourceRow, y * stride)
+      const srcY = height - 1 - y
+      dst.data.set(data.subarray(srcY * stride, (srcY + 1) * stride), y * stride)
     }
-
-    return flipped
   }
 
-// ========== Главный рендер-луп ==========
-const startRenderLoop = () => {
-  const loop = async () => {
-    const frame = await window.electron.preview.getFrame()
-
-    if (frame && frame.data && frame.width && frame.height && ctxRef.value) {
-      try {
-        // Динамически меняем размер canvas под реальное разрешение игры
-        if (canvasRef.value!.width !== frame.width || canvasRef.value!.height !== frame.height) {
-          canvasRef.value!.width = frame.width
-          canvasRef.value!.height = frame.height
-
-          ctxRef.value = canvasRef.value!.getContext('2d', { alpha: false })
-          if (ctxRef.value) {
-            ctxRef.value.imageSmoothingEnabled = false
-          }
-        }
-
-        let imageData = new ImageData(
-          new Uint8ClampedArray(frame.data),
-          frame.width,
-          frame.height
-        )
-
-        // ←←← Исправление переворота
-        imageData = flipImageDataVertically(imageData)
-
-        ctxRef.value!.putImageData(imageData, 0, 0)
-      } catch (e) {
-        console.warn('[Preview] Failed to draw frame:', e)
+  const startRenderLoop = () => {
+    const loop = async () => {
+      const now = Date.now()
+      if (now - lastRenderTime < FRAME_TIME) {
+        animationFrameId = requestAnimationFrame(loop)
+        return
       }
-    }
+      lastRenderTime = now
 
-    // FPS
-    frameCount++
-    const now = Date.now()
-    if (now - lastFrameTime.value >= 1000) {
-      fps.value = frameCount
-      frameCount = 0
-      lastFrameTime.value = now
-    }
+      const frame = await window.electron.preview.getFrame()
 
-    animationFrameId = requestAnimationFrame(loop)
+      if (frame?.data && frame.width && frame.height && ctxRef.value) {
+        try {
+          if (canvasRef.value!.width !== frame.width || canvasRef.value!.height !== frame.height) {
+            initCanvas(frame.width, frame.height)
+          }
+
+          const uint8 = new Uint8ClampedArray(frame.data)
+          if (!currentImageData || currentImageData.width !== frame.width) {
+            currentImageData = new ImageData(uint8, frame.width, frame.height)
+            flippedImageData = ctxRef.value!.createImageData(frame.width, frame.height)
+          } else {
+            currentImageData.data.set(uint8)
+          }
+
+          flipImageDataVertically(currentImageData, flippedImageData!)
+          ctxRef.value!.putImageData(flippedImageData!, 0, 0)
+        } catch (e) {
+          console.warn('[Preview] draw error:', e)
+        }
+      }
+
+      frameCount++
+      if (now - lastFrameTime.value >= 1000) {
+        fps.value = frameCount
+        frameCount = 0
+        lastFrameTime.value = now
+      }
+
+      animationFrameId = requestAnimationFrame(loop)
+    }
+    loop()
   }
-  loop()
-}
 
   const stopPreview = async () => {
     cancelAnimationFrame(animationFrameId)
+    currentImageData = flippedImageData = null
     await window.electron.preview.stop()
     isRunning.value = false
   }
 
-  onUnmounted(() => {
-    stopPreview()
-  })
+  onUnmounted(stopPreview)
 
   return {
     canvasRef,

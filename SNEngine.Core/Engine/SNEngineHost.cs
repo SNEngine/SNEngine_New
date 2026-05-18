@@ -135,24 +135,16 @@ public class SNEngineHost : IDisposable
         {
             int w = _previewWidth;
             int h = _previewHeight;
-            byte[] pixels = new byte[w * h * 4];
+            byte[] pixels = new byte[w * h * 4];   // можно сделать static/reusable
 
             fixed (byte* ptr = pixels)
             {
-                _gl!.ReadPixels(0, 0, (uint)w, (uint)h,
-                    PixelFormat.Rgba,
-                    PixelType.UnsignedByte,
-                    ptr);
+                _gl!.ReadPixels(0, 0, (uint)w, (uint)h, PixelFormat.Rgba, PixelType.UnsignedByte, ptr);
             }
 
-            // Исправлено:
-            // Замени строку на:
             _sharedFramePublisher!.PublishFrame(w, h, pixels.AsSpan());
         }
-        catch (Exception ex)
-        {
-            Debug.LogError($"[Preview] Failed to publish frame: {ex.Message}");
-        }
+        catch { }
     }
 
     private void OnClosing()

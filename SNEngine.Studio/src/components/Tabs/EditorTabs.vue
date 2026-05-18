@@ -163,7 +163,7 @@ const openPreviewTab = () => {
   const previewTab = {
     id: 'preview-tab',
     filePath: previewPath,
-    name: 'Game Preview',
+    name: 'Game',
     type: 'preview',
     isDirty: false,
     icon: 'game_icon'

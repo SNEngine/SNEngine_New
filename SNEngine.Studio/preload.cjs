@@ -61,6 +61,22 @@ preview: {
   onError: (callback) => ipcRenderer.on('preview:error', (_, msg) => callback(msg))
 },
 
+terminal: {
+    init: (id, shellType) => ipcRenderer.send('terminal-init', id, shellType),
+    write: (id, data) => ipcRenderer.send('terminal-write', id, data),
+    kill: (id) => ipcRenderer.send('terminal-kill', id),
+    onData: (id, callback) => {
+      const listener = (_event, data) => callback(data)
+      ipcRenderer.on(`terminal-data-${id}`, listener)
+      return () => ipcRenderer.removeListener(`terminal-data-${id}`, listener)
+    },
+    onExit: (id, callback) => {
+      const listener = () => callback()
+      ipcRenderer.on(`terminal-exit-${id}`, listener)
+      return () => ipcRenderer.removeListener(`terminal-exit-${id}`, listener)
+    }
+  },
+
   // Управление watcher
   startWatcher: (path) => ipcRenderer.send('start-watcher', path),
   stopWatcher: () => ipcRenderer.send('stop-watcher')

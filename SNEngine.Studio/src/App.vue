@@ -9,23 +9,28 @@
       <SystemStatus class="system-status" />
 
       <div class="header-actions">
+        <!-- Preview Button -->
         <button 
           class="preview-btn"
           @click="openPreview"
           title="Открыть Game Preview"
         >
-          ▶ Preview
+          <BaseIcon name="preview_icon" class="btn-icon" />
+          <span>Preview</span>
         </button>
 
+        <!-- Terminal Button -->
         <button 
           class="terminal-toggle-btn"
           @click="toggleTerminal"
           :class="{ active: showTerminal }"
           title="Открыть/Закрыть Terminal (Ctrl+T)"
         >
-          📟 Terminal
+          <BaseIcon name="terminal_icon" class="btn-icon" />
+          <span>Terminal</span>
         </button>
 
+        <!-- Fullscreen -->
         <button 
           class="fullscreen-btn"
           @click="toggleFullScreen"
@@ -36,6 +41,7 @@
           />
         </button>
 
+        <!-- New File -->
         <button class="new-file-btn" @click="showNewFileDialog = true" title="Создать новый файл">
           <span class="plus">+</span>
           New File
@@ -58,14 +64,33 @@
       <div class="main-content">
         <EditorTabs ref="tabsRef" />
 
-        <!-- Нижняя панель терминала -->
         <div v-if="showTerminal" class="terminal-panel">
-          <Terminal />
+          <div class="terminal-tabs">
+            <button 
+              :class="{ active: activeTerminal === 'runtime' }"
+              @click="activeTerminal = 'runtime'"
+            >
+              Runtime Console
+            </button>
+            <button 
+              :class="{ active: activeTerminal === 'system' }"
+              @click="activeTerminal = 'system'"
+            >
+              System Terminal
+            </button>
+          </div>
+
+          <div v-if="activeTerminal === 'runtime'" class="terminal-content">
+            <Terminal />
+          </div>
+
+          <div v-if="activeTerminal === 'system'" class="terminal-content">
+            <SystemTerminal />
+          </div>
         </div>
       </div>
     </div>
 
-    <!-- Game Preview Modal -->
     <Teleport to="body">
       <div v-if="showPreview" class="preview-modal">
         <div class="preview-modal-content">
@@ -115,7 +140,8 @@ import NotificationBox from "./components/NotificationBox/NotificationBox.vue"
 import NewFileDialog from "./components/NewFileDialog/NewFileDialog.vue"
 import SystemStatus from "./components/SystemStatus/SystemStatus.vue"
 import GamePreview from "./components/GamePreview/GamePreview.vue"
-import Terminal from "./components/Terminal/Terminal.vue"   // ← Новый компонент
+import Terminal from "./components/Terminal/Terminal.vue"
+import SystemTerminal from "./components/Terminal/SystemTerminal.vue"
 
 import { useMessageBox } from './composables/useMessageBox'
 import { useInputBox } from './composables/useInputBox'
@@ -136,7 +162,8 @@ const inputBoxRef = ref<any>(null)
 const showNewFileDialog = ref(false)
 const isFullScreen = ref(false)
 const showPreview = ref(false)
-const showTerminal = ref(false)        // ← Управление терминалом
+const showTerminal = ref(false)
+const activeTerminal = ref<'runtime' | 'system'>('runtime')
 
 const { notifications, remove } = useNotification()
 const { messageBox } = useMessageBox()
@@ -261,14 +288,14 @@ html, body {
   padding: 0 12px; 
   border-bottom: 1px solid #333; 
   flex-shrink: 0;
-  position: relative; /* Важно для центрирования SystemStatus */
+  position: relative;
 }
 
 .logo-section { 
   display: flex; 
   align-items: center; 
   gap: 12px;
-  z-index: 2; /* Чтобы логотип был поверх, если наползут */
+  z-index: 2;
 }
 
 .header h1 { 
@@ -288,18 +315,17 @@ html, body {
   border-radius: 4px;
 }
 
-/* Центрирование SystemStatus независимо от кнопок */
 .system-status {
   position: absolute;
   left: 50%;
   transform: translateX(-50%);
   display: flex;
   justify-content: center;
-  pointer-events: none; /* Пропускает клики под себя, если нужно */
+  pointer-events: none;
 }
 
 .system-status > * {
-  pointer-events: auto; /* Возвращает клики самим элементам статуса */
+  pointer-events: auto;
 }
 
 .header-actions {
@@ -393,11 +419,8 @@ html, body {
   pointer-events: auto;
 }
 
-/* ====================== NEW PREVIEW & TERMINAL STYLES ====================== */
-
-/* Кнопка Preview */
 .preview-btn {
-  background: #22c55e;
+  background: #FF5252;
   color: white;
   border: none;
   padding: 6px 14px;
@@ -412,13 +435,12 @@ html, body {
 }
 
 .preview-btn:hover {
-  background: #16a34a;
+  background: #555;
   transform: translateY(-1px);
 }
 
-/* Кнопка Terminal */
 .terminal-toggle-btn {
-  background: #444;
+  background: #FF5252;
   color: #ccc;
   border: 1px solid #555;
   padding: 6px 14px;
@@ -438,12 +460,11 @@ html, body {
 }
 
 .terminal-toggle-btn.active {
-  background: #22c55e;
+  background: #FF5252;
   color: white;
-  border-color: #16a34a;
+  border-color: #FF5252;
 }
 
-/* Основная область контента (Editor + Terminal) */
 .main-content {
   flex: 1;
   display: flex;
@@ -452,7 +473,7 @@ html, body {
   position: relative;
 }
 
-/* Панель терминала внизу */
+/* Панель терминала и стили для вкладок переключения */
 .terminal-panel {
   height: 320px;
   min-height: 200px;
@@ -464,7 +485,48 @@ html, body {
   z-index: 10;
 }
 
-/* Preview Modal Styles */
+.terminal-tabs {
+  display: flex;
+  background: #181818;
+  border-bottom: 1px solid #2d2d2d;
+  padding: 0 4px;
+  height: 32px;
+  align-items: flex-end;
+}
+
+.terminal-tabs button {
+  background: transparent;
+  border: none;
+  color: #858585;
+  padding: 6px 16px;
+  font-size: 12px;
+  cursor: pointer;
+  border-top-left-radius: 4px;
+  border-top-right-radius: 4px;
+  transition: all 0.15s ease;
+  height: 28px;
+  display: flex;
+  align-items: center;
+}
+
+.terminal-tabs button:hover {
+  color: #cccccc;
+  background: #222222;
+}
+
+.terminal-tabs button.active {
+  color: #ffffff;
+  background: #0c0c0c;
+  border-bottom: 2px solid #FF5252;
+  font-weight: 500;
+}
+
+.terminal-content {
+  flex: 1;
+  overflow: hidden;
+  height: calc(100% - 32px);
+}
+
 .preview-modal {
   position: fixed;
   inset: 0;

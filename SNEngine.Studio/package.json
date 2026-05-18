@@ -1,6 +1,6 @@
 {
   "name": "snengine-studio",
-  "version": "0.0.58",
+  "version": "0.0.73",
   "description": "SNEngine Studio - Visual Novel Editor",
   "author": "SNEngine Team",
   "private": true,
@@ -20,10 +20,13 @@
     "chokidar": "^5.0.0",
     "monaco-editor": "^0.53.0",
     "monaco-editor-vue3": "^1.0.5",
+    "node-pty": "^1.1.0",
     "sortablejs": "^1.15.7",
     "systeminformation": "^5.31.6",
     "vue": "^3.5.32",
-    "vue-draggable-next": "^2.3.0"
+    "vue-draggable-next": "^2.3.0",
+    "xterm": "^5.3.0",
+    "xterm-addon-fit": "^0.8.0"
   },
   "devDependencies": {
     "@tsconfig/node24": "^24.0.4",

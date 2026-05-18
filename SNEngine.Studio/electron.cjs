@@ -647,6 +647,73 @@ ipcMain.handle('preview:get-frame', async () => {
 });
 
 
+// ====================== SYSTEM TERMINAL (node-pty) ======================
+const pty = require('node-pty')
+
+const activeTerminals = new Map()
+
+ipcMain.on('terminal-init', (event, terminalId, shellType) => {
+  if (activeTerminals.has(terminalId)) {
+    activeTerminals.get(terminalId).kill()
+    activeTerminals.delete(terminalId)
+  }
+
+  let shell = 'powershell.exe'
+  let args = ['-NoLogo', '-NoProfile']
+
+  if (shellType === 'cmd') {
+    shell = 'cmd.exe'
+    args = ['/Q']
+  } else if (shellType === 'bash') {
+    const gitBash = 'C:\\Program Files\\Git\\bin\\bash.exe'
+    shell = fs.existsSync(gitBash) ? gitBash : 'bash.exe'
+    args = ['--login', '-i']
+  }
+
+  const ptyProcess = pty.spawn(shell, args, {
+    name: 'xterm-256color',
+    cols: 120,
+    rows: 30,
+    cwd: process.env.USERPROFILE || '.',
+    env: {
+      ...process.env,
+      LANG: 'ru_RU.UTF-8',
+      LC_ALL: 'ru_RU.UTF-8',
+      TERM: 'xterm-256color'
+    },
+    // Ключевой параметр — отключаем ConPTY и используем winpty
+    useConpty: false,
+    // Дополнительная совместимость
+    handleFlowControl: true
+  })
+
+  activeTerminals.set(terminalId, ptyProcess)
+
+  ptyProcess.on('data', (data) => {
+    event.reply(`terminal-data-${terminalId}`, { text: data })
+  })
+
+  ptyProcess.on('exit', () => {
+    event.reply(`terminal-exit-${terminalId}`)
+    activeTerminals.delete(terminalId)
+  })
+
+  console.log(`[node-pty] ${shellType} started (useConpty: false) for ${terminalId}`)
+})
+
+// Остальные обработчики остаются без изменений
+ipcMain.on('terminal-write', (event, terminalId, data) => {
+  const proc = activeTerminals.get(terminalId)
+  if (proc) proc.write(data)
+})
+
+ipcMain.on('terminal-kill', (event, terminalId) => {
+  const proc = activeTerminals.get(terminalId)
+  if (proc) {
+    proc.kill()
+    activeTerminals.delete(terminalId)
+  }
+})
 // ====================== APP LIFECYCLE ======================
 app.whenReady().then(() => {
   createWindow();

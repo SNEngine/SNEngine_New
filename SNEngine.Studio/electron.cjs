@@ -5,6 +5,7 @@ const { app, BrowserWindow, Menu, ipcMain, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const chokidar = require('chokidar');
+const { spawn } = require('child_process');
 
 let mainWindow = null;
 let watcher = null;
@@ -503,6 +504,134 @@ ipcMain.handle('toggle-fullscreen', async () => {
   
   return !isFull; // возвращаем новое состояние
 });
+
+const os = require('os');
+
+const HEADER_SIZE = 32;
+const MAX_WIDTH = 1920;
+const MAX_HEIGHT = 1080;
+const FULL_BUFFER_SIZE = HEADER_SIZE + (MAX_WIDTH * MAX_HEIGHT * 4) * 2;
+
+const MAP_NAME = path.join(os.tmpdir(), 'SNEngine_Preview_Frame_v1.dat');
+
+let previewProcess = null;
+let previewFd = null;
+let previewBuffer = null;
+
+
+
+ipcMain.handle('preview:start', async (event, projectPath, width = 800, height = 450) => {
+  if (previewProcess) {
+    if (previewProcess) {
+      previewProcess.kill();
+      previewProcess = null;
+    }
+    if (previewFd !== null) {
+      try { fs.closeSync(previewFd); } catch {}
+      previewFd = null;
+    }
+    previewBuffer = null;
+    try {
+      if (fs.existsSync(MAP_NAME)) {
+        fs.unlinkSync(MAP_NAME);
+      }
+    } catch {}
+  }
+
+  const runtimePath = path.join(__dirname, 'PlayerTemplates/Windows/SNEngine.Runtime.exe');
+  const args = ['--preview', `--width=${width}`, `--height=${height}`, `--project=${projectPath}`];
+
+  previewProcess = spawn(runtimePath, args, {
+    cwd: projectPath,
+    stdio: 'ignore'
+  });
+
+  previewProcess.on('error', (err) => {
+    mainWindow?.webContents.send('preview:error', err.message);
+  });
+
+  previewProcess.on('exit', () => {
+    previewProcess = null;
+  });
+
+  let attempts = 0;
+  const maxAttempts = 15;
+
+  while (attempts < maxAttempts) {
+    await new Promise(r => setTimeout(r, 300));
+    attempts++;
+    try {
+      if (fs.existsSync(MAP_NAME)) {
+        previewFd = fs.openSync(MAP_NAME, 'r+');
+        previewBuffer = Buffer.allocUnsafe(FULL_BUFFER_SIZE);
+        break;
+      }
+    } catch (err) {
+      if (attempts === maxAttempts) {
+        mainWindow?.webContents.send('preview:error', err.message);
+      }
+    }
+  }
+
+  return { success: previewFd !== null };
+});
+
+ipcMain.handle('preview:stop', async () => {
+  if (previewProcess) {
+    previewProcess.kill();
+    previewProcess = null;
+  }
+
+  if (previewFd !== null) {
+    try { 
+      fs.closeSync(previewFd); 
+    } catch {}
+    previewFd = null;
+  }
+  previewBuffer = null;
+
+  try {
+    if (fs.existsSync(MAP_NAME)) {
+      fs.unlinkSync(MAP_NAME);
+    }
+  } catch {}
+
+  return { success: true };
+});
+
+ipcMain.handle('preview:get-frame', async () => {
+  if (previewFd === null || previewBuffer === null) return null;
+
+  try {
+    fs.readSync(previewFd, previewBuffer, 0, previewBuffer.length, 0);
+
+    const width = previewBuffer.readInt32LE(0);
+    const height = previewBuffer.readInt32LE(4);
+    // === ИСПРАВЛЕНО: правильный offset ===
+    const bufferIndex = previewBuffer.readInt32LE(28);
+
+    if (width <= 0 || height <= 0 || (bufferIndex !== 0 && bufferIndex !== 1)) {
+      return null;
+    }
+
+    const offset = HEADER_SIZE + bufferIndex * MAX_WIDTH * MAX_HEIGHT * 4;
+    const frameSize = width * height * 4;
+
+    if (offset + frameSize > previewBuffer.length) return null;
+
+    const frameData = Buffer.from(previewBuffer.slice(offset, offset + frameSize));
+
+    return {
+      width,
+      height,
+      data: frameData
+    };
+  } catch (e) {
+    console.error('[Preview] get-frame error:', e);
+    return null;
+  }
+});
+
 
 // ====================== APP LIFECYCLE ======================
 app.whenReady().then(() => {

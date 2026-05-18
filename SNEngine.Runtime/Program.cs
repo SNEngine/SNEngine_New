@@ -11,25 +11,36 @@ namespace SNEngine.Runtime;
 class Program
 {
     private static GameInfo? _gameInfo;
+    private static bool _isPreviewMode = false;
 
     static void Main(string[] args)
     {
-        Console.WriteLine("=== SNEngine Runtime Starting ===");
+        Console.WriteLine("=== SNEngine Runtime / Preview Starting ===");
 
-        // 1. Load game configuration
+        ParseCommandLineArguments(args);
         LoadGameInfo();
 
-        // 2. Subscribe to engine initialization event
-        SNEngine.API.SNEngine.OnInitialized += OnEngineInitialized;
-
-        // 3. Start the engine with resolution from game config
         var (width, height) = _gameInfo?.GetResolution() ?? (1280, 720);
+        string title = _gameInfo?.Title ?? (_isPreviewMode ? "SNEngine Preview" : "SNEngine Game");
+
+        Console.WriteLine(_isPreviewMode
+            ? "[Preview Mode] Shared Memory enabled"
+            : "[Normal Runtime Mode]");
 
         SNEngine.API.SNEngine.Run(
-            windowTitle: _gameInfo?.Title ?? "SNEngine Game",
+            windowTitle: title,
             width: width,
-            height: height
+            height: height,
+            useSharedMemoryPreview: _isPreviewMode
         );
+    }
+
+    private static void ParseCommandLineArguments(string[] args)
+    {
+        _isPreviewMode = args.Any(a =>
+            a.Equals("--preview", StringComparison.OrdinalIgnoreCase) ||
+            a.Equals("-preview", StringComparison.OrdinalIgnoreCase) ||
+            a.Equals("/preview", StringComparison.OrdinalIgnoreCase));
     }
 
     private static void LoadGameInfo()
@@ -54,48 +65,6 @@ class Program
         {
             Console.WriteLine($"[Runtime] Failed to load game.sngi: {ex.Message}");
             _gameInfo = new GameInfo();
-        }
-    }
-
-    private static void OnEngineInitialized()
-    {
-        Console.WriteLine("[Runtime] Engine initialized. Loading game content...");
-
-        SNEngine.API.SNEngine.LoadDefaultPackages();
-
-        try
-        {
-            var gameAssembly = Assembly.LoadFrom("game.dll");
-
-            var mainType = gameAssembly.GetTypes()
-                .FirstOrDefault(t => t.Name == "Main"
-                                  && typeof(SNScript).IsAssignableFrom(t)
-                                  && !t.IsAbstract);
-
-            if (mainType == null)
-            {
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine("[Runtime] ERROR: Class 'Main' not found in game.dll!");
-                Console.WriteLine("         Please ensure at least one .sn file was compiled.");
-                Console.ResetColor();
-
-                SNEngine.API.SNEngine.LoadEmptyScene();
-                return;
-            }
-
-            var mainScript = (SNScript)Activator.CreateInstance(mainType)!;
-
-            Console.WriteLine($"[Runtime] Starting Main script: {mainType.FullName}");
-
-            mainScript.OnLoadAsync();
-            mainScript.ExecuteAsync();
-        }
-        catch (Exception ex)
-        {
-            Console.ForegroundColor = ConsoleColor.Red;
-            Console.WriteLine($"[Runtime] Failed to load game.dll: {ex.Message}");
-            Console.ResetColor();
-            SNEngine.API.SNEngine.LoadEmptyScene();
         }
     }
 }

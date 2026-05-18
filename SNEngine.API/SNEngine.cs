@@ -22,11 +22,14 @@ public static class SNEngine
     public static event Action? OnInitialized;
 
     /// <summary>
-    /// Starts the engine with the specified window settings.
+    /// Starts the engine (main entry point)
     /// </summary>
-    public static void Run(string windowTitle = "SNEngine Novel", int width = 1280, int height = 720)
+    public static void Run(string windowTitle = "SNEngine Novel",
+                          int width = 1280,
+                          int height = 720,
+                          bool useSharedMemoryPreview = false)
     {
-        _host = new SNEngineHost(windowTitle, width, height);
+        _host = new SNEngineHost(windowTitle, width, height, useSharedMemoryPreview);
 
         _host.OnInitialized += () =>
         {

@@ -44,6 +44,17 @@ contextBridge.exposeInMainWorld('electron', {
     ipcRenderer.removeListener('file-change', callback)
   },
 
+preview: {
+  start: (projectPath, width = 800, height = 450) =>
+    ipcRenderer.invoke('preview:start', projectPath, width, height),
+
+  stop: () => ipcRenderer.invoke('preview:stop'),
+
+  getFrame: () => ipcRenderer.invoke('preview:get-frame'),
+
+  onError: (callback) => ipcRenderer.on('preview:error', (_, msg) => callback(msg))
+},
+
   // Управление watcher
   startWatcher: (path) => ipcRenderer.send('start-watcher', path),
   stopWatcher: () => ipcRenderer.send('stop-watcher')

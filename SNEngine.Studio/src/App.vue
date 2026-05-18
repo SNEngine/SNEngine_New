@@ -9,6 +9,15 @@
       <SystemStatus class="system-status" />
 
       <div class="header-actions">
+        <!-- Кнопка Preview -->
+        <button 
+          class="preview-btn"
+          @click="openPreview"
+          title="Открыть Game Preview"
+        >
+          ▶ Preview
+        </button>
+
         <button 
           class="fullscreen-btn"
           @click="toggleFullScreen"
@@ -43,6 +52,23 @@
       </div>
     </div>
 
+    <!-- Game Preview Modal -->
+    <Teleport to="body">
+      <div v-if="showPreview" class="preview-modal">
+        <div class="preview-modal-content">
+          <div class="preview-modal-header">
+            <span>Game Preview</span>
+            <button @click="closePreview" class="close-btn">✕</button>
+          </div>
+          <GamePreview 
+            :project-path="currentProjectPath" 
+            @started="onPreviewStarted"
+            @stopped="onPreviewStopped"
+          />
+        </div>
+      </div>
+    </Teleport>
+
     <MessageBox ref="messageBoxRef" />
     <InputBox ref="inputBoxRef" />
 
@@ -75,6 +101,7 @@ import InputBox from "./components/InputBox/InputBox.vue"
 import NotificationBox from "./components/NotificationBox/NotificationBox.vue"
 import NewFileDialog from "./components/NewFileDialog/NewFileDialog.vue"
 import SystemStatus from "./components/SystemStatus/SystemStatus.vue"
+import GamePreview from "./components/GamePreview/GamePreview.vue"
 
 import { useMessageBox } from './composables/useMessageBox'
 import { useInputBox } from './composables/useInputBox'
@@ -85,6 +112,7 @@ const treeWidth = ref(320)
 let isResizing = false
 const currentFile = ref<string | null>(null)
 const appVersion = ref('0.0.1')
+const currentProjectPath = ref('C:/Users/Siphome/Desktop/testBuild')
 
 const tabsRef = ref<any>(null)
 const directoryTreeRef = ref<any>(null)
@@ -93,6 +121,7 @@ const inputBoxRef = ref<any>(null)
 
 const showNewFileDialog = ref(false)
 const isFullScreen = ref(false)
+const showPreview = ref(false)
 
 const { notifications, remove } = useNotification()
 const { messageBox } = useMessageBox()
@@ -108,6 +137,22 @@ const toggleFullScreen = async () => {
   } catch (err) {
     console.error('Full screen toggle error:', err)
   }
+}
+
+const openPreview = () => {
+  showPreview.value = true
+}
+
+const closePreview = () => {
+  showPreview.value = false
+}
+
+const onPreviewStarted = () => {
+  console.log('[App] Preview started')
+}
+
+const onPreviewStopped = () => {
+  console.log('[App] Preview stopped')
 }
 
 onMounted(async () => {
@@ -328,5 +373,79 @@ html, body {
 
 .notifications-container > * {
   pointer-events: auto;
+}
+
+/* === Preview Button === */
+.preview-btn {
+  background: #22c55e;
+  color: white;
+  border: none;
+  padding: 6px 14px;
+  border-radius: 4px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.preview-btn:hover {
+  background: #16a34a;
+  transform: translateY(-1px);
+}
+
+/* === Preview Modal === */
+.preview-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+.preview-modal-content {
+  width: 860px;
+  max-width: 95vw;
+  max-height: 92vh;
+  background: #1e1e1e;
+  border-radius: 10px;
+  border: 1px solid #333;
+  overflow: hidden;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+  display: flex;
+  flex-direction: column;
+}
+
+.preview-modal-header {
+  height: 42px;
+  background: #252526;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  font-weight: 600;
+  color: #ddd;
+  border-bottom: 1px solid #333;
+  flex-shrink: 0;
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  color: #aaa;
+  font-size: 20px;
+  cursor: pointer;
+  line-height: 1;
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+.close-btn:hover {
+  background: #333;
+  color: white;
 }
 </style>

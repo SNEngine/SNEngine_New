@@ -1,10 +1,12 @@
 <template>
   <div class="game-preview">
-    <!-- Header -->
     <div class="preview-header">
-      <div class="title">
-        <span>🎮 Game Preview</span>
-        <span v-if="isRunning" class="status live">● LIVE</span>
+      <div class="header-left">
+        <BaseIcon name="game_icon" color="#FF5252" class="header-icon" />
+        <div>
+          <div class="title">Game Preview</div>
+          <div v-if="isRunning" class="status live">● LIVE • {{ fps }} FPS</div>
+        </div>
       </div>
 
       <div class="controls">
@@ -16,10 +18,6 @@
           {{ isRunning ? '⏹ Stop Preview' : '▶ Start Preview' }}
         </button>
 
-        <div v-if="isRunning" class="fps-info">
-          FPS: <strong>{{ fps }}</strong>
-        </div>
-
         <button 
           v-if="isRunning"
           @click="restartPreview"
@@ -27,28 +25,40 @@
         >
           ⟳ Reload
         </button>
+
+        <button 
+          v-if="isRunning"
+          @click="toggleFullscreen"
+          class="btn btn-secondary"
+          :class="{ active: isFullscreen }"
+        >
+          ⛶ {{ isFullscreen ? 'Exit' : 'Full' }}
+        </button>
       </div>
     </div>
 
-    <!-- Canvas Area -->
-    <div class="canvas-container">
+    <div class="canvas-container" ref="containerRef">
       <canvas
         ref="canvasRef"
-        width="800"
-        height="450"
         class="preview-canvas"
+        @dblclick="toggleFullscreen"
       />
 
-      <!-- Loading Overlay -->
       <div v-if="isLoading" class="overlay loading">
-        <div class="spinner"></div>
+        <LoadingSpinner size="64" accent />
         <p>Launching SNEngine Runtime...</p>
       </div>
 
-      <!-- Empty State -->
       <div v-else-if="!isRunning" class="overlay empty">
-        <p>Preview is not running</p>
+        <div class="empty-icon">
+          <BaseIcon name="game_icon" color="#444" size="96" />
+        </div>
+        <div class="empty-title">Game Preview</div>
+        <p class="empty-description">
+          Запустите превью, чтобы увидеть игру в реальном времени
+        </p>
         <button @click="startPreview" class="btn btn-primary large">
+          <span class="play-icon">▶</span>
           Start Preview
         </button>
       </div>
@@ -58,7 +68,9 @@
 
 <script setup lang="ts">
 import { useGamePreview } from '@/composables/useGamePreview'
-import { onMounted } from 'vue'
+import { onMounted, ref } from 'vue'
+import BaseIcon from '../icons/BaseIcon.vue'
+import LoadingSpinner from '../LoadingSpinner/LoadingSpinner.vue'
 
 const props = defineProps<{
   projectPath: string
@@ -68,6 +80,9 @@ const emit = defineEmits<{
   (e: 'started'): void
   (e: 'stopped'): void
 }>()
+
+const containerRef = ref<HTMLElement | null>(null)
+const isFullscreen = ref(false)
 
 const {
   canvasRef,
@@ -97,9 +112,26 @@ const restartPreview = async () => {
   setTimeout(() => startPreview(), 300)
 }
 
+const toggleFullscreen = async () => {
+  if (!containerRef.value) return
+  try {
+    if (!document.fullscreenElement) {
+      await containerRef.value.requestFullscreen()
+      isFullscreen.value = true
+    } else {
+      await document.exitFullscreen()
+      isFullscreen.value = false
+    }
+  } catch (err) {
+    console.error('Fullscreen error:', err)
+  }
+}
+
+document.addEventListener('fullscreenchange', () => {
+  isFullscreen.value = !!document.fullscreenElement
+})
+
 onMounted(() => {
-  // Автозапуск можно включить здесь, если нужно
-  // startPreview()
 })
 </script>
 
@@ -107,7 +139,7 @@ onMounted(() => {
 .game-preview {
   display: flex;
   flex-direction: column;
-  height: 100%;
+  width: 100%;
   background: #1e1e1e;
   border-radius: 8px;
   overflow: hidden;
@@ -115,118 +147,186 @@ onMounted(() => {
 }
 
 .preview-header {
-  padding: 10px 16px;
+  height: 54px;
   background: #252526;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
   border-bottom: 1px solid #333;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  flex-shrink: 0;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.header-icon {
+  width: 28px;
+  height: 28px;
 }
 
 .title {
+  font-size: 15px;
   font-weight: 600;
   color: #ddd;
-  display: flex;
-  align-items: center;
-  gap: 8px;
 }
 
 .status.live {
-  color: #4ade80;
   font-size: 13px;
+  color: #4ade80;
 }
 
 .controls {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
 }
 
 .btn {
-  padding: 6px 14px;
+  padding: 6px 16px;
   border: none;
-  border-radius: 4px;
+  border-radius: 6px;
   cursor: pointer;
   font-size: 14px;
-  transition: all 0.2s;
+  font-weight: 500;
+  transition: all 0.2s ease;
 }
 
 .btn-primary {
-  background: #3b82f6;
+  background: #FF5252;
   color: white;
 }
 
 .btn-primary:hover:not(:disabled) {
-  background: #2563eb;
+  background: #ff3333;
+  transform: translateY(-1px);
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none !important;
 }
 
 .btn-secondary {
-  background: #475569;
-  color: white;
+  background: #333;
+  color: #ccc;
+  border: 1px solid #444;
 }
 
 .btn-secondary:hover {
-  background: #334155;
+  background: #444;
+  color: #fff;
 }
 
-.fps-info {
-  font-size: 13px;
-  color: #94a3b8;
-  padding: 4px 8px;
-  background: #1e2937;
-  border-radius: 4px;
+.btn-secondary.active {
+  background: #FF5252;
+  border-color: #ff3333;
+  color: #fff;
 }
 
 .canvas-container {
   position: relative;
-  flex: 1;
-  background: #000;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background: #0a0a0a;
   display: flex;
   align-items: center;
   justify-content: center;
   overflow: hidden;
+  box-sizing: border-box;
 }
 
 .preview-canvas {
   image-rendering: pixelated;
-  display: block;           /* убирает лишние отступы */
-  max-width: 100%;
-  max-height: 100%;
-  width: auto;
-  height: auto;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.7);
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.8);
 }
+
 .overlay {
   position: absolute;
-  inset: 0;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(10, 10, 10, 0.85);
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  color: #aaa;
-  background: rgba(20, 20, 20, 0.95);
+  z-index: 10;
+}
+
+.loading {
   gap: 16px;
 }
 
 .loading p {
-  margin-top: 8px;
+  color: #aaa;
+  font-size: 14px;
+  margin: 0;
 }
 
-.spinner {
-  width: 36px;
-  height: 36px;
-  border: 4px solid #334155;
-  border-top-color: #60a5fa;
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
+.empty {
+  gap: 16px;
+  text-align: center;
+  padding: 24px;
 }
 
-@keyframes spin {
-  to { transform: rotate(360deg); }
+.empty-icon {
+  opacity: 0.6;
+  margin-bottom: 4px;
+  display: flex;
+  justify-content: center;
+}
+
+.empty-title {
+  font-size: 22px;
+  font-weight: 600;
+  color: #aaa;
+  margin: 0;
+}
+
+.empty-description {
+  color: #666;
+  font-size: 15px;
+  max-width: 320px;
+  line-height: 1.4;
+  margin: 0 auto;
 }
 
 .large {
-  padding: 10px 24px;
+  padding: 12px 32px;
   font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin: 8px auto 0 auto;
+}
+
+.play-icon {
+  font-size: 18px;
+}
+
+:fullscreen .canvas-container {
+  padding: 0;
+  width: 100vw;
+  height: 100vh;
+  aspect-ratio: auto;
+}
+
+:fullscreen .preview-canvas {
+  border-radius: 0;
+  border: none;
+  max-width: none;
+  max-height: none;
+  width: 100%;
+  height: 100%;
 }
 </style>

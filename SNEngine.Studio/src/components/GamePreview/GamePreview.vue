@@ -1,24 +1,29 @@
 <template>
   <div class="game-preview">
-    <!-- Минимальная шапка только с названием и статусом -->
     <div class="preview-header">
       <div class="header-left">
-        <div v-if="isRunning" class="status live">
-          ● LIVE • {{ fps }} FPS
+        <div v-if="launcher.isRunning.value" class="status live">
+          ● LIVE • {{ preview.fps.value }} FPS
+        </div>
+        <div v-else-if="launcher.state.value === 'building'" class="status building">
+          ⏳ Building...
+        </div>
+        <div v-else-if="launcher.state.value === 'error'" class="status error">
+          ❌ {{ launcher.errorMessage.value || 'Error' }}
         </div>
       </div>
 
       <div class="controls">
         <button 
           @click="togglePreview"
-          :disabled="isLoading"
+          :disabled="isBusy"
           class="btn btn-primary"
         >
-          {{ isRunning ? '⏹ Stop' : '▶ Start Preview' }}
+          {{ launcher.isRunning.value ? '⏹ Stop' : '▶ Start Preview' }}
         </button>
 
         <button 
-          v-if="isRunning"
+          v-if="launcher.isRunning.value"
           @click="restartPreview"
           class="btn btn-secondary"
         >
@@ -27,22 +32,25 @@
       </div>
     </div>
 
-    <!-- Основная область превью -->
     <div class="canvas-container" ref="containerRef">
       <canvas
-        ref="canvasRef"
+        v-show="launcher.isRunning.value"
+        :ref="(el) => { preview.canvasRef.value = el as HTMLCanvasElement }"
         class="preview-canvas"
         @dblclick="toggleFullscreen"
       />
 
-      <!-- Loading -->
-      <div v-if="isLoading" class="overlay loading">
+      <div v-if="isBusy" class="overlay loading">
         <LoadingSpinner size="64" accent />
-        <p>Launching SNEngine Runtime...</p>
+        <p>
+          {{ launcher.state.value === 'building' 
+            ? 'Compiling project...' 
+            : 'Launching SNEngine Runtime...' 
+          }}
+        </p>
       </div>
 
-      <!-- Пустое состояние -->
-      <div v-else-if="!isRunning" class="overlay empty">
+      <div v-else-if="!launcher.isRunning.value && !launcher.errorMessage.value" class="overlay empty">
         <div class="empty-icon">
           <BaseIcon name="game_icon" color="#444" size="80" />
         </div>
@@ -51,13 +59,19 @@
           Нажмите кнопку Start Preview, чтобы запустить игру
         </p>
       </div>
+
+<div v-if="launcher.errorMessage.value && !launcher.isRunning.value" class="overlay error-overlay">
+        <p class="error-text">{{ launcher.errorMessage.value }}</p>
+        <button @click="launcher.stop()" class="btn btn-secondary">Close</button>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
+import { useGameLauncher } from '@/composables/useGameLauncher'
 import { useGamePreview } from '@/composables/useGamePreview'
-import { onMounted, ref } from 'vue'
+import { ref, computed } from 'vue'
 import BaseIcon from '../icons/BaseIcon.vue'
 import LoadingSpinner from '../LoadingSpinner/LoadingSpinner.vue'
 
@@ -71,34 +85,37 @@ const emit = defineEmits<{
 }>()
 
 const containerRef = ref<HTMLElement | null>(null)
-const isFullscreen = ref(false)
 
-const {
-  canvasRef,
-  isRunning,
-  isLoading,
-  fps,
-  startPreview: startPreviewComposable,
-  stopPreview
-} = useGamePreview()
+const launcher = useGameLauncher()
+const preview = useGamePreview()
 
-const startPreview = () => {
-  startPreviewComposable(props.projectPath, 800, 450)
-  emit('started')
-}
+const isBusy = computed(() => 
+  launcher.state.value === 'building' || 
+  launcher.state.value === 'stopping' ||
+  preview.isLoading.value
+)
 
-const togglePreview = () => {
-  if (isRunning.value) {
-    stopPreview()
+const togglePreview = async () => {
+  if (launcher.isRunning.value) {
+    await preview.stopPreview()
+    await launcher.stop()
     emit('stopped')
   } else {
-    startPreview()
+    await launcher.start(props.projectPath, 800, 450)
+
+    if (launcher.isRunning.value) {
+      preview.startRenderOnly(800, 450)
+      emit('started')
+    }
   }
 }
 
 const restartPreview = async () => {
-  await stopPreview()
-  setTimeout(() => startPreview(), 300)
+  await preview.stopPreview()
+  await launcher.restart(800, 450)
+  if (launcher.isRunning.value) {
+    preview.startRenderOnly(800, 450)
+  }
 }
 
 const toggleFullscreen = async () => {
@@ -106,19 +123,13 @@ const toggleFullscreen = async () => {
   try {
     if (!document.fullscreenElement) {
       await containerRef.value.requestFullscreen()
-      isFullscreen.value = true
     } else {
       await document.exitFullscreen()
-      isFullscreen.value = false
     }
   } catch (err) {
     console.error('Fullscreen error:', err)
   }
 }
-
-document.addEventListener('fullscreenchange', () => {
-  isFullscreen.value = !!document.fullscreenElement
-})
 </script>
 
 <style scoped>
@@ -147,22 +158,16 @@ document.addEventListener('fullscreenchange', () => {
   gap: 12px;
 }
 
-.header-icon {
-  width: 24px;
-  height: 24px;
-}
-
-.title {
-  font-size: 15px;
-  font-weight: 600;
-  color: #ddd;
-}
-
-.status.live {
+.status {
   font-size: 13px;
-  color: #4ade80;
-  margin-left: 8px;
+  font-weight: 500;
+  padding: 2px 10px;
+  border-radius: 4px;
 }
+
+.status.live   { color: #4ade80; }
+.status.building { color: #facc15; }
+.status.error  { color: #f87171; }
 
 .controls {
   display: flex;
@@ -193,6 +198,11 @@ document.addEventListener('fullscreenchange', () => {
   color: #ccc;
 }
 
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .canvas-container {
   flex: 1;
   position: relative;
@@ -208,17 +218,29 @@ document.addEventListener('fullscreenchange', () => {
   max-width: 100%;
   max-height: 100%;
   object-fit: contain;
+  background: #000;
 }
 
 .overlay {
   position: absolute;
   inset: 0;
-  background: rgba(10, 10, 10, 0.9);
+  background: rgba(10, 10, 10, 0.92);
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   z-index: 10;
+  gap: 12px;
+}
+
+.error-overlay {
+  background: rgba(20, 20, 20, 0.95);
+}
+
+.error-text {
+  color: #f87171;
+  max-width: 80%;
+  text-align: center;
 }
 
 .empty {
@@ -241,7 +263,6 @@ document.addEventListener('fullscreenchange', () => {
   max-width: 340px;
 }
 
-/* Fullscreen */
 :fullscreen .game-preview {
   height: 100vh;
 }

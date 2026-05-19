@@ -652,10 +652,20 @@ const pty = require('node-pty')
 
 const activeTerminals = new Map()
 
-ipcMain.on('terminal-init', (event, terminalId, shellType) => {
+// ====================== SYSTEM TERMINAL ======================
+ipcMain.on('terminal-init', async (event, terminalId, shellType, cwd = null) => {
   if (activeTerminals.has(terminalId)) {
     activeTerminals.get(terminalId).kill()
     activeTerminals.delete(terminalId)
+  }
+
+  // Получаем путь проекта, если cwd не передан
+  if (!cwd) {
+    try {
+      cwd = await ipcMain.handlers['get-project-path']?.() || process.env.USERPROFILE
+    } catch (e) {
+      cwd = process.env.USERPROFILE || '.'
+    }
   }
 
   let shell = 'powershell.exe'
@@ -674,16 +684,14 @@ ipcMain.on('terminal-init', (event, terminalId, shellType) => {
     name: 'xterm-256color',
     cols: 120,
     rows: 30,
-    cwd: process.env.USERPROFILE || '.',
+    cwd: cwd,                    // ← теперь используем путь проекта
     env: {
       ...process.env,
       LANG: 'ru_RU.UTF-8',
       LC_ALL: 'ru_RU.UTF-8',
       TERM: 'xterm-256color'
     },
-    // Ключевой параметр — отключаем ConPTY и используем winpty
     useConpty: false,
-    // Дополнительная совместимость
     handleFlowControl: true
   })
 
@@ -698,7 +706,7 @@ ipcMain.on('terminal-init', (event, terminalId, shellType) => {
     activeTerminals.delete(terminalId)
   })
 
-  console.log(`[node-pty] ${shellType} started (useConpty: false) for ${terminalId}`)
+  console.log(`[node-pty] ${shellType} started in ${cwd} for ${terminalId}`)
 })
 
 // Остальные обработчики остаются без изменений

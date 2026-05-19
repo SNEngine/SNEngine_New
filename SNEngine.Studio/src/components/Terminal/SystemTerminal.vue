@@ -29,21 +29,41 @@ import { Terminal } from 'xterm'
 import { FitAddon } from 'xterm-addon-fit'
 import 'xterm/css/xterm.css'
 
-const terminalContainer = ref(null)
-const selectedShell = ref('powershell')
+const terminalContainer = ref<HTMLElement | null>(null)
+const selectedShell = ref<'powershell' | 'cmd' | 'bash'>('powershell')
 const shellName = ref('PowerShell')
+const currentProjectPath = ref('')
 
 const terminalId = 'system-terminal-main'
-let term = null
-let fitAddon = null
-let removeDataListener = null
-let removeExitListener = null
+let term: any = null
+let fitAddon: any = null
+let removeDataListener: any = null
+let removeExitListener: any = null
 
-const startShell = () => {
+// Получение пути проекта
+const loadProjectPath = async () => {
+  try {
+    currentProjectPath.value = await window.electron.getProjectPath()
+    console.log('[SystemTerminal] Project path loaded:', currentProjectPath.value)
+  } catch (e) {
+    console.warn('Не удалось получить путь проекта')
+    currentProjectPath.value = process.env.USERPROFILE || ''
+  }
+}
+
+// Запуск терминала
+const startShell = async () => {
   window.electron.terminal.kill(terminalId)
-  term?.reset()
-  term?.clear()
-  window.electron.terminal.init(terminalId, selectedShell.value)
+  term?.reset?.()
+  term?.clear?.()
+
+  await loadProjectPath() // ← важно: await!
+
+  window.electron.terminal.init(
+    terminalId, 
+    selectedShell.value, 
+    currentProjectPath.value || undefined
+  )
 }
 
 const clear = () => {
@@ -61,7 +81,11 @@ const restartShell = () => startShell()
 
 onMounted(async () => {
   term = new Terminal({
-    theme: { background: '#0c0c0c', foreground: '#ffffff', cursor: '#FF5252' },
+    theme: { 
+      background: '#0c0c0c', 
+      foreground: '#ffffff', 
+      cursor: '#FF5252' 
+    },
     cursorBlink: true,
     fontFamily: 'Consolas, "Courier New", monospace',
     fontSize: 14,
@@ -71,14 +95,14 @@ onMounted(async () => {
 
   fitAddon = new FitAddon()
   term.loadAddon(fitAddon)
-  term.open(terminalContainer.value)
+  term.open(terminalContainer.value!)
 
   await nextTick()
   fitAddon.fit()
 
-  startShell()
+  await startShell() // ← теперь с await
 
-  removeDataListener = window.electron.terminal.onData(terminalId, (data) => {
+  removeDataListener = window.electron.terminal.onData(terminalId, (data: any) => {
     term.write(data.text)
   })
 
@@ -86,7 +110,7 @@ onMounted(async () => {
     term.write('\r\n\x1b[31m[Shell exited]\x1b[0m\r\n')
   })
 
-  term.onData((data) => {
+  term.onData((data: string) => {
     window.electron.terminal.write(terminalId, data)
   })
 
@@ -103,6 +127,7 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+/* Стили оставляем без изменений */
 .system-terminal {
   display: flex;
   flex-direction: column;
@@ -168,10 +193,9 @@ onUnmounted(() => {
   background: #0c0c0c;
   position: relative;
   overflow: hidden;
-  min-height: 0; /* важно для flex */
+  min-height: 0;
 }
 
-/* Основные правки для xterm */
 :deep(.xterm) {
   height: 100% !important;
   padding: 4px 8px;
@@ -179,25 +203,6 @@ onUnmounted(() => {
 
 :deep(.xterm-viewport) {
   background-color: #0c0c0c !important;
-  /* Убираем лишний скроллбар когда контента мало */
   overflow: hidden !important;
-}
-
-:deep(.xterm-screen) {
-  padding-bottom: 4px;
-}
-
-/* Скрываем скроллбар когда он не нужен */
-:deep(.xterm-viewport::-webkit-scrollbar) {
-  width: 6px;
-}
-
-:deep(.xterm-viewport::-webkit-scrollbar-thumb) {
-  background: #444;
-  border-radius: 3px;
-}
-
-:deep(.xterm-viewport::-webkit-scrollbar-thumb:hover) {
-  background: #666;
 }
 </style>

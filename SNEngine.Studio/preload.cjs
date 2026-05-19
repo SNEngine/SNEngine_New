@@ -62,7 +62,8 @@ preview: {
 },
 
 terminal: {
-    init: (id, shellType) => ipcRenderer.send('terminal-init', id, shellType),
+init: (id, shellType, cwd = null) => 
+    ipcRenderer.send('terminal-init', id, shellType, cwd),
     write: (id, data) => ipcRenderer.send('terminal-write', id, data),
     kill: (id) => ipcRenderer.send('terminal-kill', id),
     onData: (id, callback) => {

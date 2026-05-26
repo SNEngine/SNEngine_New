@@ -3,6 +3,7 @@ using SNEngine.Core;
 using SNEngine.Core.Components;
 using SNEngine.Core.Engine;
 using SNEngine.Core.Scenes;
+using Silk.NET.Windowing;
 using System;
 using System.IO;
 
@@ -24,12 +25,14 @@ public static class SNEngine
     /// <summary>
     /// Starts the engine (main entry point)
     /// </summary>
+    /// <param name="graphicsApi">Позволяет выбрать графический бэкенд (OpenGL Desktop / OpenGL ES и т.д.)</param>
     public static void Run(string windowTitle = "SNEngine Novel",
                           int width = 1280,
                           int height = 720,
-                          bool useSharedMemoryPreview = false)
+                          bool useSharedMemoryPreview = false,
+                          GraphicsAPI? graphicsApi = null)
     {
-        _host = new SNEngineHost(windowTitle, width, height, useSharedMemoryPreview);
+        _host = new SNEngineHost(windowTitle, width, height, useSharedMemoryPreview, graphicsApi);
 
         _host.OnInitialized += () =>
         {

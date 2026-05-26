@@ -28,8 +28,7 @@ class Program
         SNEngine.API.SNEngine.Run(
             windowTitle: "SNEngine Test Window",
             width: 1280,
-            height: 720,
-            useSharedMemoryPreview: true
+            height: 720
         );
     }
 }

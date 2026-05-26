@@ -32,13 +32,25 @@ public class SNEngineHost : IDisposable
     private bool _isDisposing = false;
 
     /// <summary>
+    /// Графический API, который был использован при создании окна.
+    /// Полезно для отладки и для условной логики (GLES vs Desktop GL).
+    /// </summary>
+    public GraphicsAPI GraphicsApi { get; }
+
+    /// <summary>
     /// Основной конструктор
     /// </summary>
     /// <param name="useSharedMemory">Включает режим превью через Shared Memory</param>
+    /// <param name="graphicsApi">
+    /// Позволяет явно задать графический API и версию контекста.
+    /// По умолчанию используется OpenGL 4.6 Core (desktop).
+    /// Для мобильных платформ обычно передают OpenGL ES (например, 3.2 или 3.0).
+    /// </param>
     public SNEngineHost(string title = "SNEngine Test Window",
                         int width = 1280,
                         int height = 720,
-                        bool useSharedMemory = false)
+                        bool useSharedMemory = false,
+                        GraphicsAPI? graphicsApi = null)
     {
         _useSharedMemory = useSharedMemory;
         _previewWidth = width;
@@ -47,7 +59,17 @@ public class SNEngineHost : IDisposable
         var options = WindowOptions.Default;
         options.Title = title;
         options.Size = new Vector2D<int>(width, height);
-        options.API = new GraphicsAPI(ContextAPI.OpenGL, ContextProfile.Core, ContextFlags.Default, new APIVersion(4, 6));
+
+        // Унифицированный выбор графического API.
+        // Если не передан явно — используем разумный desktop GL по умолчанию.
+        // Это позволяет использовать один и тот же хост для Windows/Linux/macOS и для мобильных (GLES).
+        GraphicsApi = graphicsApi ?? new GraphicsAPI(
+            ContextAPI.OpenGL,
+            ContextProfile.Core,
+            ContextFlags.Default,
+            new APIVersion(4, 6));
+
+        options.API = GraphicsApi;
         options.VSync = true;
 
 

@@ -13,7 +13,7 @@ export interface TreeItem {
 export function useDirectoryTree(basePath: string, isRoot = true) {
   const items = ref<TreeItem[]>([])
   const loading = ref(true)
-  const selectedItem = ref<TreeItem | null>(null)
+  // selectedItem removed — multi-selection now lives in useTreeSelection.ts
 
   const normalizePath = (p: string) => p.replace(/\\/g, '/')
   const openFolders = new Set<string>()
@@ -134,7 +134,6 @@ export function useDirectoryTree(basePath: string, isRoot = true) {
   return {
     items,
     loading,
-    selectedItem,
     loadDirectory,
     toggleOpen
   }

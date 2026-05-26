@@ -1,18 +1,21 @@
 // useTreeDragDrop.ts
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 
 export interface DragDropPayload {
-  source: any      // TreeItem который перетаскиваем
+  sources: any[]   // Массив TreeItem (поддержка мульти)
   target: any      // TreeItem (папка) куда дропаем
   isCopy: boolean  // Ctrl нажат = копирование
 }
 
 export function useTreeDragDrop() {
-  const draggedItem = ref<any>(null)
+  const draggedItems = ref<any[]>([])
   const dragOverItem = ref<any>(null)
   const isCopyMode = ref(false)
 
-  // Проверяем, не пытаемся ли мы закинуть папку в саму себя или в своего потомка
+  const draggedCount = computed(() => draggedItems.value.length)
+  const isMultiDrag = computed(() => draggedCount.value > 1)
+
+  // Проверка на попытку перетащить папку в саму себя или в потомка
   const isDescendant = (source: any, target: any): boolean => {
     if (!source || !target || !target.isFolder) return false
     if (source.path === target.path) return true
@@ -20,32 +23,47 @@ export function useTreeDragDrop() {
     let current: any = target
     while (current) {
       if (current.path === source.path) return true
-      current = current.parent // если у тебя есть parent в TreeItem, иначе нужно рекурсивно проверять
+      current = current.parent
     }
     return false
   }
 
-  const startDrag = (item: any, e: DragEvent) => {
-    draggedItem.value = item
+  /**
+   * Начать перетаскивание.
+   * items — массив. Если передан один элемент, преобразуем в массив.
+   */
+  const startDrag = (items: any | any[], e: DragEvent) => {
+    const list = Array.isArray(items) ? items : [items]
+    draggedItems.value = list
     isCopyMode.value = false
 
     if (e.dataTransfer) {
       e.dataTransfer.effectAllowed = 'move'
-      e.dataTransfer.setData('text/plain', item.path)
-      // Можно добавить кастомный ghost-образ при необходимости
+
+      // Передаём все пути через dataTransfer (для fallback)
+      const paths = list.map(i => i.path).join('\n')
+      e.dataTransfer.setData('text/plain', paths)
+      e.dataTransfer.setData('application/x-snengine-paths', JSON.stringify(list.map(i => i.path)))
     }
   }
 
   const endDrag = () => {
-    draggedItem.value = null
+    draggedItems.value = []
     dragOverItem.value = null
   }
 
   const onDragOver = (targetItem: any, e: DragEvent) => {
-    if (!draggedItem.value) return
-    if (draggedItem.value.path === targetItem.path) return
+    if (draggedItems.value.length === 0) return
+
+    // Не даём дропать на один из перетаскиваемых элементов
+    const isOverDragged = draggedItems.value.some(i => i.path === targetItem.path)
+    if (isOverDragged) return
+
     if (!targetItem.isFolder) return
-    if (isDescendant(draggedItem.value, targetItem)) return
+
+    // Проверяем, чтобы ни одна из перетаскиваемых папок не была предком цели
+    const hasInvalid = draggedItems.value.some(source => isDescendant(source, targetItem))
+    if (hasInvalid) return
 
     e.preventDefault()
     e.dataTransfer!.dropEffect = e.ctrlKey ? 'copy' : 'move'
@@ -61,32 +79,32 @@ export function useTreeDragDrop() {
   }
 
   const onDrop = (targetItem: any, e: DragEvent): DragDropPayload | null => {
-    if (!draggedItem.value || !targetItem?.isFolder) return null
+    if (draggedItems.value.length === 0 || !targetItem?.isFolder) return null
 
     e.preventDefault()
     e.stopImmediatePropagation()
 
     const payload: DragDropPayload = {
-      source: draggedItem.value,
+      sources: [...draggedItems.value],
       target: targetItem,
       isCopy: e.ctrlKey || isCopyMode.value
     }
 
-    // Сбрасываем состояние
     reset()
-
     return payload
   }
 
   const reset = () => {
-    draggedItem.value = null
+    draggedItems.value = []
     dragOverItem.value = null
     isCopyMode.value = false
   }
 
   return {
     // Реактивные состояния
-    draggedItem,
+    draggedItems,
+    draggedCount,
+    isMultiDrag,
     dragOverItem,
     isCopyMode,
 

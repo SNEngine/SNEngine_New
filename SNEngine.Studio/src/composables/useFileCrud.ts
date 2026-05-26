@@ -66,27 +66,61 @@ export function useFileCrud() {
     }
   }
 
-  // Удалить
+  // Удалить один элемент
   const deleteItem = async (item: any) => {
     if (!item) return
+    await deleteItems([item])
+  }
+
+  /**
+   * Bulk delete — supports multiple items
+   */
+  const deleteItems = async (items: any[]) => {
+    if (!items || items.length === 0) return
+
+    const count = items.length
+    const title = count === 1 
+      ? 'Подтверждение удаления' 
+      : `Удалить ${count} элементов?`
+
+    const message = count === 1
+      ? `Вы действительно хотите удалить "${items[0].name}"?`
+      : `Вы действительно хотите удалить ${count} элементов?\nЭто действие необратимо.`
 
     const result = await showMessageBox({
-      title: 'Подтверждение удаления',
-      message: `Вы действительно хотите удалить "${item.name}"?`,
+      title,
+      message,
       type: 'yesno',
       icon: 'warning'
     })
 
     if (result !== 'yes') return
 
-    try {
-      await (window as any).electron?.deleteItem?.(item.path)
-      lastUpdate.value = Date.now()
-      success('Удалено', item.name)
-    } catch (err) {
-      error('Не удалось удалить', item.name)
+    let successCount = 0
+    let errorCount = 0
+
+    for (const item of items) {
+      try {
+        await (window as any).electron?.deleteItem?.(item.path)
+        successCount++
+      } catch (err) {
+        errorCount++
+        console.error('Failed to delete', item.path, err)
+      }
+    }
+
+    lastUpdate.value = Date.now()
+
+    if (successCount > 0) {
+      success(
+        'Удалено', 
+        count === 1 ? items[0].name : `${successCount} элемент(ов)`
+      )
+    }
+    if (errorCount > 0) {
+      error('Не удалось удалить', `${errorCount} элемент(ов)`)
     }
   }
 
-  return { createItem, renameItem, deleteItem }
+  return { createItem, renameItem, deleteItem, deleteItems }
 }

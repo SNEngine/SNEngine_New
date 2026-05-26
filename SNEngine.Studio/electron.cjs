@@ -33,6 +33,7 @@ const getIconPath = () => {
 };
 
 function createWindow() {
+  console.log('[Electron] createWindow() called (dev mode will retry dev server)');
   mainWindow = new BrowserWindow({
     width: 1400,
     height: 900,
@@ -52,7 +53,25 @@ function createWindow() {
   Menu.setApplicationMenu(null);
 
   if (!app.isPackaged) {
-    mainWindow.loadURL('http://localhost:5173');
+    const devServerUrl = 'http://127.0.0.1:5173';
+
+    const tryLoadDevServer = async (attempt = 1) => {
+      const maxAttempts = 40; // ~8 seconds total
+      try {
+        await mainWindow.loadURL(devServerUrl);
+      } catch (err) {
+        if (attempt < maxAttempts) {
+          console.log(`[Electron] Waiting for Vite dev server... (attempt ${attempt})`);
+          await new Promise(r => setTimeout(r, 200));
+          return tryLoadDevServer(attempt + 1);
+        } else {
+          console.error('[Electron] Failed to connect to http://127.0.0.1:5173 after multiple attempts.');
+          console.error('Make sure `npm run dev` is running.');
+        }
+      }
+    };
+
+    tryLoadDevServer();
     mainWindow.webContents.openDevTools({ mode: 'detach' });
   } else {
     mainWindow.loadFile(path.join(__dirname, 'dist', 'index.html'));
@@ -724,6 +743,7 @@ ipcMain.on('terminal-kill', (event, terminalId) => {
 })
 // ====================== APP LIFECYCLE ======================
 app.whenReady().then(() => {
+  console.log('[Electron] app.whenReady() - launching main window');
   createWindow();
 
   app.on('activate', () => {

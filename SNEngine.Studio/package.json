@@ -1,6 +1,6 @@
 {
   "name": "snengine-studio",
-  "version": "0.0.84",
+  "version": "0.0.90",
   "description": "SNEngine Studio - Visual Novel Editor",
   "author": "SNEngine Team",
   "private": true,
@@ -14,7 +14,7 @@
     "electron:build-win": "vite build && electron-builder --win",
     "electron:build-mac": "vite build && electron-builder --mac",
     "electron:build-linux": "vite build && electron-builder --linux",
-    "electron:dev:all": "npm version --no-git-tag-version patch && concurrently \"npm run dev\" \"npm run electron:dev\""
+    "electron:dev:all": "npm version --no-git-tag-version patch && concurrently -k -n \"VITE,ELECTRON\" -c \"cyan,green\" \"npm run dev\" \"wait-on -t 30000 -v tcp:127.0.0.1:5173 && npm run electron:dev\""
   },
   "dependencies": {
     "chokidar": "^5.0.0",
@@ -34,6 +34,7 @@
     "@vitejs/plugin-vue": "^6.0.6",
     "@vue/tsconfig": "^0.9.1",
     "concurrently": "^9.2.1",
+    "wait-on": "^8.0.0",
     "electron": "^42.0.1",
     "electron-builder": "^26.8.1",
     "npm-run-all2": "^8.0.4",

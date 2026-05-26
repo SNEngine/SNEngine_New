@@ -2,8 +2,11 @@
   <div 
     class="tab"
     :class="{ active: isActive }"
+    draggable="true"
     @click="$emit('activate', tab)"
     @contextmenu.prevent="$emit('context-menu', $event, tab)"
+    @dragstart="onDragStart"
+    @dragend="onDragEnd"
   >
     <BaseIcon 
       :name="getTabIconName(tab)" 
@@ -32,12 +35,15 @@ interface Tab {
 const props = defineProps<{
   tab: Tab
   isActive: boolean
+  groupId?: string
 }>()
 
-defineEmits<{
+const emit = defineEmits<{
   (e: 'activate', tab: Tab): void
   (e: 'close', tab: Tab): void
   (e: 'context-menu', event: MouseEvent, tab: Tab): void
+  (e: 'drag-start', tab: Tab, groupId: string | undefined, event: DragEvent): void
+  (e: 'drag-end', tab: Tab, event: DragEvent): void
 }>()
 
 // Теперь используем единую функцию из icons.config.ts
@@ -47,6 +53,33 @@ const getTabIconName = (tab: Tab): string => {
   }
   if (!tab.filePath) return 'unknown_icon'
   return getFileIcon(tab.filePath)
+}
+
+const onDragStart = (e: DragEvent) => {
+  if (!props.groupId) return
+
+  // Use a custom MIME type so only our tab system accepts the drop
+  const payload = JSON.stringify({
+    tabId: props.tab.id,
+    filePath: props.tab.filePath,
+    fromGroupId: props.groupId
+  })
+
+  e.dataTransfer?.setData('application/x-snengine-tab', payload)
+  // Also set plain text fallback
+  e.dataTransfer?.setData('text/plain', props.tab.name)
+
+  // Mark as internal tab drag
+  if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move'
+
+  emit('drag-start', props.tab, props.groupId, e)
+  // Add a class for visual feedback on the dragged element
+  ;(e.currentTarget as HTMLElement)?.classList.add('dragging')
+}
+
+const onDragEnd = (e: DragEvent) => {
+  ;(e.currentTarget as HTMLElement)?.classList.remove('dragging')
+  emit('drag-end', props.tab, e)
 }
 </script>
 
@@ -134,5 +167,12 @@ const getTabIconName = (tab: Tab): string => {
   font-weight: bold;
   font-size: 14px;
   line-height: 1;
+}
+
+/* Drag & Drop visual feedback */
+.tab.dragging {
+  opacity: 0.4;
+  background: #3a3a3a;
+  border: 1px dashed #ff5252;
 }
 </style>

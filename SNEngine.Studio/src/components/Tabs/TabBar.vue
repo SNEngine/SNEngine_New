@@ -9,9 +9,12 @@
       :key="tab.id"
       :tab="tab"
       :is-active="tab.filePath === activeFilePath"
+      :group-id="groupId"
       @activate="$emit('activate', $event)"
       @close="$emit('close', $event)"
       @context-menu="handleContextMenu"
+      @drag-start="(t, gid, e) => $emit('drag-start', t, gid, e)"
+      @drag-end="(t, e) => $emit('drag-end', t, e)"
     />
   </div>
 </template>
@@ -30,12 +33,15 @@ interface Tab {
 const props = defineProps<{
   tabs: Tab[]
   activeFilePath: string | null
+  groupId?: string
 }>()
 
 const emit = defineEmits<{
   (e: 'activate', tab: Tab): void
   (e: 'close', tab: Tab): void
   (e: 'context-menu', event: MouseEvent, tab: Tab): void
+  (e: 'drag-start', tab: Tab, groupId: string | undefined, event: DragEvent): void
+  (e: 'drag-end', tab: Tab, event: DragEvent): void
 }>()
 
 const handleWheel = (e: WheelEvent) => {

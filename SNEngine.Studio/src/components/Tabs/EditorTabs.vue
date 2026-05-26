@@ -1,262 +1,245 @@
 <template>
-  <div class="editor-tabs">
-    <TabBar
-      :tabs="tabs"
-      :active-file-path="activeFilePath"
-      @activate="activateTab"
-      @close="closeTab"
-      @context-menu="showTabContextMenu"
-    />
+  <div class="editor-tabs" ref="rootEl">
+    <!-- Multi-group horizontal layout (VS Code style panes) -->
+    <div 
+      class="groups-container" 
+      :class="{ 'single-group': groups.length === 1 }"
+    >
+      <template v-for="(group, index) in groups" :key="group.id">
+        <TabGroup
+          :group-id="group.id"
+          :ref="(el: any) => registerGroupRef(group.id, el)"
+          @activate-group="onGroupActivated"
+          @group-became-empty="onGroupBecameEmpty"
+          @split-tab="onSplitTab"
+        />
 
-    <TabContent
-      :current-component="currentComponent"
-      :current-props="currentProps"
-      :is-editable="currentHandler?.isEditable ?? false"
-      ref="tabContentRef"
-      @update:model-value="handleContentUpdate"
-      @save="handleComponentSave"
-      @close-tab="handleCloseActiveTab"
-    />
-
-    <ContextMenu ref="tabContextMenuRef" />
+        <!-- Resizable splitter between groups -->
+        <div
+          v-if="index < groups.length - 1"
+          class="editor-splitter"
+          @mousedown="startGroupResize(index, $event)"
+        />
+      </template>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from 'vue'
-import { lastUpdate } from '@/utils/watcherState'
+import { ref, onMounted, onUnmounted, nextTick } from 'vue'
 
-import ContextMenu from '../ContextMenu/ContextMenu.vue'
-import TabBar from './TabBar.vue'
-import TabContent from './TabContent.vue'
-import DeletedFile from '../DeletedFile/DeletedFile.vue'
-import GamePreview from '../GamePreview/GamePreview.vue'   // ← добавили
+import TabGroup from './TabGroup.vue'
 
-import { useTabs } from '@/composables/useTabs'
+import { useTabs, type Tab, type EditorGroup } from '@/composables/useTabs'
 import { useFileType } from '@/composables/useFileType'
-import { useFileSave } from '@/composables/useFileSave'
 import { useKeyboard } from '@/composables/useKeyboard'
 import { useNotification } from '@/composables/useNotification'
 
-const { tabs, activeFilePath, activateTab, closeTab, markDirty, markClean } = useTabs()
+const { 
+  groups, 
+  activeGroupId, 
+  setActiveGroup, 
+  openTabInGroup, 
+  closeGroup, 
+  splitTabToNewGroup, 
+  findGroupWithPreview,
+  markDirty,
+  markClean,
+  removeEmptyGroupIfPossible,
+  closeTab: closeTabGlobal
+} = useTabs()
+
 const { getFileHandler } = useFileType()
-const { saveFile, getContentFromEditor } = useFileSave()
 const { add: addShortcut } = useKeyboard()
 const { success, error } = useNotification()
 
-const tabContextMenuRef = ref<any>(null)
-const tabContentRef = ref<any>(null)
+// Refs for imperative access to individual TabGroup instances (for save, etc.)
+const groupRefs = ref<Record<string, any>>({})
+const rootEl = ref<HTMLElement | null>(null)
 
-const currentHandler = ref<any>(null)
-
-const currentComponent = computed(() => currentHandler.value?.component || null)
-const currentProps = computed(() => currentHandler.value?.props || {})
-
-// ====================== ОБРАБОТКА УДАЛЕНИЯ ======================
-watch(lastUpdate, (update) => {
-  if (!update) return
-
-  const activePath = activeFilePath.value
-  if (!activePath) return
-
-  const normalizedActive = String(activePath).replace(/\\+/g, '/').replace(/\/+$/, '')
-  const normalizedUpdate = String(update.path || '').replace(/\\+/g, '/').replace(/\/+$/, '')
-
-  if (normalizedActive === normalizedUpdate && 
-      (update.type === 'unlink' || update.type === 'unlinkDir')) {
-    
-    currentHandler.value = {
-      component: DeletedFile,
-      props: { 
-        filePath: normalizedActive,
-        isDeleted: true 
-      }
-    }
+// ====================== GROUP REF REGISTRY ======================
+const registerGroupRef = (groupId: string, el: any) => {
+  if (el) {
+    groupRefs.value[groupId] = el
+  } else {
+    delete groupRefs.value[groupId]
   }
-})
+}
 
-// ====================== СМЕНА АКТИВНОЙ ВКЛАДКИ ======================
-watch(activeFilePath, async (newPath) => {
-  if (!newPath) {
-    currentHandler.value = null
-    return
-  }
+const getActiveGroupComponent = () => {
+  return groupRefs.value[activeGroupId.value]
+}
 
-  const normalizedNew = newPath.replace(/\\+/g, '/').replace(/\/+$/, '')
-
-  // Специальная обработка для Game Preview
-  if (newPath === '::preview::') {
-    const activeTab = tabs.value.find(t => t.filePath === '::preview::')
-    const autoStart = activeTab?.previewOptions?.autoStart ?? false
-
-    // Clear the flag so it doesn't auto-start on subsequent tab switches
-    if (activeTab?.previewOptions) {
-      activeTab.previewOptions.autoStart = false
-    }
-
-    currentHandler.value = {
-      component: GamePreview,
-      props: { 
-        projectPath: 'C:/Users/Siphome/Desktop/testBuild',
-        autoStart
-      },
-      isEditable: false
-    }
-    return
-  }
-
-  const tab = tabs.value.find(t => t.filePath.replace(/\\+/g, '/').replace(/\/+$/, '') === normalizedNew)
-  if (tab?.isDeleted) {
-    currentHandler.value = {
-      component: DeletedFile,
-      props: { 
-        filePath: normalizedNew,
-        isDeleted: true 
-      }
-    }
-    return
-  }
-
-  try {
-    const handler = await getFileHandler(newPath)
-    currentHandler.value = handler
-  } catch (err) {
-    console.warn('File handler error:', err)
-    currentHandler.value = {
-      component: DeletedFile,
-      props: { 
-        filePath: normalizedNew,
-        isDeleted: true 
-      }
-    }
-  }
-})
-
-// ====================== ОТКРЫТИЕ ФАЙЛА ======================
+// ====================== PUBLIC API (kept compatible for App.vue + useFileOpener) ======================
 const openFile = async (rawPath: string) => {
   const filePath = rawPath.replace(/\\+/g, '/').replace(/\/+$/, '')
 
-  const existing = tabs.value.find(t => t.filePath.replace(/\\+/g, '/').replace(/\/+$/, '') === filePath)
-  if (existing) {
-    if (existing.isDeleted) existing.isDeleted = false
-    activateTab(existing)
-    return
+  // 1. Check if file is already open in ANY group → focus it (VS Code behavior)
+  for (const g of groups.value) {
+    const existing = g.tabs.find(t => t.filePath.replace(/\\+/g, '/').replace(/\/+$/, '') === filePath)
+    if (existing) {
+      setActiveGroup(g.id)
+      g.activeFilePath = existing.filePath
+      return
+    }
   }
 
+  // 2. Not open anywhere → open in the currently active group
+  const targetGroupId = activeGroupId.value
   const handler = await getFileHandler(filePath)
 
-  const newTab = {
-    id: Date.now().toString(),
+  const newTabData = {
     filePath,
     name: filePath.split(/[/\\]/).pop() || filePath,
     type: handler.type,
-    content: handler.props.modelValue || handler.props.initialHtml || '',
+    content: handler.props?.modelValue || handler.props?.initialHtml || '',
     language: handler.language,
     isDirty: false
   }
 
-  tabs.value.push(newTab)
-  activateTab(newTab)
+  openTabInGroup(targetGroupId, newTabData)
 }
 
-// ====================== СПЕЦИАЛЬНЫЙ ТАБ ДЛЯ PREVIEW ======================
 const openPreviewTab = (options: { autoStart?: boolean } = {}) => {
   const previewPath = '::preview::'
 
-  const existing = tabs.value.find(t => t.filePath === previewPath)
-  if (existing) {
-    activateTab(existing)
-    // If already open and autoStart requested, we can't easily force start from here
-    // (the component instance is managed by TabContent). For now we just activate.
+  // If preview already exists anywhere, switch to that group + tab
+  const existingGroupId = findGroupWithPreview()
+  if (existingGroupId) {
+    const group = groups.value.find(g => g.id === existingGroupId)
+    if (group) {
+      const tab = group.tabs.find(t => t.filePath === previewPath)
+      if (tab) {
+        setActiveGroup(existingGroupId)
+        group.activeFilePath = previewPath
+        if (options.autoStart && tab.previewOptions) {
+          tab.previewOptions.autoStart = true
+        }
+      }
+    }
     return
   }
 
-  const previewTab = {
-    id: 'preview-tab',
+  // Create new preview tab in the currently active group
+  const previewTabData = {
     filePath: previewPath,
     name: 'Game',
     type: 'preview',
     isDirty: false,
     icon: 'game_icon',
-    // Pass autoStart down via the tab metadata
     previewOptions: {
       autoStart: !!options.autoStart
     }
   }
 
-  tabs.value.push(previewTab)
-  activateTab(previewTab)
+  openTabInGroup(activeGroupId.value, previewTabData)
 }
 
-// ====================== СОХРАНЕНИЕ ======================
+// ====================== SAVE (delegates to active TabGroup) ======================
 const saveCurrentFile = async () => {
-  const activeTab = tabs.value.find(t => t.filePath === activeFilePath.value)
-  if (!activeTab || activeTab.isDeleted) return
-
-  if (!['code', 'web'].includes(activeTab.type)) return
-
-  const editor = tabContentRef.value?.activeEditorRef
-  let content = getContentFromEditor(editor, activeTab.content || '')
-
-  if (!content && activeTab.content) content = activeTab.content
-
-  const result = await saveFile(activeTab.filePath, content)
-
-  if (result.success) {
-    activeTab.content = content
-    markClean(activeTab.filePath)
-    success(`Файл сохранён`, activeTab.name)
+  const activeTabGroup = getActiveGroupComponent()
+  if (activeTabGroup?.saveCurrent) {
+    await activeTabGroup.saveCurrent()
   } else {
-    error(`Не удалось сохранить файл`, activeTab.name)
+    console.warn('[EditorTabs] No active TabGroup ref for save')
   }
 }
 
-const handleContentUpdate = (newContent: string) => {
-  const tab = tabs.value.find(t => t.filePath === activeFilePath.value)
-  if (tab) {
-    tab.content = newContent
-    markDirty(tab.filePath)
+// ====================== GROUP ACTIVATION & LIFECYCLE ======================
+const onGroupActivated = (groupId: string) => {
+  setActiveGroup(groupId)
+}
+
+const onGroupBecameEmpty = (groupId: string) => {
+  removeEmptyGroupIfPossible(groupId)
+}
+
+// ====================== SPLITTING (from TabGroup events or direct) ======================
+const onSplitTab = (tab: Tab, sourceGroupId: string) => {
+  // Already handled inside TabGroup via composable, but keep hook
+  splitTabToNewGroup(sourceGroupId, tab)
+}
+
+// ====================== RESIZABLE SPLITTERS (horizontal panes) ======================
+let isResizing = false
+let resizeLeftIndex = -1
+let startX = 0
+let startLeftWidth = 0
+let startRightWidth = 0
+let containerWidth = 0
+
+const startGroupResize = (splitterIndex: number, e: MouseEvent) => {
+  isResizing = true
+  resizeLeftIndex = splitterIndex
+  startX = e.clientX
+
+  const container = rootEl.value?.querySelector('.groups-container') as HTMLElement
+  if (!container) return
+  containerWidth = container.offsetWidth
+
+  const children = Array.from(container.children).filter(el => el.classList.contains('tab-group')) as HTMLElement[]
+  if (children[splitterIndex] && children[splitterIndex + 1]) {
+    startLeftWidth = children[splitterIndex].offsetWidth
+    startRightWidth = children[splitterIndex + 1].offsetWidth
   }
+
+  document.addEventListener('mousemove', onResizeMove)
+  document.addEventListener('mouseup', stopGroupResize, { once: true })
+  document.body.style.cursor = 'col-resize'
+  document.body.style.userSelect = 'none'
 }
 
-const handleComponentSave = () => saveCurrentFile()
+const onResizeMove = (e: MouseEvent) => {
+  if (!isResizing || resizeLeftIndex < 0) return
 
-const handleCloseActiveTab = () => {
-  const activeTab = tabs.value.find(t => t.filePath === activeFilePath.value)
-  if (activeTab) closeTab(activeTab)
+  const delta = e.clientX - startX
+  const container = rootEl.value?.querySelector('.groups-container') as HTMLElement
+  if (!container) return
+
+  const children = Array.from(container.children).filter(el => el.classList.contains('tab-group')) as HTMLElement[]
+  const leftPane = children[resizeLeftIndex]
+  const rightPane = children[resizeLeftIndex + 1]
+  if (!leftPane || !rightPane) return
+
+  let newLeft = startLeftWidth + delta
+  let newRight = startRightWidth - delta
+
+  // Enforce minimums
+  const min = 220
+  if (newLeft < min) {
+    const diff = min - newLeft
+    newLeft = min
+    newRight -= diff
+  }
+  if (newRight < min) {
+    const diff = min - newRight
+    newRight = min
+    newLeft -= diff
+  }
+
+  const total = startLeftWidth + startRightWidth
+  leftPane.style.flex = `0 0 ${newLeft}px`
+  rightPane.style.flex = `0 0 ${newRight}px`
 }
 
+const stopGroupResize = () => {
+  isResizing = false
+  document.removeEventListener('mousemove', onResizeMove)
+  document.body.style.cursor = ''
+  document.body.style.userSelect = ''
+
+  // Leave pixel flex-basis (works well enough for now)
+}
+
+// ====================== KEYBOARD ======================
 onMounted(() => {
   addShortcut('ctrl+s', saveCurrentFile, true)
 })
 
-// Контекстное меню
-const showTabContextMenu = (e: MouseEvent, tab: any) => {
-  const i = tabs.value.findIndex(t => t.id === tab.id)
-  const menu = [
-    { label: 'Закрыть вкладку', action: () => closeTab(tab) },
-    { label: 'Закрыть другие', action: () => closeOtherTabs(tab) },
-    { label: 'Закрыть справа', action: () => closeTabsToRight(i) },
-    { label: 'Закрыть слева', action: () => closeTabsToLeft(i) },
-    { type: 'separator' },
-    { label: 'Закрыть все', action: closeAllTabs },
-  ]
-  tabContextMenuRef.value?.show(e.clientX, e.clientY, menu)
-}
-
-const closeOtherTabs = (tab: any) => tabs.value.filter(t => t.id !== tab.id).forEach(closeTab)
-const closeTabsToRight = (i: number) => tabs.value.slice(i + 1).forEach(closeTab)
-const closeTabsToLeft = (i: number) => tabs.value.slice(0, i).forEach(closeTab)
-
-const closeAllTabs = () => {
-  while (tabs.value.length) closeTab(tabs.value[0])
-  activeFilePath.value = null
-  currentHandler.value = null
-}
-
-defineExpose({ 
+// ====================== EXPOSE (for App.vue + header buttons) ======================
+defineExpose({
   openFile,
-  openPreviewTab   // ← новый метод
+  openPreviewTab
 })
 </script>
 
@@ -268,5 +251,38 @@ defineExpose({
   overflow: hidden;
   background: #1e1e1e;
   user-select: none;
+}
+
+.groups-container {
+  display: flex;
+  flex-direction: row;
+  height: 100%;
+  overflow: hidden;
+  flex: 1;
+  min-height: 0;
+}
+
+.groups-container.single-group {
+  /* single pane takes full space */
+}
+
+.editor-splitter {
+  width: 6px;
+  background: #252526;
+  cursor: col-resize;
+  flex-shrink: 0;
+  z-index: 10;
+  transition: background 0.15s ease;
+}
+
+.editor-splitter:hover {
+  background: #FF5252;
+}
+
+/* TabGroup children participate in flex layout */
+.groups-container > .tab-group {
+  flex: 1 1 0;
+  min-width: 220px;
+  height: 100%;
 }
 </style>

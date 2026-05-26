@@ -11,12 +11,11 @@
       <div class="header-actions">
         <!-- Preview Button -->
 <button 
-  class="preview-btn"
+  class="preview-btn play-btn"
   @click="openPreviewTab"
-  title="Открыть Game Preview как вкладку"
+  title="Запустить превью (Play)"
 >
-  <BaseIcon name="preview_icon" class="btn-icon" />
-  <span>Preview</span>
+  <BaseIcon name="run_icon" class="btn-icon" />
 </button>
 
         <!-- Terminal Button -->
@@ -154,10 +153,11 @@ const { messageBox } = useMessageBox()
 const { inputBox } = useInputBox()
 const { createFromTemplate } = useFileCreation()
 
-// ====================== PREVIEW AS TAB ======================
+// ====================== PREVIEW (Unity Play mode style) ======================
 const openPreviewTab = () => {
   if (tabsRef.value?.openPreviewTab) {
-    tabsRef.value.openPreviewTab()
+    // Immediately start the game when opened from header button
+    tabsRef.value.openPreviewTab({ autoStart: true })
   } else {
     console.error('openPreviewTab method not found on EditorTabs')
   }
@@ -419,6 +419,31 @@ html, body {
 .preview-btn:hover {
   background: #555;
   transform: translateY(-1px);
+}
+
+/* Play button (green) - used for immediate game preview */
+.preview-btn.play-btn {
+  background: #22c55e; /* nice green */
+  color: white;
+  padding: 0;
+  border-radius: 6px;
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+}
+
+.preview-btn.play-btn:hover {
+  background: #16a34a;
+  transform: scale(1.05);
+}
+
+.preview-btn.play-btn .btn-icon {
+  width: 18px;
+  height: 18px;
+  color: white; /* ensures currentColor works well */
 }
 
 .terminal-toggle-btn {

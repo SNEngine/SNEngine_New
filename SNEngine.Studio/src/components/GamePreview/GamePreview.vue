@@ -71,12 +71,13 @@
 <script setup lang="ts">
 import { useGameLauncher } from '@/composables/useGameLauncher'
 import { useGamePreview } from '@/composables/useGamePreview'
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, nextTick } from 'vue'
 import BaseIcon from '../icons/BaseIcon.vue'
 import LoadingSpinner from '../LoadingSpinner/LoadingSpinner.vue'
 
 const props = defineProps<{
   projectPath: string
+  autoStart?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -130,6 +131,18 @@ const toggleFullscreen = async () => {
     console.error('Fullscreen error:', err)
   }
 }
+
+// Auto-start logic (Unity Play mode style)
+onMounted(() => {
+  if (props.autoStart) {
+    // Small delay to let the canvas mount properly
+    nextTick(() => {
+      if (!launcher.isRunning.value) {
+        togglePreview()
+      }
+    })
+  }
+})
 </script>
 
 <style scoped>

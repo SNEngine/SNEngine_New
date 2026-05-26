@@ -86,10 +86,19 @@ watch(activeFilePath, async (newPath) => {
 
   // Специальная обработка для Game Preview
   if (newPath === '::preview::') {
+    const activeTab = tabs.value.find(t => t.filePath === '::preview::')
+    const autoStart = activeTab?.previewOptions?.autoStart ?? false
+
+    // Clear the flag so it doesn't auto-start on subsequent tab switches
+    if (activeTab?.previewOptions) {
+      activeTab.previewOptions.autoStart = false
+    }
+
     currentHandler.value = {
       component: GamePreview,
       props: { 
-        projectPath: 'C:/Users/Siphome/Desktop/testBuild' 
+        projectPath: 'C:/Users/Siphome/Desktop/testBuild',
+        autoStart
       },
       isEditable: false
     }
@@ -151,12 +160,14 @@ const openFile = async (rawPath: string) => {
 }
 
 // ====================== СПЕЦИАЛЬНЫЙ ТАБ ДЛЯ PREVIEW ======================
-const openPreviewTab = () => {
+const openPreviewTab = (options: { autoStart?: boolean } = {}) => {
   const previewPath = '::preview::'
 
   const existing = tabs.value.find(t => t.filePath === previewPath)
   if (existing) {
     activateTab(existing)
+    // If already open and autoStart requested, we can't easily force start from here
+    // (the component instance is managed by TabContent). For now we just activate.
     return
   }
 
@@ -166,7 +177,11 @@ const openPreviewTab = () => {
     name: 'Game',
     type: 'preview',
     isDirty: false,
-    icon: 'game_icon'
+    icon: 'game_icon',
+    // Pass autoStart down via the tab metadata
+    previewOptions: {
+      autoStart: !!options.autoStart
+    }
   }
 
   tabs.value.push(previewTab)

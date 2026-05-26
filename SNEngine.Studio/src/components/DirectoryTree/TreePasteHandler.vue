@@ -1,5 +1,8 @@
 <template>
-  <div @paste="handlePaste">
+  <div 
+    @paste="handlePaste"
+    @contextmenu.prevent="handleBackgroundContextMenu"
+  >
     <slot />
   </div>
 </template>
@@ -15,6 +18,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'pasted'): void
+  (e: 'background-contextmenu', event: MouseEvent): void
 }>()
 
 async function handlePaste(e: ClipboardEvent) {
@@ -46,6 +50,13 @@ async function handlePaste(e: ClipboardEvent) {
     const success = await props.copyItem(text, targetPath)
     if (success) props.refresh?.()
     emit('pasted')
+  }
+}
+
+function handleBackgroundContextMenu(e: MouseEvent) {
+  // If the click was not on a tree node, treat it as background
+  if (!(e.target as HTMLElement).closest('.tree-node')) {
+    emit('background-contextmenu', e)
   }
 }
 </script>

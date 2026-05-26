@@ -16,6 +16,7 @@
       :refresh="refresh"
       :handle-drop-from-clipboard="handleDropFromClipboard"
       @pasted="() => {}"
+      @background-contextmenu="onContextMenu($event, null)"
     >
       <TreeDropBackground
         :base-path="basePath"

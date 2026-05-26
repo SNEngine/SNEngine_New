@@ -6,6 +6,7 @@
     @dragover.prevent="handleDragOver"
     @dragleave="handleDragLeave"
     @click="handleBackgroundClick"
+    @contextmenu.prevent="handleBackgroundContextMenu"
   >
     <slot />
   </div>
@@ -24,6 +25,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'background-click'): void
+  (e: 'background-contextmenu', event: MouseEvent): void
   (e: 'drop', event: DragEvent): void
 }>()
 
@@ -51,6 +53,13 @@ function handleBackgroundClick(e: MouseEvent) {
   // Родитель сам решит, что делать (сейчас — только сброс выделения).
   if (!(e.target as HTMLElement).closest('.tree-node')) {
     emit('background-click')
+  }
+}
+
+function handleBackgroundContextMenu(e: MouseEvent) {
+  // Только если кликнули именно по фону, а не по элементу дерева
+  if (!(e.target as HTMLElement).closest('.tree-node')) {
+    emit('background-contextmenu', e)
   }
 }
 

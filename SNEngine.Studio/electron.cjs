@@ -77,6 +77,17 @@ function createWindow() {
     mainWindow.loadFile(path.join(__dirname, 'dist', 'index.html'));
     // mainWindow.webContents.openDevTools({ mode: 'detach' });
   }
+
+  // ====================== GRACEFUL CLOSE WITH UNSAVED CHANGES ======================
+  mainWindow.on('close', (event) => {
+    // Always prevent the default close first
+    event.preventDefault();
+
+    // Ask the renderer if it's safe to close (it will check for unsaved tabs and may show our MessageBox)
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('app:request-close');
+    }
+  });
 }
 
 // ====================== PROJECT PATH ======================
@@ -753,4 +764,16 @@ app.whenReady().then(() => {
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
+});
+
+// Renderer confirms whether we can actually close the window
+ipcMain.on('app:confirm-close', (event, shouldClose) => {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+
+  if (shouldClose) {
+    // User chose to close (with or without saving)
+    mainWindow.destroy(); // bypass the 'close' event
+  } else {
+    // User cancelled – do nothing, window stays open
+  }
 });

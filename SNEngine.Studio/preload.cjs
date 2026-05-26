@@ -80,5 +80,13 @@ init: (id, shellType, cwd = null) =>
 
   // Управление watcher
   startWatcher: (path) => ipcRenderer.send('start-watcher', path),
-  stopWatcher: () => ipcRenderer.send('stop-watcher')
+  stopWatcher: () => ipcRenderer.send('stop-watcher'),
+
+  // ====================== APP CLOSE (with unsaved changes) ======================
+  // Renderer listens for close request from main (native window X, Alt+F4, etc.)
+  onAppCloseRequest: (callback) => {
+    ipcRenderer.on('app:request-close', callback)
+  },
+  // Renderer tells main whether it's safe to close the window
+  confirmAppClose: (shouldClose) => ipcRenderer.send('app:confirm-close', shouldClose)
 })

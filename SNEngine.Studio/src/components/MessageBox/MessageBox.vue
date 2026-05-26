@@ -39,7 +39,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import BaseIcon from '../icons/BaseIcon.vue'
 
 export type MessageBoxType = 'ok' | 'okcancel' | 'yesno' | 'yesnocancel'
@@ -84,6 +84,7 @@ const show = (options: MessageBoxOptions): Promise<string> => {
     ...options
   }
   visible.value = true
+  addKeyListener()
 
   return new Promise<string>((resolve) => {
     resolvePromise.value = resolve
@@ -92,6 +93,7 @@ const show = (options: MessageBoxOptions): Promise<string> => {
 
 const handleClick = (result: string) => {
   visible.value = false
+  removeKeyListener()
   if (resolvePromise.value) {
     resolvePromise.value(result)
     resolvePromise.value = null
@@ -99,8 +101,51 @@ const handleClick = (result: string) => {
 }
 
 const handleOverlayClick = () => {
+  removeKeyListener()
   if (currentOptions.value.type === 'ok') handleClick('ok')
 }
+
+// ====================== ESC KEY SUPPORT ======================
+let keydownHandler: ((e: KeyboardEvent) => void) | null = null
+
+const handleKeyDown = (e: KeyboardEvent) => {
+  if (!visible.value) return
+  if (e.key === 'Escape') {
+    e.preventDefault()
+    e.stopPropagation()
+
+    const type = currentOptions.value.type || 'ok'
+
+    // Map ESC to the most appropriate "cancel" action
+    if (type === 'ok') {
+      handleClick('ok') // for simple ok dialogs, ESC acts as confirm
+    } else {
+      handleClick('cancel')
+    }
+  }
+}
+
+const addKeyListener = () => {
+  if (keydownHandler) return
+  keydownHandler = handleKeyDown
+  document.addEventListener('keydown', keydownHandler, true) // capture phase
+}
+
+const removeKeyListener = () => {
+  if (keydownHandler) {
+    document.removeEventListener('keydown', keydownHandler, true)
+    keydownHandler = null
+  }
+}
+
+onMounted(() => {
+  // In case component is mounted while already visible (rare)
+  if (visible.value) addKeyListener()
+})
+
+onUnmounted(() => {
+  removeKeyListener()
+})
 
 const buttons = computed(() => {
   const t = currentOptions.value.type || 'ok'

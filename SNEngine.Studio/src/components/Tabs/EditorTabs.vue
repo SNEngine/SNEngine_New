@@ -239,7 +239,47 @@ onMounted(() => {
 // ====================== EXPOSE (for App.vue + header buttons) ======================
 defineExpose({
   openFile,
-  openPreviewTab
+  openPreviewTab,
+  hasUnsavedChanges: () => {
+    const { hasUnsavedChanges } = useTabs()
+    return hasUnsavedChanges()
+  },
+  saveAllUnsaved: async () => {
+    const { getAllDirtyTabs, markClean } = useTabs()
+
+    const dirtyItems = getAllDirtyTabs()
+    if (dirtyItems.length === 0) return true
+
+    for (const item of dirtyItems) {
+      const groupComp = groupRefs.value[item.groupId]
+      const groupData = groups.value.find(g => g.id === item.groupId)
+      if (!groupComp || !groupData) continue
+
+      // Temporarily activate the dirty tab so its editor instance is mounted
+      const previousActive = groupData.activeFilePath
+      groupData.activeFilePath = item.tab.filePath
+
+      // Wait for the TabGroup to react to the active tab change and mount the editor
+      await nextTick()
+      await new Promise(r => setTimeout(r, 60))
+
+      try {
+        if (typeof groupComp.saveCurrent === 'function') {
+          await groupComp.saveCurrent()
+        }
+      } catch (e) {
+        console.warn('[EditorTabs] Failed to save tab during "Save All"', item.tab.filePath, e)
+      }
+
+      // Restore previous active tab if it was different
+      if (previousActive && previousActive !== item.tab.filePath) {
+        groupData.activeFilePath = previousActive
+        await nextTick()
+      }
+    }
+
+    return true
+  }
 })
 </script>
 

@@ -57,6 +57,7 @@ import { useTabs, type Tab, type EditorGroup } from '@/composables/useTabs'
 import { useFileType } from '@/composables/useFileType'
 import { useFileSave } from '@/composables/useFileSave'
 import { useNotification } from '@/composables/useNotification'
+import { useMessageBox } from '@/composables/useMessageBox'
 
 const props = defineProps<{
   groupId: string
@@ -82,6 +83,7 @@ const {
 const { getFileHandler } = useFileType()
 const { saveFile, getContentFromEditor } = useFileSave()
 const { success, error } = useNotification()
+const { showMessageBox } = useMessageBox()
 
 const contextMenuRef = ref<any>(null)
 const tabContentRef = ref<any>(null)
@@ -296,8 +298,23 @@ const activateTabInGroup = (tab: Tab) => {
   }
 }
 
-const closeTabInGroup = (tab: Tab) => {
+const closeTabInGroup = async (tab: Tab) => {
+  if (tab.isDirty) {
+    const result = await showMessageBox({
+      title: 'Несохранённые изменения',
+      message: `Файл "${tab.name}" содержит несохранённые изменения.\n\nЗакрыть вкладку без сохранения?`,
+      type: 'yesno',
+      icon: 'warning'
+    })
+
+    if (result === 'no' || result === 'cancel') {
+      return // user cancelled or chose not to close
+    }
+    // 'yes' → close without saving
+  }
+
   closeTabGlobal(tab, props.groupId)
+
   // notify parent if this group is now empty
   if ((group.value?.tabs.length || 0) === 0) {
     emit('group-became-empty', props.groupId)
@@ -372,35 +389,82 @@ const showTabContextMenu = (e: MouseEvent, tab: Tab) => {
   contextMenuRef.value?.show(e.clientX, e.clientY, menu)
 }
 
-const closeOtherTabs = (tab: Tab) => {
+const closeOtherTabs = async (tab: Tab) => {
   const g = group.value
   if (!g) return
-  g.tabs.filter(t => t.id !== tab.id).forEach(t => closeTabInGroup(t))
-}
 
-const closeTabsToRight = (i: number) => {
-  const g = group.value
-  if (!g) return
-  g.tabs.slice(i + 1).forEach(t => closeTabInGroup(t))
-}
-
-const closeTabsToLeft = (i: number) => {
-  const g = group.value
-  if (!g) return
-  g.tabs.slice(0, i).forEach(t => closeTabInGroup(t))
-}
-
-const closeAllInGroup = () => {
-  const g = group.value
-  if (!g) return
-  while (g.tabs.length) {
-    closeTabInGroup(g.tabs[0])
+  const tabsToClose = g.tabs.filter(t => t.id !== tab.id)
+  if (tabsToClose.some(t => t.isDirty)) {
+    const result = await showMessageBox({
+      title: 'Несохранённые изменения',
+      message: 'Среди закрываемых вкладок есть несохранённые файлы.\n\nЗакрыть их без сохранения?',
+      type: 'yesno',
+      icon: 'warning'
+    })
+    if (result === 'no' || result === 'cancel') return
   }
+
+  tabsToClose.forEach(t => closeTabInGroup(t))
 }
 
-const closeThisGroup = () => {
+const closeTabsToRight = async (i: number) => {
+  const g = group.value
+  if (!g) return
+
+  const tabsToClose = g.tabs.slice(i + 1)
+  if (tabsToClose.some(t => t.isDirty)) {
+    const result = await showMessageBox({
+      title: 'Несохранённые изменения',
+      message: 'Среди закрываемых вкладок есть несохранённые файлы.\n\nЗакрыть их без сохранения?',
+      type: 'yesno',
+      icon: 'warning'
+    })
+    if (result === 'no' || result === 'cancel') return
+  }
+
+  tabsToClose.forEach(t => closeTabInGroup(t))
+}
+
+const closeTabsToLeft = async (i: number) => {
+  const g = group.value
+  if (!g) return
+
+  const tabsToClose = g.tabs.slice(0, i)
+  if (tabsToClose.some(t => t.isDirty)) {
+    const result = await showMessageBox({
+      title: 'Несохранённые изменения',
+      message: 'Среди закрываемых вкладок есть несохранённые файлы.\n\nЗакрыть их без сохранения?',
+      type: 'yesno',
+      icon: 'warning'
+    })
+    if (result === 'no' || result === 'cancel') return
+  }
+
+  tabsToClose.forEach(t => closeTabInGroup(t))
+}
+
+const closeAllInGroup = async () => {
+  const g = group.value
+  if (!g) return
+
+  if (g.tabs.some(t => t.isDirty)) {
+    const result = await showMessageBox({
+      title: 'Несохранённые изменения',
+      message: 'В этой панели есть несохранённые файлы.\n\nЗакрыть все вкладки без сохранения?',
+      type: 'yesno',
+      icon: 'warning'
+    })
+    if (result === 'no' || result === 'cancel') return
+  }
+
+  // Use a copy because closeTabInGroup may mutate the array
+  const tabsToClose = [...g.tabs]
+  tabsToClose.forEach(t => closeTabInGroup(t))
+}
+
+const closeThisGroup = async () => {
   // Close all tabs then let parent prune via events
-  closeAllInGroup()
+  await closeAllInGroup()
   emit('group-became-empty', props.groupId)
 }
 

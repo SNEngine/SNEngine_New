@@ -202,6 +202,44 @@ onMounted(async () => {
   }
 
   window.addEventListener('keydown', handleKeyDown)
+
+  // ====================== PROPER APP CLOSE VIA IPC (with custom MessageBox) ======================
+  if (window.electron?.onAppCloseRequest) {
+    window.electron.onAppCloseRequest(async () => {
+      const hasUnsaved = tabsRef.value?.hasUnsavedChanges?.() ?? false
+
+      if (!hasUnsaved) {
+        window.electron.confirmAppClose(true)
+        return
+      }
+
+      // Show custom dialog for app close with unsaved tabs
+      const result = await messageBox.value?.show({
+        title: 'Несохранённые изменения',
+        message: 'Есть несохранённые файлы. Сохранить все перед выходом?',
+        type: 'yesnocancel',
+        icon: 'warning'
+      })
+
+      if (result === 'cancel') {
+        // User cancelled — do not close the app
+        window.electron.confirmAppClose(false)
+        return
+      }
+
+      if (result === 'yes') {
+        // User wants to save all + close
+        try {
+          await tabsRef.value?.saveAllUnsaved?.()
+        } catch (e) {
+          console.error('[App] Error while saving all unsaved tabs on close:', e)
+        }
+      }
+
+      // 'yes' (after saving) or 'no' (don't save) → close the app
+      window.electron.confirmAppClose(true)
+    })
+  }
 })
 
 const openFileSafely = async (filePath: string, retries = 8) => {

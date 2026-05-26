@@ -290,6 +290,22 @@ function _createTabs() {
     }
   }
 
+  const hasUnsavedChanges = () => {
+    return groups.value.some(g => g.tabs.some(t => t.isDirty))
+  }
+
+  const getAllDirtyTabs = () => {
+    const result: Array<{ groupId: string; tab: Tab }> = []
+    for (const g of groups.value) {
+      for (const t of g.tabs) {
+        if (t.isDirty && !t.isDeleted) {
+          result.push({ groupId: g.id, tab: { ...t } })
+        }
+      }
+    }
+    return result
+  }
+
   return {
     // Modern pane API
     groups,
@@ -303,6 +319,8 @@ function _createTabs() {
     moveTabToGroup,
     removeEmptyGroupIfPossible,
     findGroupWithPreview,
+    hasUnsavedChanges,
+    getAllDirtyTabs,
 
     // Legacy / compat (used by current EditorTabs during migration)
     tabs,

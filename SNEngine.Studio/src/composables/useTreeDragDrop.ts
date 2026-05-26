@@ -15,17 +15,20 @@ export function useTreeDragDrop() {
   const draggedCount = computed(() => draggedItems.value.length)
   const isMultiDrag = computed(() => draggedCount.value > 1)
 
-  // Проверка на попытку перетащить папку в саму себя или в потомка
+  /**
+   * Проверяет, является ли target потомком (или равен) source.
+   * Использует сравнение путей — надёжнее, чем .parent (которого нет в TreeItem).
+   */
   const isDescendant = (source: any, target: any): boolean => {
-    if (!source || !target || !target.isFolder) return false
+    if (!source?.path || !target?.path) return false
     if (source.path === target.path) return true
 
-    let current: any = target
-    while (current) {
-      if (current.path === source.path) return true
-      current = current.parent
-    }
-    return false
+    // Нормализуем пути для Windows
+    const src = source.path.replace(/\\/g, '/').toLowerCase()
+    const tgt = target.path.replace(/\\/g, '/').toLowerCase()
+
+    // target является потомком source, если начинается с source + /
+    return tgt.startsWith(src + '/')
   }
 
   /**
@@ -79,19 +82,56 @@ export function useTreeDragDrop() {
   }
 
   const onDrop = (targetItem: any, e: DragEvent): DragDropPayload | null => {
-    if (draggedItems.value.length === 0 || !targetItem?.isFolder) return null
+    console.log('[DragDebug] onDrop called', {
+      targetPath: targetItem?.path,
+      draggedItemsCount: draggedItems.value.length,
+      ctrlKey: e.ctrlKey
+    });
 
-    e.preventDefault()
-    e.stopImmediatePropagation()
-
-    const payload: DragDropPayload = {
-      sources: [...draggedItems.value],
-      target: targetItem,
-      isCopy: e.ctrlKey || isCopyMode.value
+    if (!targetItem?.isFolder) {
+      console.log('[DragDebug] onDrop rejected: target is not folder');
+      return null;
     }
 
-    reset()
-    return payload
+    let sources = draggedItems.value;
+
+    // Fallback: if in-memory draggedItems was cleared
+    if (sources.length === 0) {
+      console.log('[DragDebug] onDrop: draggedItems empty, trying dataTransfer fallback');
+      try {
+        const json = e.dataTransfer?.getData('application/x-snengine-paths');
+        if (json) {
+          const paths: string[] = JSON.parse(json);
+          sources = paths.map(p => ({ path: p }));
+          console.log('[DragDebug] onDrop: reconstructed sources from dataTransfer', paths);
+        }
+      } catch (err) {
+        console.warn('[DragDebug] Failed to reconstruct from dataTransfer', err);
+      }
+    }
+
+    if (sources.length === 0) {
+      console.log('[DragDebug] onDrop rejected: no sources');
+      return null;
+    }
+
+    e.preventDefault();
+    e.stopImmediatePropagation();
+
+    const payload: DragDropPayload = {
+      sources: [...sources],
+      target: targetItem,
+      isCopy: e.ctrlKey || isCopyMode.value
+    };
+
+    console.log('[DragDebug] onDrop SUCCESS, returning payload', {
+      sources: payload.sources.map(s => s.path),
+      target: payload.target.path,
+      isCopy: payload.isCopy
+    });
+
+    reset();
+    return payload;
   }
 
   const reset = () => {

@@ -40,6 +40,7 @@ function handleDragLeave(e: DragEvent) {
 }
 
 function handleDrop(e: DragEvent) {
+  console.log('[DragDebug] TreeDropBackground: drop event received on background');
   isDragOver.value = false
   props.handleRootDrop?.(e)
   emit('drop', e)

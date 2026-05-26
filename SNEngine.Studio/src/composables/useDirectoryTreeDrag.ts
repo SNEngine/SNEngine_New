@@ -20,12 +20,22 @@ export function useDirectoryTreeDrag(
   const { isDragOver, handleDragOver, handleDragLeave, handleDrop } = dragDrop
 
   function handleRootDragOver(e: DragEvent) {
-    if (treeDrag.draggedItems?.value?.length > 0) {
-      e.preventDefault()
-      e.dataTransfer!.dropEffect = e.ctrlKey ? 'copy' : 'move'
-    } else {
-      handleDragOver(e)
+    const dragged = treeDrag.draggedItems?.value || []
+
+    if (dragged.length > 0) {
+      const normalizedRootPath = props.basePath.replace(/\\/g, '/')
+      const rootTarget = { path: normalizedRootPath, isFolder: true }
+
+      if (treeDrag.onDragOver) {
+        treeDrag.onDragOver(rootTarget, e)
+      } else {
+        e.preventDefault()
+        e.dataTransfer!.dropEffect = e.ctrlKey ? 'copy' : 'move'
+      }
+      return
     }
+
+    handleDragOver(e)
   }
 
   function handleRootDragLeave(e: DragEvent) {
@@ -33,11 +43,28 @@ export function useDirectoryTreeDrag(
   }
 
   function handleRootDrop(e: DragEvent) {
-    if (treeDrag.draggedItems?.value?.length > 0) {
-      const payload = treeDrag.onDrop({ path: props.basePath, isFolder: true }, e)
-      if (payload) handleInternalDropFn(payload)
+    console.log('[DragDebug] handleRootDrop called (from useDirectoryTreeDrag)');
+
+    const dragged = treeDrag.draggedItems?.value || []
+
+    if (dragged.length > 0) {
+      console.log('[DragDebug] handleRootDrop: internal drag detected');
+      const normalizedRootPath = props.basePath.replace(/\\/g, '/')
+      const rootTarget = { path: normalizedRootPath, isFolder: true }
+
+      const payload = treeDrag.onDrop(rootTarget, e)
+
+      if (payload) {
+        payload.target = { ...payload.target, path: normalizedRootPath }
+        console.log('[DragDebug] handleRootDrop: got payload, forwarding to handleInternalDropFn');
+        handleInternalDropFn(payload)
+      } else {
+        console.log('[DragDebug] handleRootDrop: onDrop returned null - drop will be ignored');
+      }
       return
     }
+
+    console.log('[DragDebug] handleRootDrop: external OS drop');
     handleDrop(e, props.basePath, refreshFn)
   }
 

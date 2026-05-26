@@ -1,30 +1,36 @@
 <template>
   <Teleport to="body">
-    <div v-if="visible" class="inputbox-overlay" @click.self="handleCancel">
-      <div class="inputbox">
-        <div class="inputbox-header">
-          <span class="title">{{ title }}</span>
-        </div>
-        
-        <div class="inputbox-content">
-          <p class="message" v-if="message">{{ message }}</p>
+    <Transition name="modal">
+      <div 
+        v-if="visible" 
+        class="inputbox-overlay" 
+        @click.self="handleCancel"
+      >
+        <div class="inputbox" @click.stop>
+          <div class="inputbox-header">
+            <span class="title">{{ title }}</span>
+          </div>
           
-          <input 
-            ref="inputRef"
-            v-model="inputValue"
-            class="input-field"
-            :placeholder="placeholder"
-            @keyup.enter="handleConfirm"
-            @keyup.esc="handleCancel"
-          />
-        </div>
+          <div class="inputbox-content">
+            <p class="message" v-if="message">{{ message }}</p>
+            
+            <input 
+              ref="inputRef"
+              v-model="inputValue"
+              class="input-field"
+              :placeholder="placeholder"
+              @keyup.enter="handleConfirm"
+              @keyup.esc="handleCancel"
+            />
+          </div>
 
-        <div class="inputbox-footer">
-          <button class="msg-btn secondary" @click="handleCancel">Отмена</button>
-          <button class="msg-btn primary" @click="handleConfirm">ОК</button>
+          <div class="inputbox-footer">
+            <button class="msg-btn secondary" @click="handleCancel">Отмена</button>
+            <button class="msg-btn primary" @click="handleConfirm">ОК</button>
+          </div>
         </div>
       </div>
-    </div>
+    </Transition>
   </Teleport>
 </template>
 
@@ -176,5 +182,28 @@ defineExpose({ show })
 .msg-btn.secondary:hover {
   background: #444;
   color: white;
+}
+
+/* ====================== АНИМАЦИИ ====================== */
+.modal-enter-active,
+.modal-leave-active {
+  transition: opacity 0.2s ease;
+}
+
+.modal-enter-from,
+.modal-leave-to {
+  opacity: 0;
+}
+
+.modal-enter-active .inputbox,
+.modal-leave-active .inputbox {
+  transition: transform 0.22s cubic-bezier(0.32, 0.72, 0, 1), 
+              opacity 0.2s ease;
+}
+
+.modal-enter-from .inputbox,
+.modal-leave-to .inputbox {
+  transform: scale(0.96) translateY(12px);
+  opacity: 0;
 }
 </style>

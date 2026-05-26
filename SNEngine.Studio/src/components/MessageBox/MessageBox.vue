@@ -1,34 +1,40 @@
 <template>
   <Teleport to="body">
-    <div v-if="visible" class="messagebox-overlay" @click.self="handleOverlayClick">
-      <div class="messagebox">
-        <div class="messagebox-header">
-          <span class="title">{{ title }}</span>
-        </div>
-        
-        <div class="messagebox-content">
-          <BaseIcon 
-            v-if="iconName" 
-            :name="iconName" 
-            class="message-icon" 
-            :color="iconColor"
-          />
-          <p class="message">{{ message }}</p>
-        </div>
+    <Transition name="modal">
+      <div 
+        v-if="visible" 
+        class="messagebox-overlay" 
+        @click.self="handleOverlayClick"
+      >
+        <div class="messagebox" @click.stop>
+          <div class="messagebox-header">
+            <span class="title">{{ title }}</span>
+          </div>
+          
+          <div class="messagebox-content">
+            <BaseIcon 
+              v-if="iconName" 
+              :name="iconName" 
+              class="message-icon" 
+              :color="iconColor"
+            />
+            <p class="message">{{ message }}</p>
+          </div>
 
-        <div class="messagebox-footer">
-          <button 
-            v-for="btn in buttons" 
-            :key="btn.key"
-            class="msg-btn"
-            :class="btn.type"
-            @click="handleClick(btn.key)"
-          >
-            {{ btn.text }}
-          </button>
+          <div class="messagebox-footer">
+            <button 
+              v-for="btn in buttons" 
+              :key="btn.key"
+              class="msg-btn"
+              :class="btn.type"
+              @click="handleClick(btn.key)"
+            >
+              {{ btn.text }}
+            </button>
+          </div>
         </div>
       </div>
-    </div>
+    </Transition>
   </Teleport>
 </template>
 
@@ -206,4 +212,27 @@ defineExpose({ show })
   color: #ddd;
 }
 .msg-btn.secondary:hover { background: #444; }
+
+/* ====================== АНИМАЦИИ ====================== */
+.modal-enter-active,
+.modal-leave-active {
+  transition: opacity 0.2s ease;
+}
+
+.modal-enter-from,
+.modal-leave-to {
+  opacity: 0;
+}
+
+.modal-enter-active .messagebox,
+.modal-leave-active .messagebox {
+  transition: transform 0.22s cubic-bezier(0.32, 0.72, 0, 1), 
+              opacity 0.2s ease;
+}
+
+.modal-enter-from .messagebox,
+.modal-leave-to .messagebox {
+  transform: scale(0.96) translateY(12px);
+  opacity: 0;
+}
 </style>

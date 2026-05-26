@@ -109,9 +109,9 @@ const { add } = useKeyboard()
 const { showProperties, isOpen, currentFile, close } = useFileProperties()
 const { openWith } = useOpenWith()
 
-// ====================== DRAG & DROP ======================
+// ====================== DRAG & DROP (single shared instance) ======================
 const { isDragOver, handleDragOver, handleDragLeave, handleDrop } = useDragDrop()
-const treeDrag = useTreeDragDrop()
+const treeDrag = useTreeDragDrop()  // <-- единственный экземпляр для всего дерева
 
 
 
@@ -132,26 +132,34 @@ const handleDropFromClipboard = async (targetDir: string, filePaths: string[]) =
 
 // ====================== ВНУТРЕННИЙ DRAG & DROP (с поддержкой multi) ======================
 const handleInternalDrop = async (payload: any) => {
-  if (!payload?.sources?.length || !payload?.target) return
+  console.log('[DragDebug] handleInternalDrop called with payload', {
+    sources: payload?.sources?.map((s: any) => s.path),
+    target: payload?.target?.path,
+    isCopy: payload?.isCopy
+  });
+
+  if (!payload?.sources?.length || !payload?.target) {
+    console.log('[DragDebug] handleInternalDrop early return: no sources or target');
+    return;
+  }
 
   let sources = [...payload.sources]
   const target = payload.target
   const isCopy = payload.isCopy
 
   // === Smart Multi-Drag ===
-  // Если тащим только один элемент, но он входит в текущее выделение > 1 элементов,
-  // то тащим всю выделенную группу (очень удобно для пользователя)
   if (sources.length === 1) {
     const single = sources[0]
     const selectedPaths = treeSelection.getSelectedPaths()
     if (selectedPaths.includes(single.path) && selectedPaths.length > 1) {
-      // Собираем все выделенные элементы из дерева
       const allSelected = getCurrentlySelectedItems()
       if (allSelected.length > 1) {
         sources = allSelected
       }
     }
   }
+
+  console.log('[DragDebug] handleInternalDrop: final sources to process', sources.map(s => s.path));
 
   let successCount = 0
 
@@ -167,9 +175,11 @@ const handleInternalDrop = async (payload: any) => {
       }
       if (ok) successCount++
     } catch (err) {
-      console.error('Multi drag error on', source.path, err)
+      console.error('[DragDebug] Multi drag error on', source.path, err)
     }
   }
+
+  console.log('[DragDebug] handleInternalDrop finished. successCount =', successCount);
 
   if (successCount > 0) {
     refresh()
@@ -254,28 +264,25 @@ const onContextMenu = (e: MouseEvent, item: any) => {
 const emitFileClick = (path: string) => emit('file-click', path)
 const refresh = () => loadDirectory()
 
-// ====================== NEW OPERATIONS COMPOSABLES (must be after finalItems / refresh) ======================
-const dragDropApi = useDragDrop()
-const treeDragApi = useTreeDragDrop()
-
+// ====================== NEW OPERATIONS COMPOSABLES ======================
 const operations = useDirectoryTreeOperations(items, treeSelection, finalItems as any)
 
 const treeDragHandlers = useDirectoryTreeDrag(
   props,
-  treeDragApi,
-  dragDropApi,
-  (payload: any) => { /* handled in handleInternalDrop below */ },
+  treeDrag,
+  { isDragOver, handleDragOver, handleDragLeave, handleDrop },
+  handleInternalDrop,   // pass the real function (defined above)
   refresh
 )
 
 const { buildContextMenuItems } = useDirectoryTreeContextMenu()
 
-// Re-export convenient drag handlers for the template
+// Drag handlers exposed to TreeNode / TreeViewport (use the shared instance)
 const dragHandlers = {
-  isDragOver: treeDragHandlers.isDragOver ?? isDragOver,
-  handleDragOver: treeDragHandlers.handleDragOver ?? handleDragOver,
-  handleDragLeave: treeDragHandlers.handleDragLeave ?? handleDragLeave,
-  handleDrop: treeDragHandlers.handleDrop ?? handleDrop,
+  isDragOver,
+  handleDragOver,
+  handleDragLeave,
+  handleDrop,
 }
 
 // Expose helpers from operations (used in keyboard, context, etc.)
@@ -290,7 +297,10 @@ const onSelectItem = (payload: any, legacyEvent?: MouseEvent) => {
 // Thin root drag handlers (for template binding)
 const handleRootDragOver = (e: DragEvent) => treeDragHandlers.handleRootDragOver?.(e)
 const handleRootDragLeave = (e: DragEvent) => treeDragHandlers.handleRootDragLeave?.(e)
-const handleRootDrop = (e: DragEvent) => treeDragHandlers.handleRootDrop?.(e)
+const handleRootDrop = (e: DragEvent) => {
+  console.log('[DragDebug] DirectoryTree.handleRootDrop called');
+  treeDragHandlers.handleRootDrop?.(e);
+}
 
 // ====================== КЛАВИАТУРА ======================
 const { setupKeyboardShortcuts } = useDirectoryTreeKeyboard(

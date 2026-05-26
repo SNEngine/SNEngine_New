@@ -1,7 +1,7 @@
 <template>
   <div class="tree-header">
     <TreeSearch
-      v-model="searchQuery"
+      v-model="modelValue"
       placeholder="Поиск по файлам..."
       :show-clear="true"
       @clear="onClear"
@@ -57,16 +57,12 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import TreeSearch from './TreeSearch.vue'
 
-const props = defineProps<{
-  modelValue: string
-  sortField: 'name' | 'modified' | 'type'
-  sortOrder: 'asc' | 'desc'
-}>()
+// Use defineModel for proper v-model support inside the component
+const modelValue = defineModel<string>('modelValue')
+const sortField = defineModel<'name' | 'modified' | 'type'>('sortField')
+const sortOrder = defineModel<'asc' | 'desc'>('sortOrder')
 
 const emit = defineEmits<{
-  (e: 'update:modelValue', value: string): void
-  (e: 'update:sortField', value: 'name' | 'modified' | 'type'): void
-  (e: 'update:sortOrder', value: 'asc' | 'desc'): void
   (e: 'refresh'): void
 }>()
 
@@ -75,7 +71,7 @@ const showSortMenu = ref(false)
 
 const sortLabel = computed(() => {
   const labels = { name: 'Имя', modified: 'Дата', type: 'Тип' }
-  return labels[props.sortField]
+  return labels[sortField.value ?? 'name']
 })
 
 const toggleSortMenu = () => {
@@ -83,16 +79,18 @@ const toggleSortMenu = () => {
 }
 
 const setField = (field: 'name' | 'modified' | 'type') => {
-  emit('update:sortField', field)
+  sortField.value = field
   showSortMenu.value = false
 }
 
 const setOrder = (order: 'asc' | 'desc') => {
-  emit('update:sortOrder', order)
+  sortOrder.value = order
   showSortMenu.value = false
 }
 
-const onClear = () => emit('update:modelValue', '')
+const onClear = () => {
+  modelValue.value = ''
+}
 
 const closeMenu = (e: MouseEvent) => {
   if (sortControl.value && !sortControl.value.contains(e.target as Node)) {

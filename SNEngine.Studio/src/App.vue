@@ -91,21 +91,7 @@
       </div>
     </div>
 
-    <Teleport to="body">
-      <div v-if="showPreview" class="preview-modal">
-        <div class="preview-modal-content">
-          <div class="preview-modal-header">
-            <span>🎮 Game Preview</span>
-            <button @click="closePreview" class="close-btn">✕</button>
-          </div>
-          <GamePreview 
-            :project-path="currentProjectPath" 
-            @started="onPreviewStarted"
-            @stopped="onPreviewStopped"
-          />
-        </div>
-      </div>
-    </Teleport>
+    <!-- Game Preview modal temporarily disabled (incomplete implementation causing warnings) -->
 
     <MessageBox ref="messageBoxRef" />
     <InputBox ref="inputBoxRef" />

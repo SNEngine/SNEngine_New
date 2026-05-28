@@ -1,32 +1,48 @@
 ﻿
 using Silk.NET.OpenGL;
 using SNEngine.Core.Assets;
+using System;
 using System.IO;
+using TrippyGL;
+using TrippyGL.ImageSharp;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.PixelFormats;
 
 namespace SNEngine.Core.Assets;
 
 /// <summary>
-/// Development-only manager for raw files (used in Studio/Editor)
+/// Development-only manager for raw files (used in Studio/Editor).
+/// Returns TrippyGL.Texture2D.
 /// </summary>
 public class FileManager
 {
-    private readonly GL _gl;
+    private readonly GraphicsDevice _device;
 
-    public FileManager(GL gl)
+    public FileManager(GraphicsDevice device)
     {
-        _gl = gl;
+        _device = device ?? throw new ArgumentNullException(nameof(device));
+    }
+
+    /// <summary>
+    /// Legacy constructor.
+    /// </summary>
+    public FileManager(GL gl) : this(new GraphicsDevice(gl))
+    {
     }
 
     /// <summary>
     /// Load texture directly from filesystem (for preview, editor, fast iteration)
     /// </summary>
-    public Texture LoadTexture(string filePath)
+    public Texture2D LoadTexture(string filePath)
     {
         if (!File.Exists(filePath))
             throw new FileNotFoundException($"Raw file not found: {filePath}");
 
-        var texture = new Texture(_gl, filePath);
-        Debug.Log($"[FileManager] Loaded raw file: {filePath}");
+        using var image = Image.Load<Rgba32>(filePath);
+        var texture = Texture2DExtensions.FromImage(_device, image, generateMipmaps: true);
+        texture.SetWrapModes(TrippyGL.TextureWrapMode.ClampToEdge, TrippyGL.TextureWrapMode.ClampToEdge);
+
+        Debug.Log($"[FileManager] Loaded raw Texture2D: {filePath}");
         return texture;
     }
 

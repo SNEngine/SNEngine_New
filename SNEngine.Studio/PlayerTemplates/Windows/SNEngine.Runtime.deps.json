@@ -224,6 +224,29 @@
           }
         }
       },
+      "TrippyGL/1.2.2": {
+        "dependencies": {
+          "Silk.NET.OpenGL": "2.23.0"
+        },
+        "runtime": {
+          "lib/net6.0/TrippyGL.dll": {
+            "assemblyVersion": "1.2.2.0",
+            "fileVersion": "1.2.2.0"
+          }
+        }
+      },
+      "TrippyGL.ImageSharp/1.2.2": {
+        "dependencies": {
+          "SixLabors.ImageSharp": "3.1.12",
+          "TrippyGL": "1.2.2"
+        },
+        "runtime": {
+          "lib/net6.0/TrippyGL.ImageSharp.dll": {
+            "assemblyVersion": "1.2.2.0",
+            "fileVersion": "1.2.2.0"
+          }
+        }
+      },
       "Ultz.Native.GLFW/3.4.0": {
         "runtimeTargets": {
           "runtimes/linux-arm/native/libglfw.so.3": {
@@ -287,7 +310,9 @@
           "Silk.NET.OpenAL": "2.23.0",
           "Silk.NET.OpenGL": "2.23.0",
           "SixLabors.ImageSharp": "3.1.12",
-          "System.Text.Json": "10.0.7"
+          "System.Text.Json": "10.0.7",
+          "TrippyGL": "1.2.2",
+          "TrippyGL.ImageSharp": "1.2.2"
         },
         "runtime": {
           "SNEngine.Core.dll": {
@@ -444,6 +469,20 @@
       "sha512": "sha512-F8Pu2QLUMeniVbtiyk7n7LCfFYxlcJ8ASaSwglJyq6dxa34iCQrikQszsgJClIJWuSWjcyhKkV7daAzYJqeVwA==",
       "path": "system.text.json/10.0.7",
       "hashPath": "system.text.json.10.0.7.nupkg.sha512"
+    },
+    "TrippyGL/1.2.2": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-lYtcBq2IMLsXjaB7oSdtbgrZiJYTeJ54nW99aDifia56FR0suRaUeeyy8TvYZPCncW6BGQz8sSLrzEfE6aPxDQ==",
+      "path": "trippygl/1.2.2",
+      "hashPath": "trippygl.1.2.2.nupkg.sha512"
+    },
+    "TrippyGL.ImageSharp/1.2.2": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-gAgtcmPid5kFXwo5INK+baioTaD0pyqahMCjErOQ++L+kQcYVFJvS8i1KVew2H8LklvSrhcS7/nygypanhfI0g==",
+      "path": "trippygl.imagesharp/1.2.2",
+      "hashPath": "trippygl.imagesharp.1.2.2.nupkg.sha512"
     },
     "Ultz.Native.GLFW/3.4.0": {
       "type": "package",

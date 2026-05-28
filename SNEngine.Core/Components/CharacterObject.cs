@@ -3,6 +3,8 @@ using SNEngine.Assets.Package;
 using SNEngine.Core.Assets;
 using SNEngine.Core.Rendering;
 using SNEngine.Data;
+using System.Numerics;
+using Texture2D = TrippyGL.Texture2D;
 
 namespace SNEngine.Core.Components;
 
@@ -61,7 +63,11 @@ public class CharacterObject : VisualComponent
     {
         if (Texture == null) return;
 
-        renderer.DrawTexture(Texture, Alpha);
+        // CharacterObject already sets Position via SetPosition
+        var pos = new Vector2(Position.X, Position.Y);
+        var scale = new Vector2(Scale.X, Scale.Y);
+
+        renderer.DrawSprite(Texture, pos, scale, Rotation, Origin, Alpha);
     }
 
     public void SetPosition(float x, float y)

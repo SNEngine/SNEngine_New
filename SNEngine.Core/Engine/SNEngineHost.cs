@@ -5,6 +5,7 @@ using SNEngine.Core.Assets;
 using SNEngine.Core.Rendering;
 using System;
 using System.Threading.Tasks;
+using TrippyGL;
 
 namespace SNEngine.Core.Engine;
 
@@ -26,6 +27,11 @@ public class SNEngineHost : IDisposable
     public Renderer Renderer { get; private set; } = null!;
     public SceneManager SceneManager { get; private set; } = null!;
     public FileManager FileManager { get; private set; } = null!;
+
+    /// <summary>
+    /// The TrippyGL GraphicsDevice. Primary graphics object after migration.
+    /// </summary>
+    public GraphicsDevice? GraphicsDevice { get; private set; }
 
     public event Action? OnInitialized;
 
@@ -96,10 +102,21 @@ public class SNEngineHost : IDisposable
         if (!_useSharedMemory)
             CenterWindow();
 
-        AssetManager = new AssetManager(_gl);
-        FileManager = new FileManager(_gl);
+        // === TRIPPYGL MIGRATION ===
+        // Create GraphicsDevice first — textures and renderer need it
+        GraphicsDevice = new GraphicsDevice(_gl);
+        Console.WriteLine("[SNEngineHost] TrippyGL GraphicsDevice created.");
+
+        // Asset managers now use GraphicsDevice (with legacy GL fallback inside)
+        AssetManager = new AssetManager(GraphicsDevice);
+        FileManager = new FileManager(GraphicsDevice);
+
         Renderer = new Renderer();
         Renderer.Initialize(_gl);
+
+        // Initial viewport + projection
+        Renderer.SetViewport(_previewWidth, _previewHeight);
+
         SceneManager = new SceneManager();
 
         Debug.Initialize();
@@ -111,7 +128,7 @@ public class SNEngineHost : IDisposable
             Debug.Log("[Preview] Shared Memory Publisher initialized successfully.");
         }
 
-        Debug.Log("SNEngineHost: All systems initialized successfully.");
+        Debug.Log("SNEngineHost: All systems initialized successfully (TrippyGL path).");
         OnInitialized?.Invoke();
     }
 
@@ -145,7 +162,7 @@ public class SNEngineHost : IDisposable
         Renderer.End();
 
         // === SHARED MEMORY ПРЕВЬЮ ===
-        if (_useSharedMemory && _sharedFramePublisher != null && _gl != null)
+        if (_useSharedMemory && _sharedFramePublisher != null && GraphicsDevice != null)
         {
             PublishPreviewFrame();
         }
@@ -157,11 +174,15 @@ public class SNEngineHost : IDisposable
         {
             int w = _previewWidth;
             int h = _previewHeight;
-            byte[] pixels = new byte[w * h * 4];   // можно сделать static/reusable
+            byte[] pixels = new byte[w * h * 4];
+
+            // Use GraphicsDevice.GL (or fallback to raw _gl) — works after TrippyGL migration
+            var gl = GraphicsDevice?.GL ?? _gl;
+            if (gl == null) return;
 
             fixed (byte* ptr = pixels)
             {
-                _gl!.ReadPixels(0, 0, (uint)w, (uint)h, PixelFormat.Rgba, PixelType.UnsignedByte, ptr);
+                gl.ReadPixels(0, 0, (uint)w, (uint)h, PixelFormat.Rgba, PixelType.UnsignedByte, ptr);
             }
 
             _sharedFramePublisher!.PublishFrame(w, h, pixels.AsSpan());
@@ -187,9 +208,9 @@ public class SNEngineHost : IDisposable
 
     private void OnResize(Vector2D<int> newSize)
     {
-        if (_gl == null) return;
+        if (Renderer == null) return;
 
-        _gl.Viewport(0, 0, (uint)newSize.X, (uint)newSize.Y);
+        Renderer.SetViewport(newSize.X, newSize.Y);
         Debug.Log($"Window resized to {newSize.X}x{newSize.Y}");
     }
 
@@ -207,7 +228,7 @@ public class SNEngineHost : IDisposable
                 _sharedFramePublisher = null;
             }
 
-            // Ресурсы рендера
+            // Ресурсы рендера (TrippyGL)
             if (Renderer != null)
             {
                 try { Renderer.Dispose(); }
@@ -218,6 +239,13 @@ public class SNEngineHost : IDisposable
             {
                 try { AssetManager.Dispose(); }
                 catch { }
+            }
+
+            if (GraphicsDevice != null)
+            {
+                try { GraphicsDevice.Dispose(); }
+                catch { }
+                GraphicsDevice = null;
             }
         }
         catch (Exception ex)
@@ -241,6 +269,7 @@ public class SNEngineHost : IDisposable
             AssetManager = null!;
             SceneManager = null!;
             FileManager = null!;
+            GraphicsDevice = null;
         }
     }
 

@@ -17,6 +17,8 @@ public class BackgroundComponent : VisualComponent
     public override void Render(Renderer renderer)
     {
         if (Texture == null) return;
-        renderer.DrawTexture(Texture, Alpha);
+
+        // Backgrounds cover the full viewport
+        renderer.DrawBackground(Texture, Alpha);
     }
 }

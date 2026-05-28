@@ -12,11 +12,5 @@ public class SpriteComponent : VisualComponent
     {
     }
 
-    public override void Render(Renderer renderer)
-    {
-        if (Texture == null) return;
-
-        // TODO: Apply transformation (Position, Scale, Rotation)
-        renderer.DrawTexture(Texture, Alpha);
-    }
+    // Render is fully handled by base VisualComponent (DrawSprite with Position/Scale/Rotation/Origin)
 }

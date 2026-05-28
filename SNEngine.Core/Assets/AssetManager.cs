@@ -4,23 +4,35 @@ using SNEngine.Data;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using TrippyGL;
+using TrippyGL.ImageSharp;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.PixelFormats;
 
 namespace SNEngine.Core.Assets;
 
 /// <summary>
 /// Central asset manager. ONLY works with .snpk packages. No filesystem fallback.
+/// Uses TrippyGL.Texture2D (replaces custom hand-written Texture).
 /// </summary>
 public class AssetManager : IDisposable
 {
-    private readonly GL _gl;
+    private readonly GraphicsDevice _device;
 
     private readonly Dictionary<AssetType, SNPKPackage> _packages = new();
-    private readonly Dictionary<string, Texture> _textureCache = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, Texture2D> _textureCache = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, CharacterData> _characterCache = new(StringComparer.OrdinalIgnoreCase);
 
-    public AssetManager(GL gl)
+    public AssetManager(GraphicsDevice device)
     {
-        _gl = gl;
+        _device = device ?? throw new ArgumentNullException(nameof(device));
+    }
+
+    /// <summary>
+    /// Legacy fallback constructor (used during transition). Creates an internal GraphicsDevice.
+    /// </summary>
+    public AssetManager(GL gl) : this(new GraphicsDevice(gl))
+    {
     }
 
     public void LoadPackage(string pakPath, AssetType type = AssetType.Misc)
@@ -31,9 +43,9 @@ public class AssetManager : IDisposable
     }
 
     /// <summary>
-    /// ONLY from packages. No filesystem.
+    /// ONLY from packages. No filesystem. Returns TrippyGL.Texture2D.
     /// </summary>
-    public Texture LoadTexture(string path, AssetType preferredPackage = AssetType.Backgrounds)
+    public Texture2D LoadTexture(string path, AssetType preferredPackage = AssetType.Backgrounds)
     {
         if (string.IsNullOrEmpty(path))
             throw new ArgumentException("Path cannot be empty");
@@ -57,7 +69,7 @@ public class AssetManager : IDisposable
             var data = TryGetAssetFromPackage(pkg, normalized);
             if (data != null)
             {
-                var texture = Texture.FromMemory(_gl, data, normalized);
+                var texture = CreateTextureFromBytes(data, normalized);
                 _textureCache[normalized] = texture;
                 Debug.Log($"[LoadTexture] SUCCESS from {preferredPackage}: {normalized}");
                 return texture;
@@ -72,15 +84,27 @@ public class AssetManager : IDisposable
             var data = TryGetAssetFromPackage(kvp.Value, normalized);
             if (data != null)
             {
-                var texture = Texture.FromMemory(_gl, data, normalized);
+                var texture = CreateTextureFromBytes(data, normalized);
                 _textureCache[normalized] = texture;
                 Debug.Log($"[LoadTexture] SUCCESS from {kvp.Key}: {normalized}");
                 return texture;
             }
         }
 
-        // 3. Если не нашли — жёсткая ошибка
+        // 3. Жёсткая ошибка
         throw new FileNotFoundException($"Asset not found in ANY .snpk package: {normalized}");
+    }
+
+    private Texture2D CreateTextureFromBytes(byte[] data, string logPath)
+    {
+        using var image = Image.Load<Rgba32>(data);
+        var tex = Texture2DExtensions.FromImage(_device, image, generateMipmaps: true);
+
+        // Good defaults for VN sprites
+        tex.SetWrapModes(TrippyGL.TextureWrapMode.ClampToEdge, TrippyGL.TextureWrapMode.ClampToEdge);
+
+        Debug.Log($"[AssetManager] Loaded Texture2D from package: {logPath} ({tex.Width}x{tex.Height})");
+        return tex;
     }
 
     private byte[]? TryGetAssetFromPackage(SNPKPackage pkg, string path)
@@ -146,5 +170,8 @@ public class AssetManager : IDisposable
         foreach (var pkg in _packages.Values)
             pkg.Dispose();
         _packages.Clear();
+
+        // If we own the device (legacy ctor path), dispose it
+        // Note: in normal flow the host owns the main GraphicsDevice
     }
 }

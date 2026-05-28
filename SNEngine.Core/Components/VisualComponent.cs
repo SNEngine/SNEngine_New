@@ -1,8 +1,8 @@
-﻿using Silk.NET.OpenGL;
-using SNEngine.Core.Assets;
+﻿using SNEngine.Core.Assets;
 using SNEngine.Core.Rendering;
 using Silk.NET.Maths;
-using Texture = SNEngine.Core.Assets.Texture;
+using System.Numerics;
+using Texture2D = TrippyGL.Texture2D;
 
 namespace SNEngine.Core.Components;
 
@@ -11,11 +11,16 @@ namespace SNEngine.Core.Components;
 /// </summary>
 public abstract class VisualComponent : Component
 {
-    public Texture? Texture { get; protected set; }
+    public Texture2D? Texture { get; protected set; }
     public float Alpha { get; set; } = 1.0f;
     public Vector2D<float> Position { get; set; } = new(0f, 0f);
     public Vector2D<float> Scale { get; set; } = new(1f, 1f);
     public float Rotation { get; set; } = 0f;
+
+    /// <summary>
+    /// Origin/pivot for rotation & scaling (in pixels). Null = use texture center.
+    /// </summary>
+    public Vector2? Origin { get; set; }
 
     protected readonly AssetManager _assetManager;
 
@@ -36,7 +41,9 @@ public abstract class VisualComponent : Component
     {
         if (Texture == null) return;
 
-        // TODO: Later we will apply Position, Scale, Rotation via matrix
-        renderer.DrawTexture(Texture, Alpha);
+        var pos = new Vector2(Position.X, Position.Y);
+        var scale = new Vector2(Scale.X, Scale.Y);
+
+        renderer.DrawSprite(Texture, pos, scale, Rotation, Origin, Alpha);
     }
 }

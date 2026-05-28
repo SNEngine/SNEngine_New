@@ -68,9 +68,23 @@ public static class CharacterAPI
     }
 
     /// <summary>
+    /// Internal default bottom padding (in pixels) used for automatic grounded positioning
+    /// when no explicit bottomPadding is provided.
+    /// Hidden from public API.
+    /// </summary>
+    private const float InternalDefaultBottomPadding = 0f;
+
+    /// <summary>
     /// Shows character on the scene.
     /// </summary>
-    public static CharacterObject Show(string characterName, string emotion = "happy", float x = 640f, float y = 120f)
+    /// <param name="bottomPadding">
+    /// If set (or left at default via overload), the character will be **automatically** positioned
+    /// to the bottom of the current screen using the bounce value computed from the raw image pixels.
+    /// This is the easiest way to get "Unity-like bottom alignment" without manually calculating groundY.
+    /// Pass null explicitly to use classic manual Y positioning.
+    /// </param>
+    public static CharacterObject Show(string characterName, string emotion = "happy", 
+                                       float x = 640f, float y = 120f, float? groundY = null, float? bottomPadding = null)
     {
         if (SNEngine.CurrentScene == null || SNEngine.Host?.AssetManager == null)
         {
@@ -78,16 +92,40 @@ public static class CharacterAPI
             return null!;
         }
 
+        bool useAutoGround = false;
+        float targetGroundY = 0;
+
+        if (groundY.HasValue)
+        {
+            targetGroundY = groundY.Value;
+            useAutoGround = true;
+        }
+        else if (bottomPadding.HasValue)
+        {
+            // Fully automatic: calculate groundY from current screen height + padding
+            targetGroundY = SNEngine.ScreenHeight - bottomPadding.Value;
+            useAutoGround = true;
+        }
+
         if (_activeCharacters.TryGetValue(characterName, out var existing))
         {
             existing.ChangeEmotion(emotion);
-            existing.SetPosition(x, y);
+
+            if (useAutoGround)
+                existing.SetGroundedPosition(x, targetGroundY);
+            else
+                existing.SetPosition(x, y);
+
             return existing;
         }
 
         var characterObj = new CharacterObject(SNEngine.Host.AssetManager);
         characterObj.Load(characterName, emotion);
-        characterObj.SetPosition(x, y);
+
+        if (useAutoGround)
+            characterObj.SetGroundedPosition(x, targetGroundY);
+        else
+            characterObj.SetPosition(x, y);
 
         var gameObject = new GameObject { Name = characterName };
         gameObject.AddComponent(characterObj);
@@ -95,8 +133,27 @@ public static class CharacterAPI
         SNEngine.CurrentScene.AddGameObject(gameObject);
         _activeCharacters[characterName] = characterObj;
 
-        Debug.Log($"[CharacterAPI] Showed {characterName} with emotion '{emotion}'");
+        string positioningInfo;
+        if (useAutoGround)
+            positioningInfo = groundY.HasValue 
+                ? $"grounded at Y={targetGroundY}" 
+                : $"auto-grounded (bottomPadding={bottomPadding ?? InternalDefaultBottomPadding})";
+        else
+            positioningInfo = $"at ({x},{y})";
+
+        Debug.Log($"[CharacterAPI] Showed {characterName} with emotion '{emotion}' ({positioningInfo})");
         return characterObj;
+    }
+
+    /// <summary>
+    /// Convenience overload: automatically places the character at the bottom of the screen
+    /// using the bounce computed from the actual sprite image pixels.
+    /// No need to manually calculate groundY.
+    /// </summary>
+    public static CharacterObject ShowAtBottom(string characterName, string emotion = "happy", float x = 640f, float? bottomPadding = null)
+    {
+        float padding = bottomPadding ?? InternalDefaultBottomPadding;
+        return Show(characterName, emotion, x, bottomPadding: padding);
     }
 
     /// <summary>

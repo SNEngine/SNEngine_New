@@ -159,4 +159,8 @@ public static class SNEngine
     public static Scene? CurrentScene => Host?.SceneManager?.CurrentScene;
 
     public static bool IsRunning => _host != null;
+
+    // === Screen / Viewport access (useful for automatic grounded positioning) ===
+    public static int ScreenWidth => Host?.Renderer?.ViewportWidth ?? 1280;
+    public static int ScreenHeight => Host?.Renderer?.ViewportHeight ?? 720;
 }

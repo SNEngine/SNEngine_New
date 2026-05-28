@@ -19,7 +19,11 @@ class Program
             SNEngine.API.SNEngine.LoadEmptyScene();
             BackgroundAPI.Show("assets/bg/classroom_day.png");
             CharacterAPI.AddExampleYuki();
-           CharacterAPI.Show("yuki", "happy");
+
+            // Fully automatic positioning to the bottom of the screen.
+            // Bounce (feet line) is calculated from the actual pixel data of the sprite.
+            // Character will sit correctly without legs being cut off.
+            CharacterAPI.ShowAtBottom("yuki", "happy", x: 640f);
 
             SNEngine.Core.Debug.Log("Scene loaded via SNEngine.API");
         };

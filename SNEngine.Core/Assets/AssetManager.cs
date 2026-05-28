@@ -23,6 +23,12 @@ public class AssetManager : IDisposable
     private readonly Dictionary<string, Texture2D> _textureCache = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, CharacterData> _characterCache = new(StringComparer.OrdinalIgnoreCase);
 
+    /// <summary>
+    /// Cached "bounce" (ground offset in pixels from bottom of image to first visible row).
+    /// Computed automatically from raw pixel data when the texture is loaded.
+    /// </summary>
+    private readonly Dictionary<string, float> _bounceCache = new(StringComparer.OrdinalIgnoreCase);
+
     public AssetManager(GraphicsDevice device)
     {
         _device = device ?? throw new ArgumentNullException(nameof(device));
@@ -98,12 +104,18 @@ public class AssetManager : IDisposable
     private Texture2D CreateTextureFromBytes(byte[] data, string logPath)
     {
         using var image = Image.Load<Rgba32>(data);
+
+        // Automatically compute bounce (feet/ground line) from the raw image pixels.
+        // This allows smart bottom positioning without manual data entry per sprite.
+        float bounce = SpriteUtils.ComputeBounce(image);
+        _bounceCache[logPath] = bounce;
+
         var tex = Texture2DExtensions.FromImage(_device, image, generateMipmaps: true);
 
         // Good defaults for VN sprites
         tex.SetWrapModes(TrippyGL.TextureWrapMode.ClampToEdge, TrippyGL.TextureWrapMode.ClampToEdge);
 
-        Debug.Log($"[AssetManager] Loaded Texture2D from package: {logPath} ({tex.Width}x{tex.Height})");
+        Debug.Log($"[AssetManager] Loaded Texture2D from package: {logPath} ({tex.Width}x{tex.Height}) bounce={bounce}");
         return tex;
     }
 
@@ -153,6 +165,35 @@ public class AssetManager : IDisposable
 
         Debug.LogWarning($"[AssetManager] Character not found: {characterName}");
         return null;
+    }
+
+    /// <summary>
+    /// Returns the automatically computed bounce (ground offset) for a previously loaded texture path.
+    /// Returns 0 if the texture was never loaded or had no visible pixels near the bottom.
+    /// </summary>
+    public float GetBounce(string path)
+    {
+        if (string.IsNullOrEmpty(path))
+            return 0f;
+
+        string normalized = path.Replace('\\', '/').TrimStart('/');
+
+        // Try exact and common variants (same logic as texture loading)
+        var candidates = new[]
+        {
+            normalized,
+            normalized.Replace("assets/", ""),
+            "characters/" + Path.GetFileName(normalized),
+            Path.GetFileName(normalized)
+        };
+
+        foreach (var c in candidates)
+        {
+            if (_bounceCache.TryGetValue(c, out var b))
+                return b;
+        }
+
+        return 0f;
     }
 
     public void ClearCache()

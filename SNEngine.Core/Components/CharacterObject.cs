@@ -19,6 +19,12 @@ public class CharacterObject : VisualComponent
 
     public float GroundOffset { get; set; } = 0f;
 
+    /// <summary>
+    /// Automatically computed bounce (in texture pixels) from the bottom of the current sprite
+    /// to the first visible row. Used for correct bottom-of-screen grounding.
+    /// </summary>
+    public float Bounce { get; private set; } = 0f;
+
     public CharacterObject(AssetManager assetManager) : base(assetManager)
     {
         Scale = new Vector2D<float>(0.95f, 0.95f);
@@ -58,6 +64,14 @@ public class CharacterObject : VisualComponent
                 Texture = _assetManager.LoadTexture(shortPath, AssetType.Characters);
             }
         }
+
+        // Compute smart bounce from the actual image data (not from data files)
+        Bounce = _assetManager.GetBounce(spritePath);
+        if (Bounce <= 0 && !string.IsNullOrEmpty(spritePath))
+        {
+            string shortPath = spritePath.Replace("characters/", "");
+            Bounce = _assetManager.GetBounce(shortPath);
+        }
     }
     public override void Render(Renderer renderer)
     {
@@ -73,5 +87,29 @@ public class CharacterObject : VisualComponent
     public void SetPosition(float x, float y)
     {
         Position = new Vector2D<float>(x, y + GroundOffset);
+    }
+
+    /// <summary>
+    /// Smart positioning: places the character so that its visual "feet" line
+    /// (determined by the automatically computed Bounce from the image pixels)
+    /// lands exactly at the given groundY on screen.
+    ///
+    /// This is the equivalent of Unity's SpriteRenderer pivot = Bottom + custom ground offset.
+    /// Prevents legs from being cut off at the bottom of the screen.
+    /// </summary>
+    /// <param name="x">Horizontal position (usually center of character on screen)</param>
+    /// <param name="groundY">The Y coordinate on screen where the feet should rest (e.g. 650 on 720p)</param>
+    public void SetGroundedPosition(float x, float groundY)
+    {
+        if (Texture == null) return;
+
+        // Origin is placed at the feet line inside the texture (center X, bottom minus bounce)
+        float originX = Texture.Width / 2f;
+        float originY = Texture.Height - Bounce;
+
+        Origin = new Vector2(originX, originY);
+
+        // Position.Y now directly corresponds to where the feet touch the ground
+        Position = new Vector2D<float>(x, groundY);
     }
 }

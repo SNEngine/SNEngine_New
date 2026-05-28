@@ -21,8 +21,8 @@ public class Renderer : IDisposable
     private TextureBatcher? _batcher;
     private SimpleShaderProgram? _shader;
 
-    private int _viewportWidth;
-    private int _viewportHeight;
+    public int ViewportWidth { get; private set; }
+    public int ViewportHeight { get; private set; }
 
     private readonly List<GameObject> _gameObjects = new();
 
@@ -68,8 +68,8 @@ public class Renderer : IDisposable
     /// </summary>
     public void SetViewport(int width, int height)
     {
-        _viewportWidth = width;
-        _viewportHeight = height;
+        ViewportWidth = width;
+        ViewportHeight = height;
 
         _device?.SetViewport(0, 0, (uint)width, (uint)height);
 
@@ -140,10 +140,10 @@ public class Renderer : IDisposable
     /// </summary>
     public void DrawBackground(Texture2D? texture, float alpha = 1.0f)
     {
-        if (texture == null || _batcher == null || _viewportWidth <= 0 || _viewportHeight <= 0) return;
+        if (texture == null || _batcher == null || ViewportWidth <= 0 || ViewportHeight <= 0) return;
 
         var color = new Color4b(255, 255, 255, (byte)(alpha * 255));
-        var destRect = new System.Drawing.RectangleF(0, 0, _viewportWidth, _viewportHeight);
+        var destRect = new System.Drawing.RectangleF(0, 0, ViewportWidth, ViewportHeight);
 
         _batcher.Draw(texture, destRect, null, color);
     }

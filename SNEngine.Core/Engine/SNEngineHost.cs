@@ -2,8 +2,10 @@
 using Silk.NET.OpenGL;
 using Silk.NET.Windowing;
 using SNEngine.Core.Assets;
+using SNEngine.Core.Engine;
 using SNEngine.Core.Rendering;
 using System;
+using System.Buffers;
 using System.Threading.Tasks;
 using TrippyGL;
 
@@ -23,6 +25,9 @@ public class SNEngineHost : IDisposable
     private readonly int _previewWidth;
     private readonly int _previewHeight;
 
+    // Reusable buffer for preview readback (allocated only in preview mode)
+    private byte[]? _previewPixelBuffer;
+
     public AssetManager AssetManager { get; private set; } = null!;
     public Renderer Renderer { get; private set; } = null!;
     public SceneManager SceneManager { get; private set; } = null!;
@@ -33,9 +38,15 @@ public class SNEngineHost : IDisposable
     /// </summary>
     public GraphicsDevice? GraphicsDevice { get; private set; }
 
+    /// <summary>
+    /// Render settings used by the engine. Can be customized before or after initialization.
+    /// </summary>
+    public RenderSettings RenderSettings { get; private set; } = new RenderSettings();
+
     public event Action? OnInitialized;
 
     private bool _isDisposing = false;
+    private bool _disposed = false;
 
     /// <summary>
     /// Графический API, который был использован при создании окна.
@@ -56,11 +67,15 @@ public class SNEngineHost : IDisposable
                         int width = 1280,
                         int height = 720,
                         bool useSharedMemory = false,
-                        GraphicsAPI? graphicsApi = null)
+                        GraphicsAPI? graphicsApi = null,
+                        RenderSettings? renderSettings = null)
     {
         _useSharedMemory = useSharedMemory;
         _previewWidth = width;
         _previewHeight = height;
+
+        if (renderSettings != null)
+            RenderSettings = renderSettings;
 
         var options = WindowOptions.Default;
         options.Title = title;
@@ -107,12 +122,17 @@ public class SNEngineHost : IDisposable
         GraphicsDevice = new GraphicsDevice(_gl);
         Console.WriteLine("[SNEngineHost] TrippyGL GraphicsDevice created.");
 
+        // Apply render settings to the device early
+        GraphicsDevice.ClearColor = RenderSettings.ClearColor;
+        GraphicsDevice.BlendState = RenderSettings.BlendState;
+
         // Asset managers now use GraphicsDevice (with legacy GL fallback inside)
         AssetManager = new AssetManager(GraphicsDevice);
         FileManager = new FileManager(GraphicsDevice);
 
         Renderer = new Renderer();
-        Renderer.Initialize(_gl);
+        // Preferred path: pass existing GraphicsDevice + our settings
+        Renderer.Initialize(GraphicsDevice, RenderSettings);
 
         // Initial viewport + projection
         Renderer.SetViewport(_previewWidth, _previewHeight);
@@ -125,6 +145,11 @@ public class SNEngineHost : IDisposable
         {
             _sharedFramePublisher = new SharedFramePublisher();
             _sharedFramePublisher.Initialize(_previewWidth, _previewHeight);
+
+            // Rent a reusable buffer for ReadPixels (big win for preview performance)
+            int bufferSize = _previewWidth * _previewHeight * 4;
+            _previewPixelBuffer = ArrayPool<byte>.Shared.Rent(bufferSize);
+
             Debug.Log("[Preview] Shared Memory Publisher initialized successfully.");
         }
 
@@ -170,13 +195,18 @@ public class SNEngineHost : IDisposable
 
     private unsafe void PublishPreviewFrame()
     {
+        if (!_useSharedMemory || _sharedFramePublisher == null || _previewPixelBuffer == null)
+            return;
+
         try
         {
             int w = _previewWidth;
             int h = _previewHeight;
-            byte[] pixels = new byte[w * h * 4];
+            int neededSize = w * h * 4;
 
-            // Use GraphicsDevice.GL (or fallback to raw _gl) — works after TrippyGL migration
+            // Use pre-rented buffer (no allocation per frame)
+            byte[] pixels = _previewPixelBuffer;
+
             var gl = GraphicsDevice?.GL ?? _gl;
             if (gl == null) return;
 
@@ -185,7 +215,7 @@ public class SNEngineHost : IDisposable
                 gl.ReadPixels(0, 0, (uint)w, (uint)h, PixelFormat.Rgba, PixelType.UnsignedByte, ptr);
             }
 
-            _sharedFramePublisher!.PublishFrame(w, h, pixels.AsSpan());
+            _sharedFramePublisher.PublishFrame(w, h, pixels.AsSpan(0, neededSize));
         }
         catch { }
     }
@@ -216,6 +246,9 @@ public class SNEngineHost : IDisposable
 
     private void SafeDispose()
     {
+        if (_disposed) return;
+        _disposed = true;
+
         if (_window == null) return;
 
         try
@@ -228,17 +261,31 @@ public class SNEngineHost : IDisposable
                 _sharedFramePublisher = null;
             }
 
-            // Ресурсы рендера (TrippyGL)
+            // Return rented preview buffer to ArrayPool
+            if (_previewPixelBuffer != null)
+            {
+                ArrayPool<byte>.Shared.Return(_previewPixelBuffer);
+                _previewPixelBuffer = null;
+            }
+
+            // Ресурсы рендера (TrippyGL) — важно соблюдать порядок
             if (Renderer != null)
             {
                 try { Renderer.Dispose(); }
                 catch { }
+                Renderer = null!;
             }
 
             if (AssetManager != null)
             {
                 try { AssetManager.Dispose(); }
                 catch { }
+                AssetManager = null!;
+            }
+
+            if (FileManager != null)
+            {
+                // FileManager currently doesn't own heavy resources in the main path
             }
 
             if (GraphicsDevice != null)
@@ -265,15 +312,16 @@ public class SNEngineHost : IDisposable
         {
             _window = null;
             _gl = null;
-            Renderer = null!;
-            AssetManager = null!;
             SceneManager = null!;
             FileManager = null!;
-            GraphicsDevice = null;
         }
     }
 
     public void Run() => _window?.Run();
 
-    public void Dispose() => SafeDispose();
+    public void Dispose()
+    {
+        SafeDispose();
+        GC.SuppressFinalize(this);
+    }
 }

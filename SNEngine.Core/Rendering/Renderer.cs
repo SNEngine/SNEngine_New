@@ -2,9 +2,9 @@
 using Silk.NET.Maths;
 using Silk.NET.OpenGL;
 using SNEngine.Core.Components;
+using SNEngine.Core.Engine;
 using SNEngine.Core.Scenes;
 using System;
-using System.Collections.Generic;
 using System.Numerics;
 using TrippyGL;
 
@@ -17,56 +17,94 @@ namespace SNEngine.Core.Rendering;
 public class Renderer : IDisposable
 {
     private GL? _gl;
-    private GraphicsDevice? _device;
-    private TextureBatcher? _batcher;
-    private SimpleShaderProgram? _shader;
+    private RenderDeviceContext? _deviceContext;
 
-    public int ViewportWidth { get; private set; }
-    public int ViewportHeight { get; private set; }
+    public int ViewportWidth => Viewport.Width;
+    public int ViewportHeight => Viewport.Height;
+
+    /// <summary>
+    /// Current 2D viewport (handles size and orthographic projection).
+    /// </summary>
+    public Viewport2D Viewport { get; } = new Viewport2D();
+
+    // Command buffer for layered rendering (extracted to reduce God Class)
+    private readonly DrawCommandBuffer _commandBuffer = new();
+
+    private RenderSettings _settings = new RenderSettings();
+
+    /// <summary>
+    /// Current render settings. Assigning a new instance will apply the changes immediately if the device is initialized.
+    /// </summary>
+    public RenderSettings Settings
+    {
+        get => _settings;
+        set
+        {
+            _settings = value ?? new RenderSettings();
+            ApplySettings();
+        }
+    }
 
     /// <summary>
     /// Reference resolution used for automatic scaling of characters and UI elements.
-    /// When the actual viewport differs, objects with AutoScaleWithViewport = true
-    /// will have their scale multiplied by (current / reference).
+    /// Delegates to Settings. Kept for backward compatibility.
     /// </summary>
-    public int ReferenceWidth { get; set; } = 1280;
-    public int ReferenceHeight { get; set; } = 720;
+    public int ReferenceWidth
+    {
+        get => Settings.ReferenceWidth;
+        set => Settings.ReferenceWidth = value;
+    }
+
+    public int ReferenceHeight
+    {
+        get => Settings.ReferenceHeight;
+        set => Settings.ReferenceHeight = value;
+    }
 
     /// <summary>
     /// The underlying TrippyGL GraphicsDevice. Exposed for advanced use / preview.
     /// </summary>
-    public GraphicsDevice? Device => _device;
+    public GraphicsDevice? Device => _deviceContext?.Device;
 
     /// <summary>
     /// The main sprite batcher. Components should prefer drawing through the helper methods
     /// on this Renderer when possible.
     /// </summary>
-    public TextureBatcher? Batcher => _batcher;
+    public TextureBatcher? Batcher => _deviceContext?.MainBatcher;
 
     public Renderer()
     {
     }
 
     /// <summary>
-    /// Called from SNEngineHost.OnLoad when GL context is ready.
+    /// Preferred initialization: pass an existing GraphicsDevice (better resource ownership).
     /// </summary>
-    public void Initialize(GL gl)
+    public void Initialize(GraphicsDevice device, RenderSettings? settings = null)
     {
-        _gl = gl ?? throw new ArgumentNullException(nameof(gl));
+        if (device == null) throw new ArgumentNullException(nameof(device));
 
-        _device = new GraphicsDevice(gl);
-        _batcher = new TextureBatcher(_device);
-        _shader = SimpleShaderProgram.Create<VertexColorTexture>(_device);
+        _gl = device.GL;
 
-        _batcher.SetShaderProgram(_shader);
+        if (settings != null)
+            Settings = settings;
 
-        // Standard 2D sprite blending (non-premultiplied alpha from ImageSharp PNGs)
-        _device.BlendState = BlendState.NonPremultiplied;
+        _deviceContext = new RenderDeviceContext(device, Settings);
 
-        // Dark blue-ish clear (matches previous custom renderer)
-        _device.ClearColor = new Color4b(5, 5, 13, 255);
+        // Apply initial projection from viewport
+        Viewport.Apply(_deviceContext.SpriteShader);
 
         Console.WriteLine("[Renderer] Initialized with TrippyGL (GraphicsDevice + TextureBatcher).");
+    }
+
+    /// <summary>
+    /// Legacy initialization path. Throws to force use of the proper GraphicsDevice-based initialization.
+    /// </summary>
+    [Obsolete("This path is no longer supported. Use Initialize(GraphicsDevice, RenderSettings).", error: true)]
+    public void Initialize(GL gl)
+    {
+        throw new NotSupportedException(
+            "Renderer.Initialize(GL) is no longer supported. " +
+            "SNEngineHost now owns the GraphicsDevice. Use the overload that accepts GraphicsDevice.");
     }
 
     /// <summary>
@@ -74,45 +112,42 @@ public class Renderer : IDisposable
     /// </summary>
     public void SetViewport(int width, int height)
     {
-        ViewportWidth = width;
-        ViewportHeight = height;
+        Viewport.SetSize(width, height);
 
-        _device?.SetViewport(0, 0, (uint)width, (uint)height);
+        _deviceContext?.SetViewport(0, 0, width, height);
 
-        if (_shader != null)
-        {
-            // Top-left origin, Y down (standard for 2D UI/sprites)
-            _shader.Projection = Matrix4x4.CreateOrthographicOffCenter(
-                0, width, height, 0, 0, 1);
-        }
+        // Apply projection to the sprite shader
+        Viewport.Apply(_deviceContext?.SpriteShader);
+    }
 
-        // World and View stay identity for pure 2D
-        if (_shader != null)
-        {
-            _shader.World = Matrix4x4.Identity;
-            _shader.View = Matrix4x4.Identity;
-        }
+    private void ApplySettings()
+    {
+        _deviceContext?.ApplySettings(Settings);
     }
 
     /// <summary>
-    /// Begins a new frame for batching. Call this before issuing draw calls.
+    /// Begins a new frame. Draw calls are recorded into the command buffer.
     /// </summary>
     public void Begin()
     {
-        _batcher?.Begin(BatcherBeginMode.Deferred);
+        _commandBuffer.Clear();
     }
 
     /// <summary>
-    /// Ends the current frame and flushes all batched draw calls.
+    /// Ends the frame: sorts recorded commands by layer and executes them through the batcher.
     /// </summary>
     public void End()
     {
-        _batcher?.End();
+        if (_deviceContext == null || !_commandBuffer.HasCommands)
+            return;
+
+        _commandBuffer.SortByLayer();
+        _commandBuffer.Execute(_deviceContext.MainBatcher);
     }
 
     public void Clear()
     {
-        _device?.Clear(ClearBuffers.Color);
+        _deviceContext?.Clear();
     }
 
     // ============================================================
@@ -126,10 +161,10 @@ public class Renderer : IDisposable
     [Obsolete("Use DrawBackground or DrawSprite instead.")]
     public void DrawTexture(Texture2D? texture, float alpha = 1.0f)
     {
-        if (texture == null || _batcher == null) return;
+        if (texture == null || _deviceContext == null) return;
 
         var color = new Color4b(255, 255, 255, (byte)(alpha * 255));
-        _batcher.Draw(texture, Vector2.Zero, null, color, 1f, 0f, Vector2.Zero);
+        _deviceContext.MainBatcher.Draw(texture, Vector2.Zero, null, color, 1f, 0f, Vector2.Zero);
     }
 
     /// <summary>
@@ -139,7 +174,7 @@ public class Renderer : IDisposable
     /// </summary>
     public void DrawBackground(Texture2D? texture, float alpha = 1.0f)
     {
-        if (texture == null || _batcher == null || ViewportWidth <= 0 || ViewportHeight <= 0) return;
+        if (texture == null || _deviceContext == null || ViewportWidth <= 0 || ViewportHeight <= 0) return;
 
         float texW = texture.Width;
         float texH = texture.Height;
@@ -159,20 +194,23 @@ public class Renderer : IDisposable
         float offsetX = (viewW - finalW) / 2f;
         float offsetY = (viewH - finalH) / 2f;
 
-        // Draw black bars first (letterbox/pillarbox) without mutating global ClearColor
-        if (offsetX > 0 || offsetY > 0)
-        {
-            // Simple full-screen black quad using a 1x1 white texture trick is not ideal.
-            // For now we rely on the fact that the frame was already cleared.
-            // If we want guaranteed black bars even if ClearColor is not black,
-            // we would need to draw a black rectangle here.
-            // Current behavior: bars will be whatever was cleared before.
-        }
-
         var color = new Color4b(255, 255, 255, (byte)(alpha * 255));
-        var destRect = new System.Drawing.RectangleF(offsetX, offsetY, finalW, finalH);
 
-        _batcher.Draw(texture, destRect, null, color);
+        // For background we use position + uniform scale to achieve the letterboxed size
+        float uniformScale = finalW / texW; // since we used min scale
+
+        if (_deviceContext != null)
+        {
+            _commandBuffer.Add(new DrawCommand(
+                texture,
+                new Vector2(offsetX, offsetY),
+                null,
+                color,
+                uniformScale,
+                0f,
+                Vector2.Zero,
+                RenderLayer.Background));
+        }
     }
 
     /// <summary>
@@ -185,22 +223,24 @@ public class Renderer : IDisposable
         float rotation = 0f,
         Vector2? origin = null,
         float alpha = 1.0f,
-        System.Drawing.Rectangle? sourceRect = null)
+        System.Drawing.Rectangle? sourceRect = null,
+        RenderLayer layer = RenderLayer.Characters)
     {
-        if (texture == null || _batcher == null) return;
+        if (texture == null || _deviceContext == null) return;
 
         var s = scale ?? Vector2.One;
         var o = origin ?? new Vector2(texture.Width / 2f, texture.Height / 2f);
         var color = new Color4b(255, 255, 255, (byte)(alpha * 255));
 
-        _batcher.Draw(
+        _commandBuffer.Add(new DrawCommand(
             texture,
             position,
             sourceRect,
             color,
-            s.X,           // scaleX (uniform for simplicity; can extend later)
+            s.X,
             rotation,
-            o);
+            o,
+            layer));
     }
 
     /// <summary>
@@ -211,24 +251,37 @@ public class Renderer : IDisposable
         Vector2 position,
         Vector2 scale,
         float rotation,
-        float alpha)
+        float alpha,
+        RenderLayer layer = RenderLayer.Characters)
     {
-        DrawSprite(texture, position, scale, rotation, null, alpha);
+        DrawSprite(texture, position, scale, rotation, null, alpha, null, layer);
     }
+
+    private bool _disposed;
 
     public void Dispose()
     {
-        try
-        {
-            _batcher?.Dispose();
-            _shader?.Dispose();
-            _device?.Dispose();
-        }
-        catch { }
+        Dispose(true);
+        GC.SuppressFinalize(this);
+    }
 
-        _batcher = null;
-        _shader = null;
-        _device = null;
+    protected virtual void Dispose(bool disposing)
+    {
+        if (_disposed) return;
+
+        if (disposing)
+        {
+            try
+            {
+                _deviceContext?.Dispose();
+                // Note: We do NOT dispose the GraphicsDevice here.
+                // Ownership belongs to SNEngineHost.
+            }
+            catch { }
+        }
+
+        _deviceContext = null;
         _gl = null;
+        _disposed = true;
     }
 }

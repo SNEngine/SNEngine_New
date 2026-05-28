@@ -1,5 +1,4 @@
 ﻿
-using Silk.NET.OpenGL;
 using SNEngine.Core.Assets;
 using System;
 using System.IO;
@@ -21,15 +20,6 @@ public class FileManager
     public FileManager(GraphicsDevice device)
     {
         _device = device ?? throw new ArgumentNullException(nameof(device));
-    }
-
-    /// <summary>
-    /// [Obsolete] Prefer the GraphicsDevice constructor.
-    /// This legacy constructor creates an internal GraphicsDevice.
-    /// </summary>
-    [Obsolete("Use constructor that accepts GraphicsDevice instead.")]
-    public FileManager(GL gl) : this(new GraphicsDevice(gl))
-    {
     }
 
     private readonly Dictionary<string, float> _bounceCache = new(StringComparer.OrdinalIgnoreCase);

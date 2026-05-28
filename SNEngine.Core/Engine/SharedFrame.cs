@@ -66,7 +66,7 @@ public sealed class SharedFramePublisher : IDisposable
         if (!_isInitialized || _accessor == null) return;
 
         int bufferOffset = HeaderSize + (_currentBufferIndex * MaxWidth * MaxHeight * 4);
-        int pixelDataSize = width * height * 4;
+        int pixelDataSize = Math.Min(width * height * 4, rgbaPixels.Length);
 
         var header = new FrameHeader
         {
@@ -79,7 +79,13 @@ public sealed class SharedFramePublisher : IDisposable
         };
 
         _accessor.Write(0, ref header);
-        _accessor.WriteArray(bufferOffset, rgbaPixels.ToArray(), 0, Math.Min(pixelDataSize, rgbaPixels.Length));
+
+        // Write directly from span without allocating .ToArray()
+        for (int i = 0; i < pixelDataSize; i++)
+        {
+            _accessor.Write(bufferOffset + i, rgbaPixels[i]);
+        }
+
         _currentBufferIndex = 1 - _currentBufferIndex;
     }
 

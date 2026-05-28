@@ -1,5 +1,4 @@
-﻿using Silk.NET.OpenGL;
-using SNEngine.Assets.Package;
+﻿using SNEngine.Assets.Package;
 using SNEngine.Data;
 using System;
 using System.Collections.Generic;
@@ -32,15 +31,6 @@ public class AssetManager : IDisposable
     public AssetManager(GraphicsDevice device)
     {
         _device = device ?? throw new ArgumentNullException(nameof(device));
-    }
-
-    /// <summary>
-    /// [Obsolete] Prefer the GraphicsDevice constructor.
-    /// This legacy constructor creates an internal GraphicsDevice and is only kept for compatibility during transition.
-    /// </summary>
-    [Obsolete("Use constructor that accepts GraphicsDevice instead. This will be removed in a future version.")]
-    public AssetManager(GL gl) : this(new GraphicsDevice(gl))
-    {
     }
 
     public void LoadPackage(string pakPath, AssetType type = AssetType.Misc)
@@ -214,7 +204,7 @@ public class AssetManager : IDisposable
             pkg.Dispose();
         _packages.Clear();
 
-        // If we own the device (legacy ctor path), dispose it
-        // Note: in normal flow the host owns the main GraphicsDevice
+        // Note: We never own the GraphicsDevice.
+        // Ownership always stays with SNEngineHost.
     }
 }

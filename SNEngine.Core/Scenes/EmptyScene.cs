@@ -12,6 +12,6 @@ public class EmptyScene : Scene
 
     public override void OnLoad()
     {
-        Console.WriteLine($"[EmptyScene] Loaded: {Name}");
+        Debug.Log($"[EmptyScene] Loaded: {Name}");
     }
 }

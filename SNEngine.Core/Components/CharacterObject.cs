@@ -32,13 +32,10 @@ public class CharacterObject : VisualComponent
     /// </summary>
     public bool AutoScaleWithViewport { get; set; } = true;
 
-    // === Auto-grounding state for resolution / fullscreen changes ===
-    private float? _autoBottomPadding;
-    private float _autoGroundedX;
-
-    // Horizontal auto-positioning (survives window resize / fullscreen)
-    private float? _autoHorizontalAnchor;   // 0.0 = left edge, 0.5 = center, 1.0 = right edge
-    private float _autoHorizontalOffset;    // additional offset in pixels from the anchor point
+    /// <summary>
+    /// Component responsible for automatic grounded/anchored positioning that survives window resizes.
+    /// </summary>
+    public AutoPositioningComponent AutoPositioning { get; } = new AutoPositioningComponent();
 
     public CharacterObject(AssetManager assetManager) : base(assetManager)
     {
@@ -94,36 +91,19 @@ public class CharacterObject : VisualComponent
 
         Vector2 drawPos;
 
-        // === Vertical auto-grounding (bottom padding) ===
-        float targetY;
-        if (_autoBottomPadding.HasValue)
+        // === Auto positioning via dedicated component ===
+        drawPos = new Vector2(Position.X, Position.Y);
+        Vector2? drawOrigin = Origin;
+
+        if (AutoPositioning.HasAutoPositioning)
         {
-            targetY = renderer.ViewportHeight - _autoBottomPadding.Value;
-        }
-        else
-        {
-            targetY = Position.Y;
+            AutoPositioning.Apply(renderer, ref drawPos, ref drawOrigin, Texture, Bounce);
         }
 
-        // === Horizontal auto-positioning ===
-        float targetX;
-        if (_autoHorizontalAnchor.HasValue)
+        // Re-apply origin every frame (in case emotion/Bounce changed)
+        if (Texture != null && drawOrigin.HasValue)
         {
-            targetX = renderer.ViewportWidth * _autoHorizontalAnchor.Value + _autoHorizontalOffset;
-        }
-        else
-        {
-            targetX = Position.X;
-        }
-
-        drawPos = new Vector2(targetX, targetY);
-
-        // Re-apply origin every frame (in case emotion/Bounce changed or we are in auto mode)
-        if (Texture != null)
-        {
-            float originX = Texture.Width / 2f;
-            float originY = Texture.Height - Bounce;
-            Origin = new Vector2(originX, originY);
+            Origin = drawOrigin;
         }
 
         // Compute effective scale (base Scale is treated as scale at Reference resolution)
@@ -144,13 +124,12 @@ public class CharacterObject : VisualComponent
             effectiveScale.Y *= scaleFactor;
         }
 
-        renderer.DrawSprite(Texture, drawPos, effectiveScale, Rotation, Origin, Alpha);
+        renderer.DrawSprite(Texture, drawPos, effectiveScale, Rotation, drawOrigin, Alpha);
     }
 
     public void SetPosition(float x, float y)
     {
-        _autoBottomPadding = null;
-        _autoHorizontalAnchor = null; // cancel auto horizontal too
+        AutoPositioning.ClearAutoPositioning();
         Position = new Vector2D<float>(x, y + GroundOffset);
     }
 
@@ -160,8 +139,7 @@ public class CharacterObject : VisualComponent
     /// </summary>
     public void SetGroundedPosition(float x, float groundY)
     {
-        _autoBottomPadding = null;
-        _autoHorizontalAnchor = null;
+        AutoPositioning.ClearAutoPositioning();
         if (Texture == null) return;
 
         float originX = Texture.Width / 2f;
@@ -176,9 +154,7 @@ public class CharacterObject : VisualComponent
     /// </summary>
     public void SetAutoGroundedPosition(float x, float bottomPadding)
     {
-        _autoBottomPadding = bottomPadding;
-        _autoGroundedX = x;           // absolute X for now (see SetAutoPosition for relative)
-        _autoHorizontalAnchor = null;
+        AutoPositioning.SetAutoGrounded(x, bottomPadding);
 
         if (Texture != null)
         {
@@ -196,9 +172,7 @@ public class CharacterObject : VisualComponent
     /// </summary>
     public void SetAutoPosition(float horizontalAnchor, float horizontalOffset, float bottomPadding)
     {
-        _autoHorizontalAnchor = horizontalAnchor;
-        _autoHorizontalOffset = horizontalOffset;
-        _autoBottomPadding = bottomPadding;
+        AutoPositioning.SetAutoPosition(horizontalAnchor, horizontalOffset, bottomPadding);
 
         if (Texture != null)
         {

@@ -32,7 +32,15 @@ public static class SNEngine
                           bool useSharedMemoryPreview = false,
                           GraphicsAPI? graphicsApi = null)
     {
-        _host = new SNEngineHost(windowTitle, width, height, useSharedMemoryPreview, graphicsApi);
+        _host = new SNEngineHost(windowTitle, width, height, useSharedMemoryPreview, graphicsApi, DefaultRenderSettings);
+
+        // Apply user-configured default settings
+        if (_host.RenderSettings != null)
+        {
+            // Copy relevant defaults (user can further customize via _host.RenderSettings before Run blocks)
+            // For simplicity we just ensure the instance exists; user can modify _host.RenderSettings directly
+            // if they access it before calling Run (advanced scenario).
+        }
 
         _host.OnInitialized += () =>
         {
@@ -159,6 +167,17 @@ public static class SNEngine
     public static Scene? CurrentScene => Host?.SceneManager?.CurrentScene;
 
     public static bool IsRunning => _host != null;
+
+    /// <summary>
+    /// Default render settings that will be used when creating a new engine instance.
+    /// Modify this before calling Run() to customize reference resolution, scaling, etc.
+    /// </summary>
+    public static RenderSettings DefaultRenderSettings { get; } = new RenderSettings();
+
+    /// <summary>
+    /// Current render settings of the running engine (if any).
+    /// </summary>
+    public static RenderSettings? RenderSettings => _host?.RenderSettings;
 
     // === Screen / Viewport access (useful for automatic grounded positioning) ===
     public static int ScreenWidth => Host?.Renderer?.ViewportWidth ?? 1280;

@@ -144,14 +144,42 @@ public class Renderer : IDisposable
     }
 
     /// <summary>
-    /// Proper fullscreen background draw (scales texture to current viewport).
+    /// Draws background while preserving aspect ratio.
+    /// Centers the image and adds letterbox/pillarbox bars when necessary.
+    /// Does NOT stretch or squish the background.
     /// </summary>
     public void DrawBackground(Texture2D? texture, float alpha = 1.0f)
     {
         if (texture == null || _batcher == null || ViewportWidth <= 0 || ViewportHeight <= 0) return;
 
+        // Clear to black first so that letterbox/pillarbox bars are pure black
+        // (standard behavior for visual novels)
+        var previousClearColor = _device?.ClearColor;
+        _device!.ClearColor = Color4b.Black;
+        _device.Clear(ClearBuffers.Color);
+        if (previousClearColor.HasValue)
+            _device.ClearColor = previousClearColor.Value;
+
+        float texW = texture.Width;
+        float texH = texture.Height;
+
+        float viewW = ViewportWidth;
+        float viewH = ViewportHeight;
+
+        // Calculate scale to fit the image inside the viewport while keeping aspect ratio (contain mode)
+        float scaleX = viewW / texW;
+        float scaleY = viewH / texH;
+        float scale = Math.Min(scaleX, scaleY);
+
+        float finalW = texW * scale;
+        float finalH = texH * scale;
+
+        // Center the image
+        float offsetX = (viewW - finalW) / 2f;
+        float offsetY = (viewH - finalH) / 2f;
+
         var color = new Color4b(255, 255, 255, (byte)(alpha * 255));
-        var destRect = new System.Drawing.RectangleF(0, 0, ViewportWidth, ViewportHeight);
+        var destRect = new System.Drawing.RectangleF(offsetX, offsetY, finalW, finalH);
 
         _batcher.Draw(texture, destRect, null, color);
     }

@@ -556,8 +556,8 @@ ipcMain.handle('preview:start', async (event, projectPath, width = 800, height =
   }
 
   // Путь к исполняемому файлу (можно сделать динамическим позже)
-  const runtimePath = path.join(__dirname, 'PlayerTemplates/Windows/SNEngine.Runtime.exe');
-  // const runtimePath = 'E:\\repos\\SNEngine\\SNEngine.Test\\bin\\Debug\\net9.0\\SNEngine.Test.exe';
+//  const runtimePath = path.join(__dirname, 'PlayerTemplates/Windows/SNEngine.Runtime.exe');
+   const runtimePath = 'E:\\repos\\SNEngine\\SNEngine.Test\\bin\\Debug\\net9.0\\SNEngine.Test.exe';
 
   const args = [
     '--preview',

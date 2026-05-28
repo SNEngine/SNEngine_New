@@ -23,7 +23,7 @@ class Program
             // Fully automatic positioning to the bottom of the screen.
             // Bounce (feet line) is calculated from the actual pixel data of the sprite.
             // Character will sit correctly without legs being cut off.
-            CharacterAPI.ShowAtBottom("yuki", "happy", x: 640f);
+            CharacterAPI.Show("yuki", "happy");
 
             SNEngine.Core.Debug.Log("Scene loaded via SNEngine.API");
         };

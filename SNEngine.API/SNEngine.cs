@@ -163,4 +163,19 @@ public static class SNEngine
     // === Screen / Viewport access (useful for automatic grounded positioning) ===
     public static int ScreenWidth => Host?.Renderer?.ViewportWidth ?? 1280;
     public static int ScreenHeight => Host?.Renderer?.ViewportHeight ?? 720;
+
+    /// <summary>
+    /// Reference resolution for auto-scaling of characters when the window size changes.
+    /// </summary>
+    public static int ReferenceWidth
+    {
+        get => Host?.Renderer?.ReferenceWidth ?? 1280;
+        set { if (Host?.Renderer != null) Host.Renderer.ReferenceWidth = value; }
+    }
+
+    public static int ReferenceHeight
+    {
+        get => Host?.Renderer?.ReferenceHeight ?? 720;
+        set { if (Host?.Renderer != null) Host.Renderer.ReferenceHeight = value; }
+    }
 }

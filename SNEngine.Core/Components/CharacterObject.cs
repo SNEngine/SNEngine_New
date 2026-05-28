@@ -25,6 +25,21 @@ public class CharacterObject : VisualComponent
     /// </summary>
     public float Bounce { get; private set; } = 0f;
 
+    /// <summary>
+    /// If true (default for characters), the character's scale will be automatically
+    /// adjusted based on current viewport size relative to ReferenceWidth/Height.
+    /// This prevents characters from looking huge in small windows or tiny in huge fullscreen.
+    /// </summary>
+    public bool AutoScaleWithViewport { get; set; } = true;
+
+    // === Auto-grounding state for resolution / fullscreen changes ===
+    private float? _autoBottomPadding;
+    private float _autoGroundedX;
+
+    // Horizontal auto-positioning (survives window resize / fullscreen)
+    private float? _autoHorizontalAnchor;   // 0.0 = left edge, 0.5 = center, 1.0 = right edge
+    private float _autoHorizontalOffset;    // additional offset in pixels from the anchor point
+
     public CharacterObject(AssetManager assetManager) : base(assetManager)
     {
         Scale = new Vector2D<float>(0.95f, 0.95f);
@@ -77,39 +92,119 @@ public class CharacterObject : VisualComponent
     {
         if (Texture == null) return;
 
-        // CharacterObject already sets Position via SetPosition
-        var pos = new Vector2(Position.X, Position.Y);
-        var scale = new Vector2(Scale.X, Scale.Y);
+        Vector2 drawPos;
 
-        renderer.DrawSprite(Texture, pos, scale, Rotation, Origin, Alpha);
+        // === Vertical auto-grounding (bottom padding) ===
+        float targetY;
+        if (_autoBottomPadding.HasValue)
+        {
+            targetY = renderer.ViewportHeight - _autoBottomPadding.Value;
+        }
+        else
+        {
+            targetY = Position.Y;
+        }
+
+        // === Horizontal auto-positioning ===
+        float targetX;
+        if (_autoHorizontalAnchor.HasValue)
+        {
+            targetX = renderer.ViewportWidth * _autoHorizontalAnchor.Value + _autoHorizontalOffset;
+        }
+        else
+        {
+            targetX = Position.X;
+        }
+
+        drawPos = new Vector2(targetX, targetY);
+
+        // Re-apply origin every frame (in case emotion/Bounce changed or we are in auto mode)
+        if (Texture != null)
+        {
+            float originX = Texture.Width / 2f;
+            float originY = Texture.Height - Bounce;
+            Origin = new Vector2(originX, originY);
+        }
+
+        // Compute effective scale (base Scale is treated as scale at Reference resolution)
+        Vector2 effectiveScale = new Vector2(Scale.X, Scale.Y);
+
+        if (AutoScaleWithViewport && renderer.ViewportWidth > 0)
+        {
+            int refWidth = renderer.ReferenceWidth > 0 ? renderer.ReferenceWidth : 1280;
+
+            // Scale relative to reference width.
+            // Important: we only scale DOWN when the window is smaller than reference.
+            // When the window is larger, we keep the designed scale (like in Ren'Py).
+            // This prevents characters from becoming huge on big/fullscreen resolutions.
+            float scaleFactor = (float)renderer.ViewportWidth / refWidth;
+            scaleFactor = Math.Min(scaleFactor, 1.0f);   // never upscale beyond designed size
+
+            effectiveScale.X *= scaleFactor;
+            effectiveScale.Y *= scaleFactor;
+        }
+
+        renderer.DrawSprite(Texture, drawPos, effectiveScale, Rotation, Origin, Alpha);
     }
 
     public void SetPosition(float x, float y)
     {
+        _autoBottomPadding = null;
+        _autoHorizontalAnchor = null; // cancel auto horizontal too
         Position = new Vector2D<float>(x, y + GroundOffset);
     }
 
     /// <summary>
-    /// Smart positioning: places the character so that its visual "feet" line
-    /// (determined by the automatically computed Bounce from the image pixels)
-    /// lands exactly at the given groundY on screen.
-    ///
-    /// This is the equivalent of Unity's SpriteRenderer pivot = Bottom + custom ground offset.
-    /// Prevents legs from being cut off at the bottom of the screen.
+    /// Explicit grounded positioning using a fixed world Y.
+    /// The position will NOT automatically adapt if the window is resized or switched to fullscreen.
     /// </summary>
-    /// <param name="x">Horizontal position (usually center of character on screen)</param>
-    /// <param name="groundY">The Y coordinate on screen where the feet should rest (e.g. 650 on 720p)</param>
     public void SetGroundedPosition(float x, float groundY)
     {
+        _autoBottomPadding = null;
+        _autoHorizontalAnchor = null;
         if (Texture == null) return;
 
-        // Origin is placed at the feet line inside the texture (center X, bottom minus bounce)
         float originX = Texture.Width / 2f;
         float originY = Texture.Height - Bounce;
 
         Origin = new Vector2(originX, originY);
-
-        // Position.Y now directly corresponds to where the feet touch the ground
         Position = new Vector2D<float>(x, groundY);
+    }
+
+    /// <summary>
+    /// Sets automatic vertical grounding using bottom padding (adapts to any resolution).
+    /// </summary>
+    public void SetAutoGroundedPosition(float x, float bottomPadding)
+    {
+        _autoBottomPadding = bottomPadding;
+        _autoGroundedX = x;           // absolute X for now (see SetAutoPosition for relative)
+        _autoHorizontalAnchor = null;
+
+        if (Texture != null)
+        {
+            float originX = Texture.Width / 2f;
+            float originY = Texture.Height - Bounce;
+            Origin = new Vector2(originX, originY);
+        }
+    }
+
+    /// <summary>
+    /// Fully automatic positioning that survives any window resize / fullscreen.
+    /// 
+    /// horizontalAnchor: 0.0 = left, 0.5 = center, 1.0 = right of the screen.
+    /// horizontalOffset: extra pixels from the anchor point (can be negative).
+    /// </summary>
+    public void SetAutoPosition(float horizontalAnchor, float horizontalOffset, float bottomPadding)
+    {
+        _autoHorizontalAnchor = horizontalAnchor;
+        _autoHorizontalOffset = horizontalOffset;
+        _autoBottomPadding = bottomPadding;
+
+        if (Texture != null)
+        {
+            float originX = Texture.Width / 2f;
+            float originY = Texture.Height - Bounce;
+            Origin = new Vector2(originX, originY);
+        }
     }
 }

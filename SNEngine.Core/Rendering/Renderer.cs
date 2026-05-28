@@ -24,6 +24,14 @@ public class Renderer : IDisposable
     public int ViewportWidth { get; private set; }
     public int ViewportHeight { get; private set; }
 
+    /// <summary>
+    /// Reference resolution used for automatic scaling of characters and UI elements.
+    /// When the actual viewport differs, objects with AutoScaleWithViewport = true
+    /// will have their scale multiplied by (current / reference).
+    /// </summary>
+    public int ReferenceWidth { get; set; } = 1280;
+    public int ReferenceHeight { get; set; } = 720;
+
     private readonly List<GameObject> _gameObjects = new();
 
     /// <summary>

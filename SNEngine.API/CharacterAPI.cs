@@ -75,16 +75,36 @@ public static class CharacterAPI
     private const float InternalDefaultBottomPadding = 0f;
 
     /// <summary>
-    /// Shows character on the scene.
+    /// Shows a character on the scene.
+    /// 
+    /// This is the main (and recommended) method for scripting.
+    /// By default it automatically centers the character horizontally and places it at the bottom
+    /// of the screen using the bounce value calculated from the raw image pixels.
+    /// 
+    /// The character will automatically adapt its position and scale when the window is resized or switched to fullscreen.
     /// </summary>
+    /// <param name="characterName">Name of the character (must be loaded via packages or AddCharacter)</param>
+    /// <param name="emotion">Emotion/pose to show</param>
+    /// <param name="x">Absolute X position. If provided together with horizontalAnchor, horizontalAnchor takes priority.</param>
+    /// <param name="y">Absolute Y position. If bottomPadding is also provided, bottomPadding takes priority for vertical placement.</param>
     /// <param name="bottomPadding">
-    /// If set (or left at default via overload), the character will be **automatically** positioned
-    /// to the bottom of the current screen using the bounce value computed from the raw image pixels.
-    /// This is the easiest way to get "Unity-like bottom alignment" without manually calculating groundY.
-    /// Pass null explicitly to use classic manual Y positioning.
+    /// Distance from the bottom of the screen. 
+    /// When set (or left null for default behavior), the character is automatically grounded using image bounce.
+    /// Default behavior (when nothing vertical is specified) uses automatic bottom placement.
     /// </param>
-    public static CharacterObject Show(string characterName, string emotion = "happy", 
-                                       float x = 640f, float y = 120f, float? groundY = null, float? bottomPadding = null)
+    /// <param name="horizontalAnchor">
+    /// Horizontal anchor from 0.0 (left) to 1.0 (right). 
+    /// Common values: 0.5 = center (default), 0.25 = leftish, 0.75 = rightish.
+    /// </param>
+    /// <param name="horizontalOffset">Pixel offset from the horizontal anchor point.</param>
+    public static CharacterObject Show(
+        string characterName, 
+        string emotion = "happy",
+        float? x = null,
+        float? y = null,
+        float? bottomPadding = null,
+        float? horizontalAnchor = null,
+        float horizontalOffset = 0f)
     {
         if (SNEngine.CurrentScene == null || SNEngine.Host?.AssetManager == null)
         {
@@ -92,29 +112,55 @@ public static class CharacterAPI
             return null!;
         }
 
-        bool useAutoGround = false;
-        float targetGroundY = 0;
+        // === Determine horizontal behavior ===
+        bool useAutoHorizontal = horizontalAnchor.HasValue;
+        float finalX = x ?? 0f;
 
-        if (groundY.HasValue)
+        // Default horizontal behavior: center the character
+        if (!useAutoHorizontal && !x.HasValue)
         {
-            targetGroundY = groundY.Value;
-            useAutoGround = true;
+            horizontalAnchor = 0.5f;
+            horizontalOffset = 0f;
+            useAutoHorizontal = true;
         }
-        else if (bottomPadding.HasValue)
+
+        // === Determine vertical behavior ===
+        bool useAutoBottom = false;
+        float finalBottomPadding = 0f;
+
+        if (bottomPadding.HasValue)
         {
-            // Fully automatic: calculate groundY from current screen height + padding
-            targetGroundY = SNEngine.ScreenHeight - bottomPadding.Value;
-            useAutoGround = true;
+            useAutoBottom = true;
+            finalBottomPadding = bottomPadding.Value;
+        }
+        else if (!y.HasValue)
+        {
+            // No Y and no explicit bottomPadding → automatic bottom placement with internal default
+            useAutoBottom = true;
+            finalBottomPadding = InternalDefaultBottomPadding;
         }
 
         if (_activeCharacters.TryGetValue(characterName, out var existing))
         {
             existing.ChangeEmotion(emotion);
 
-            if (useAutoGround)
-                existing.SetGroundedPosition(x, targetGroundY);
+            if (useAutoBottom || useAutoHorizontal)
+            {
+                float paddingToUse = finalBottomPadding;
+
+                if (useAutoHorizontal)
+                {
+                    existing.SetAutoPosition(horizontalAnchor!.Value, horizontalOffset, paddingToUse);
+                }
+                else
+                {
+                    existing.SetAutoGroundedPosition(finalX, paddingToUse);
+                }
+            }
             else
-                existing.SetPosition(x, y);
+            {
+                existing.SetPosition(finalX, y!.Value);
+            }
 
             return existing;
         }
@@ -122,10 +168,21 @@ public static class CharacterAPI
         var characterObj = new CharacterObject(SNEngine.Host.AssetManager);
         characterObj.Load(characterName, emotion);
 
-        if (useAutoGround)
-            characterObj.SetGroundedPosition(x, targetGroundY);
+        if (useAutoBottom || useAutoHorizontal)
+        {
+            if (useAutoHorizontal)
+            {
+                characterObj.SetAutoPosition(horizontalAnchor!.Value, horizontalOffset, finalBottomPadding);
+            }
+            else
+            {
+                characterObj.SetAutoGroundedPosition(finalX, finalBottomPadding);
+            }
+        }
         else
-            characterObj.SetPosition(x, y);
+        {
+            characterObj.SetPosition(finalX, y!.Value);
+        }
 
         var gameObject = new GameObject { Name = characterName };
         gameObject.AddComponent(characterObj);
@@ -134,26 +191,19 @@ public static class CharacterAPI
         _activeCharacters[characterName] = characterObj;
 
         string positioningInfo;
-        if (useAutoGround)
-            positioningInfo = groundY.HasValue 
-                ? $"grounded at Y={targetGroundY}" 
-                : $"auto-grounded (bottomPadding={bottomPadding ?? InternalDefaultBottomPadding})";
+        if (useAutoBottom || useAutoHorizontal)
+        {
+            string h = useAutoHorizontal ? $"anchor={horizontalAnchor}, offset={horizontalOffset}" : $"x={finalX}";
+            string v = useAutoBottom ? $"bottomPadding={finalBottomPadding}" : $"y={y}";
+            positioningInfo = $"auto ({h}, {v})";
+        }
         else
-            positioningInfo = $"at ({x},{y})";
+        {
+            positioningInfo = $"manual (x={finalX}, y={y})";
+        }
 
-        Debug.Log($"[CharacterAPI] Showed {characterName} with emotion '{emotion}' ({positioningInfo})");
+        Debug.Log($"[CharacterAPI] Showed {characterName} ({emotion}) → {positioningInfo}");
         return characterObj;
-    }
-
-    /// <summary>
-    /// Convenience overload: automatically places the character at the bottom of the screen
-    /// using the bounce computed from the actual sprite image pixels.
-    /// No need to manually calculate groundY.
-    /// </summary>
-    public static CharacterObject ShowAtBottom(string characterName, string emotion = "happy", float x = 640f, float? bottomPadding = null)
-    {
-        float padding = bottomPadding ?? InternalDefaultBottomPadding;
-        return Show(characterName, emotion, x, bottomPadding: padding);
     }
 
     /// <summary>

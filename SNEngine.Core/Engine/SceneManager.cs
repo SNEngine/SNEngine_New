@@ -25,7 +25,7 @@ public class SceneManager
         _currentScene = scene;
 
         scene.OnLoad();
-        Console.WriteLine($"[SceneManager] Loaded scene: {scene.GetType().Name}");
+        Debug.Log($"[SceneManager] Loaded scene: {scene.GetType().Name}");
     }
 
     /// <summary>
@@ -36,7 +36,7 @@ public class SceneManager
         _sceneStack.Push(scene);
         _currentScene = scene;
         scene.OnLoad();
-        Console.WriteLine($"[SceneManager] Pushed scene: {scene.GetType().Name}");
+        Debug.Log($"[SceneManager] Pushed scene: {scene.GetType().Name}");
     }
 
     /// <summary>
@@ -49,7 +49,7 @@ public class SceneManager
             var oldScene = _sceneStack.Pop();
             oldScene.OnUnload();
             _currentScene = _sceneStack.Peek();
-            Console.WriteLine($"[SceneManager] Popped scene. Current: {_currentScene.GetType().Name}");
+            Debug.Log($"[SceneManager] Popped scene. Current: {_currentScene.GetType().Name}");
         }
     }
 

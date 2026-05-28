@@ -32,7 +32,7 @@ public abstract class Scene
     public virtual void Render(Renderer renderer)
     {
         foreach (var go in _gameObjects)
-            renderer.DrawGameObject(go);
+            go.Render(renderer);
     }
 
     public virtual void OnUnload() { }

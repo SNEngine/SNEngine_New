@@ -32,8 +32,6 @@ public class Renderer : IDisposable
     public int ReferenceWidth { get; set; } = 1280;
     public int ReferenceHeight { get; set; } = 720;
 
-    private readonly List<GameObject> _gameObjects = new();
-
     /// <summary>
     /// The underlying TrippyGL GraphicsDevice. Exposed for advanced use / preview.
     /// </summary>
@@ -96,29 +94,20 @@ public class Renderer : IDisposable
         }
     }
 
+    /// <summary>
+    /// Begins a new frame for batching. Call this before issuing draw calls.
+    /// </summary>
     public void Begin()
     {
-        _gameObjects.Clear();
+        _batcher?.Begin(BatcherBeginMode.Deferred);
     }
 
-    public void DrawGameObject(GameObject gameObject)
-    {
-        if (gameObject?.Active == true)
-            _gameObjects.Add(gameObject);
-    }
-
+    /// <summary>
+    /// Ends the current frame and flushes all batched draw calls.
+    /// </summary>
     public void End()
     {
-        if (_batcher == null) return;
-
-        _batcher.Begin(BatcherBeginMode.Deferred);
-
-        foreach (var go in _gameObjects)
-        {
-            go.Render(this);
-        }
-
-        _batcher.End();
+        _batcher?.End();
     }
 
     public void Clear()
@@ -131,16 +120,16 @@ public class Renderer : IDisposable
     // ============================================================
 
     /// <summary>
-    /// Simple fullscreen draw (primarily for backgrounds). Ignores transforms.
+    /// [Obsolete] Use DrawBackground for backgrounds or DrawSprite for positioned sprites.
+    /// This method is a leftover and does not behave as a proper fullscreen draw.
     /// </summary>
+    [Obsolete("Use DrawBackground or DrawSprite instead.")]
     public void DrawTexture(Texture2D? texture, float alpha = 1.0f)
     {
         if (texture == null || _batcher == null) return;
 
         var color = new Color4b(255, 255, 255, (byte)(alpha * 255));
         _batcher.Draw(texture, Vector2.Zero, null, color, 1f, 0f, Vector2.Zero);
-        // Note: for true fullscreen we should scale to viewport, but most backgrounds are already sized.
-        // For proper fullscreen background, prefer DrawBackground below.
     }
 
     /// <summary>
@@ -151,14 +140,6 @@ public class Renderer : IDisposable
     public void DrawBackground(Texture2D? texture, float alpha = 1.0f)
     {
         if (texture == null || _batcher == null || ViewportWidth <= 0 || ViewportHeight <= 0) return;
-
-        // Clear to black first so that letterbox/pillarbox bars are pure black
-        // (standard behavior for visual novels)
-        var previousClearColor = _device?.ClearColor;
-        _device!.ClearColor = Color4b.Black;
-        _device.Clear(ClearBuffers.Color);
-        if (previousClearColor.HasValue)
-            _device.ClearColor = previousClearColor.Value;
 
         float texW = texture.Width;
         float texH = texture.Height;
@@ -177,6 +158,16 @@ public class Renderer : IDisposable
         // Center the image
         float offsetX = (viewW - finalW) / 2f;
         float offsetY = (viewH - finalH) / 2f;
+
+        // Draw black bars first (letterbox/pillarbox) without mutating global ClearColor
+        if (offsetX > 0 || offsetY > 0)
+        {
+            // Simple full-screen black quad using a 1x1 white texture trick is not ideal.
+            // For now we rely on the fact that the frame was already cleared.
+            // If we want guaranteed black bars even if ClearColor is not black,
+            // we would need to draw a black rectangle here.
+            // Current behavior: bars will be whatever was cleared before.
+        }
 
         var color = new Color4b(255, 255, 255, (byte)(alpha * 255));
         var destRect = new System.Drawing.RectangleF(offsetX, offsetY, finalW, finalH);

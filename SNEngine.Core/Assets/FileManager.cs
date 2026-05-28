@@ -24,8 +24,10 @@ public class FileManager
     }
 
     /// <summary>
-    /// Legacy constructor.
+    /// [Obsolete] Prefer the GraphicsDevice constructor.
+    /// This legacy constructor creates an internal GraphicsDevice.
     /// </summary>
+    [Obsolete("Use constructor that accepts GraphicsDevice instead.")]
     public FileManager(GL gl) : this(new GraphicsDevice(gl))
     {
     }

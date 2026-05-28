@@ -35,8 +35,10 @@ public class AssetManager : IDisposable
     }
 
     /// <summary>
-    /// Legacy fallback constructor (used during transition). Creates an internal GraphicsDevice.
+    /// [Obsolete] Prefer the GraphicsDevice constructor.
+    /// This legacy constructor creates an internal GraphicsDevice and is only kept for compatibility during transition.
     /// </summary>
+    [Obsolete("Use constructor that accepts GraphicsDevice instead. This will be removed in a future version.")]
     public AssetManager(GL gl) : this(new GraphicsDevice(gl))
     {
     }

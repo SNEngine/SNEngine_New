@@ -39,6 +39,12 @@ public class SNEngineHost : IDisposable
     public GraphicsDevice? GraphicsDevice { get; private set; }
 
     /// <summary>
+    /// UI overlay (e.g. Ultralight). Rendered on top of the main game scene.
+    /// Set from the outside (usually from SNEngine.Runtime or application entry point).
+    /// </summary>
+    public IUiOverlay? UiOverlay { get; set; }
+
+    /// <summary>
     /// Render settings used by the engine. Can be customized before or after initialization.
     /// </summary>
     public RenderSettings RenderSettings { get; private set; } = new RenderSettings();
@@ -47,6 +53,8 @@ public class SNEngineHost : IDisposable
 
     private bool _isDisposing = false;
     private bool _disposed = false;
+
+    private InternalGraphicsContext? _graphicsContext;
 
     /// <summary>
     /// Графический API, который был использован при создании окна.
@@ -154,6 +162,17 @@ public class SNEngineHost : IDisposable
         }
 
         Debug.Log("SNEngineHost: All systems initialized successfully (TrippyGL path).");
+
+        // Create graphics context for UI (using delegates to avoid tight coupling)
+        _graphicsContext = new InternalGraphicsContext(
+            () => GraphicsDevice,
+            () => Renderer?.ViewportWidth ?? 0,
+            () => Renderer?.ViewportHeight ?? 0
+        );
+
+        // Initialize UI overlay if it was assigned before Run()
+        UiOverlay?.Initialize(_graphicsContext);
+
         OnInitialized?.Invoke();
     }
 
@@ -185,6 +204,13 @@ public class SNEngineHost : IDisposable
         Renderer.Begin();
         SceneManager?.Render(Renderer);
         Renderer.End();
+
+        // === UI OVERLAY ===
+        // Render UI on top of the game scene (but before shared memory preview)
+        if (UiOverlay != null && _graphicsContext != null)
+        {
+            UiOverlay.Render(_graphicsContext);
+        }
 
         // === SHARED MEMORY ПРЕВЬЮ ===
         if (_useSharedMemory && _sharedFramePublisher != null && GraphicsDevice != null)
@@ -242,6 +268,9 @@ public class SNEngineHost : IDisposable
 
         Renderer.SetViewport(newSize.X, newSize.Y);
         Debug.Log($"Window resized to {newSize.X}x{newSize.Y}");
+
+        // Notify UI overlay about size change
+        UiOverlay?.Resize(newSize.X, newSize.Y);
     }
 
     private void SafeDispose()
@@ -253,6 +282,14 @@ public class SNEngineHost : IDisposable
 
         try
         {
+            // UI Overlay (dispose first before heavy graphics resources)
+            if (UiOverlay != null)
+            {
+                try { UiOverlay.Dispose(); }
+                catch (Exception ex) { Debug.LogError($"UiOverlay dispose error: {ex.Message}"); }
+                UiOverlay = null;
+            }
+
             // Очищаем Shared Memory
             if (_sharedFramePublisher != null)
             {
@@ -314,6 +351,7 @@ public class SNEngineHost : IDisposable
             _gl = null;
             SceneManager = null!;
             FileManager = null!;
+            _graphicsContext = null;
         }
     }
 

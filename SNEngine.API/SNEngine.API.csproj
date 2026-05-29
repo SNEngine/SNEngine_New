@@ -10,6 +10,7 @@
     <PackageReference Include="Silk.NET.Windowing" Version="2.23.0" />
     <ProjectReference Include="..\SNEngine.Core\SNEngine.Core.csproj" />
     <ProjectReference Include="..\SNEngine.Data\SNEngine.Data.csproj" />
+    <ProjectReference Include="..\SNEngine.UI\SNEngine.UI.csproj" />
   </ItemGroup>
 
 </Project>

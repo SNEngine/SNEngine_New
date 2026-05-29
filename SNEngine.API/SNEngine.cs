@@ -2,6 +2,7 @@
 using SNEngine.Core;
 using SNEngine.Core.Components;
 using SNEngine.Core.Engine;
+using SNEngine.Core.Rendering;
 using SNEngine.Core.Scenes;
 using Silk.NET.Windowing;
 using System;
@@ -23,9 +24,15 @@ public static class SNEngine
     public static event Action? OnInitialized;
 
     /// <summary>
+    /// UI overlay to be used by the engine (e.g. Ultralight-based UI).
+    /// Assign this before calling Run().
+    /// </summary>
+    public static IUiOverlay? UiOverlay { get; set; }
+
+    /// <summary>
     /// Starts the engine (main entry point)
     /// </summary>
-    /// <param name="graphicsApi">Позволяет выбрать графический бэкенд (OpenGL Desktop / OpenGL ES и т.д.)</param>
+    /// <param name="graphicsApi">Allows choosing the graphics backend (OpenGL Desktop / OpenGL ES, etc.)</param>
     public static void Run(string windowTitle = "SNEngine Novel",
                           int width = 1280,
                           int height = 720,
@@ -41,6 +48,14 @@ public static class SNEngine
             // For simplicity we just ensure the instance exists; user can modify _host.RenderSettings directly
             // if they access it before calling Run (advanced scenario).
         }
+
+        // Auto-initialize default Ultralight overlay if none was provided (convenience for development)
+        if (UiOverlay == null)
+        {
+            UiOverlay = new UI.Ultralight.UltralightOverlay();
+        }
+
+        _host.UiOverlay = UiOverlay;
 
         _host.OnInitialized += () =>
         {

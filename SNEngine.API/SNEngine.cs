@@ -93,6 +93,55 @@ public static class SNEngine
     }
 
     // ================================================================
+    // ====================== UI SCREENS ==============================
+    // ================================================================
+
+    /// <summary>
+    /// Loads and displays a UI screen (HTML-based) from the ui.snpk package.
+    /// The overlay must be an UltralightOverlay (default).
+    ///
+    /// The screenName corresponds to a subfolder inside the UI package.
+    /// It will first try "{screenName}/index.html", then fall back to "index.html".
+    ///
+    /// Example:
+    ///     SNEngine.LoadScreen("mainmenu");   // loads "mainmenu/index.html" from ui.snpk
+    ///     SNEngine.LoadScreen("dialog");     // loads "dialog/index.html"
+    /// </summary>
+    public static void LoadScreen(string screenName)
+    {
+        if (_host == null)
+        {
+            Debug.LogError("Cannot load screen before Run()");
+            return;
+        }
+
+        if (UiOverlay is UI.Ultralight.UltralightOverlay ulOverlay)
+        {
+            ulOverlay.LoadScreen(screenName);
+            Console.WriteLine($"[SNEngine.API] Loaded UI screen: {screenName}");
+        }
+        else if (UiOverlay != null)
+        {
+            Debug.LogWarning("[SNEngine.API] Current UiOverlay does not support LoadScreen (only Ultralight is supported).");
+        }
+    }
+
+    /// <summary>
+    /// Clears any currently loaded UI screen.
+    /// </summary>
+    public static void ClearScreen()
+    {
+        if (_host == null) return;
+
+        if (UiOverlay is UI.Ultralight.UltralightOverlay ulOverlay)
+        {
+            // Load empty content to clear the view
+            ulOverlay.LoadScreen(string.Empty);
+            Console.WriteLine("[SNEngine.API] Cleared UI screen.");
+        }
+    }
+
+    // ================================================================
     // ====================== GAME CONTROL ============================
     // ================================================================
 

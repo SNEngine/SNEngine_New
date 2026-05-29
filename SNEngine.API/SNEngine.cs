@@ -25,9 +25,16 @@ public static class SNEngine
 
     /// <summary>
     /// UI overlay to be used by the engine (e.g. Ultralight-based UI).
-    /// Assign this before calling Run().
+    /// Assign this before calling Run(). If left null, a default UltralightOverlay will be created.
     /// </summary>
     public static IUiOverlay? UiOverlay { get; set; }
+
+    /// <summary>
+    /// Controls whether the default UI overlay (Ultralight) will have a transparent background.
+    /// When true, HTML content can be drawn on top of the game without covering it with white/opaque color.
+    /// Set this before calling Run(). Default: true.
+    /// </summary>
+    public static bool UiTransparentBackground { get; set; } = true;
 
     /// <summary>
     /// Starts the engine (main entry point)
@@ -52,7 +59,7 @@ public static class SNEngine
         // Auto-initialize default Ultralight overlay if none was provided (convenience for development)
         if (UiOverlay == null)
         {
-            UiOverlay = new UI.Ultralight.UltralightOverlay();
+            UiOverlay = new UI.Ultralight.UltralightOverlay(transparent: UiTransparentBackground);
         }
 
         _host.UiOverlay = UiOverlay;

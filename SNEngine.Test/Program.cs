@@ -35,6 +35,7 @@ class Program
             // Character will sit correctly without legs being cut off.
             CharacterAPI.Show("yuki", "happy");
             SNEngine.API.SNEngine.LoadScreen("fps");
+            SNEngine.API.SNEngine.LoadScreen("dialog");
 
             SNEngine.Core.Debug.Log("Scene loaded via SNEngine.API");
         };

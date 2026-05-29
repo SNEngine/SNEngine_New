@@ -81,6 +81,8 @@ public unsafe class UltralightOverlay : IUiOverlay
 
     public void LoadScreen(string screenName)
     {
+        // During the transition, we still support the old single-view behavior.
+        // In the long term, users should use SNEngine.Ui.CreateHtmlElement(...) instead.
         if (_ulView == null)
             return;
 

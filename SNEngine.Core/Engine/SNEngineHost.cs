@@ -41,8 +41,21 @@ public class SNEngineHost : IDisposable
     /// <summary>
     /// UI overlay (e.g. Ultralight). Rendered on top of the main game scene.
     /// Set from the outside (usually from SNEngine.Runtime or application entry point).
+    /// 
+    /// Note: This is the legacy single-overlay path. New code should prefer using <see cref="Ui"/>.
     /// </summary>
     public IUiOverlay? UiOverlay { get; set; }
+
+    /// <summary>
+    /// New recommended UI system that supports multiple independent UI elements
+    /// (HTML panels, HUD, dialogs, etc.) with proper z-ordering.
+    /// </summary>
+    public UI.UiManager Ui { get; set; } = new UI.UiManager();
+
+    /// <summary>
+    /// Вызывается при изменении размера окна.
+    /// </summary>
+    public event Action<int, int>? Resized;
 
     /// <summary>
     /// Render settings used by the engine. Can be customized before or after initialization.
@@ -170,7 +183,10 @@ public class SNEngineHost : IDisposable
             () => Renderer?.ViewportHeight ?? 0
         );
 
-        // Initialize UI overlay if it was assigned before Run()
+        // Initialize new UI system (preferred)
+        Ui?.Initialize(_graphicsContext);
+
+        // Legacy single-overlay path (still supported for backward compatibility)
         UiOverlay?.Initialize(_graphicsContext);
 
         OnInitialized?.Invoke();
@@ -193,7 +209,11 @@ public class SNEngineHost : IDisposable
     private void OnUpdateFrame(double deltaTime)
     {
         if (_isDisposing) return;
+
         SceneManager?.Update(deltaTime);
+
+        // Update UI elements (logic, JS, animations, etc.)
+        Ui?.Update(deltaTime);
     }
 
     private void OnRenderFrame(double deltaTime)
@@ -205,8 +225,13 @@ public class SNEngineHost : IDisposable
         SceneManager?.Render(Renderer);
         Renderer.End();
 
-        // === UI OVERLAY ===
-        // Render UI on top of the game scene (but before shared memory preview)
+        // === NEW UI SYSTEM (multiple elements with z-ordering) ===
+        if (Ui != null && _graphicsContext != null)
+        {
+            Ui.Render(_graphicsContext);
+        }
+
+        // === LEGACY SINGLE UI OVERLAY (for backward compatibility) ===
         if (UiOverlay != null && _graphicsContext != null)
         {
             UiOverlay.Render(_graphicsContext);
@@ -269,7 +294,13 @@ public class SNEngineHost : IDisposable
         Renderer.SetViewport(newSize.X, newSize.Y);
         Debug.Log($"Window resized to {newSize.X}x{newSize.Y}");
 
-        // Notify UI overlay about size change
+        // Notify new UI system
+        Ui?.Resize(newSize.X, newSize.Y);
+
+        // Уведомляем подписчиков о ресайзе (в т.ч. SNEngine для активных LoadScreen)
+        Resized?.Invoke(newSize.X, newSize.Y);
+
+        // Legacy overlay
         UiOverlay?.Resize(newSize.X, newSize.Y);
     }
 
@@ -282,7 +313,21 @@ public class SNEngineHost : IDisposable
 
         try
         {
-            // UI Overlay (dispose first before heavy graphics resources)
+            // New UI system (dispose before legacy overlay)
+            if (Ui != null)
+            {
+                try
+                {
+                    Ui.Dispose();
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogError($"UiManager dispose error: {ex.Message}");
+                }
+                Ui = null;
+            }
+
+            // Legacy UI Overlay (dispose first before heavy graphics resources)
             if (UiOverlay != null)
             {
                 try

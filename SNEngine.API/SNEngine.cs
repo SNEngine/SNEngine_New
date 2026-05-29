@@ -3,10 +3,13 @@ using SNEngine.Core;
 using SNEngine.Core.Components;
 using SNEngine.Core.Engine;
 using SNEngine.Core.Rendering;
+using System.Numerics;
+using UiCore = SNEngine.Core.UI;
 using SNEngine.Core.Scenes;
 using Silk.NET.Windowing;
 using System;
 using System.IO;
+using SNEngine.Core.UI;
 
 namespace SNEngine.API;
 
@@ -26,8 +29,145 @@ public static class SNEngine
     /// <summary>
     /// UI overlay to be used by the engine (e.g. Ultralight-based UI).
     /// Assign this before calling Run(). If left null, a default UltralightOverlay will be created.
+    /// 
+    /// Note: This is the legacy path. New projects should use the <see cref="Ui"/> manager for multiple HTML elements.
     /// </summary>
     public static IUiOverlay? UiOverlay { get; set; }
+
+    /// <summary>
+    /// The new recommended UI system supporting multiple independent HTML (and future) elements
+    /// with proper layering and z-ordering.
+    /// </summary>
+    public static UiCore.UiManager? Ui => _host?.Ui;
+
+    // ============================================================
+    // Temporary / convenience API for creating HTML elements
+    // ============================================================
+
+    /// <summary>
+    /// Creates a new HTML-based UI element. This is the preferred way to create
+    /// multiple independent HTML panels, HUDs, dialogs, etc.
+    /// </summary>
+    public static IUiElement? CreateHtmlElement(int width, int height, int zIndex = 0)
+    {
+        if (_host?.Ui == null) return null;
+
+        // Using the shared renderer host ensures all HTML elements share one Ultralight Renderer.
+        var rendererHost = UI.Ultralight.UltralightRendererHost.Shared;
+
+        var element = new UI.Ultralight.UltralightHtmlElement(rendererHost, _host.AssetManager);
+
+        element.ZIndex = zIndex;
+
+        // Ensure the shared Ultralight renderer performs its Update+Render pass
+        if (_host.Ui.PreRenderHook == null)
+        {
+            _host.Ui.PreRenderHook = rendererHost.GetPreRenderHook();
+        }
+
+        _host.Ui.Add(element);
+
+        return element;
+    }
+
+    // ============================================================
+    // Legacy LoadScreen bridge (for backward compatibility)
+    // ============================================================
+
+    // Храним созданные экраны по имени, чтобы не создавать дубликаты
+    private static readonly Dictionary<string, IUiElement> _activeScreens = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Загружает HTML-экран (удобный метод для перехода со старой архитектуры).
+    /// 
+    /// Под капотом создаёт/переиспользует элемент в новом UiManager.
+    /// Не нужно вручную вызывать CreateHtmlElement + LoadHtmlAsset + SetPosition.
+    /// </summary>
+    /// <param name="screenName">Имя экрана (папка в ui.snpk)</param>
+    /// <param name="position">Позиция на экране (по умолчанию верхний левый угол)</param>
+    /// <param name="size">Размер элемента (по умолчанию размер окна)</param>
+    /// <param name="zIndex">Слой отрисовки (чем выше — тем выше по Z)</param>
+    public static void LoadScreen(
+        string screenName,
+        Vector2? position = null,
+        Vector2? size = null,
+        int zIndex = 0)
+    {
+        if (_host?.Ui == null)
+        {
+            Debug.LogError("Cannot load screen before Run()");
+            return;
+        }
+
+        // Получаем или создаём элемент для этого экрана
+        if (!_activeScreens.TryGetValue(screenName, out var element))
+        {
+            int w = (int)(size?.X ?? ScreenWidth);
+            int h = (int)(size?.Y ?? ScreenHeight);
+
+            element = CreateHtmlElement(w, h, zIndex);
+            _activeScreens[screenName] = element;
+        }
+
+        if (element is UI.Ultralight.UltralightHtmlElement htmlElement)
+        {
+            // Устанавливаем позицию, если передана
+            if (position.HasValue)
+            {
+                htmlElement.SetPosition(position.Value);
+            }
+
+            // Загружаем контент
+            htmlElement.LoadScreen(screenName);
+        }
+        else
+        {
+            Debug.LogWarning($"[SNEngine] Screen '{screenName}' is not an Ultralight element.");
+        }
+    }
+
+    /// <summary>
+    /// Удаляет/скрывает экран, загруженный через LoadScreen.
+    /// </summary>
+    public static void UnloadScreen(string screenName)
+    {
+        if (_activeScreens.TryGetValue(screenName, out var element))
+        {
+            _host?.Ui?.Remove(element);
+            _activeScreens.Remove(screenName);
+        }
+    }
+
+    /// <summary>
+    /// Очищает все экраны, загруженные через LoadScreen.
+    /// </summary>
+    public static void ClearAllScreens()
+    {
+        foreach (var kvp in _activeScreens)
+        {
+            _host?.Ui?.Remove(kvp.Value);
+        }
+        _activeScreens.Clear();
+    }
+
+    // === Старые методы для обратной совместимости (можно потом удалить) ===
+
+    [Obsolete("Use LoadScreen(string, Vector2?, Vector2?, int) instead. This will be removed in future versions.")]
+    public static void LoadScreen(string screenName)
+    {
+        LoadScreen(screenName, position: null, size: null, zIndex: 0);
+    }
+
+    [Obsolete("Use UnloadScreen or ClearAllScreens instead.")]
+    public static void ClearScreen()
+    {
+        // Очищаем последний загруженный экран (для обратной совместимости)
+        if (_activeScreens.Count > 0)
+        {
+            var last = _activeScreens.Last();
+            UnloadScreen(last.Key);
+        }
+    }
 
     /// <summary>
     /// Controls whether the default UI overlay (Ultralight) will have a transparent background.
@@ -48,6 +188,18 @@ public static class SNEngine
     {
         _host = new SNEngineHost(windowTitle, width, height, useSharedMemoryPreview, graphicsApi, DefaultRenderSettings);
 
+        // Подписываемся на ресайз, чтобы обновлять размеры экранов из LoadScreen
+        _host.Resized += (w, h) =>
+        {
+            foreach (var kvp in _activeScreens)
+            {
+                if (kvp.Value is UI.Ultralight.UltralightHtmlElement htmlElem)
+                {
+                    htmlElem.Resize(w, h);
+                }
+            }
+        };
+
         // Apply user-configured default settings
         if (_host.RenderSettings != null)
         {
@@ -66,10 +218,22 @@ public static class SNEngine
 
         _host.OnInitialized += () =>
         {
-            // Wire AssetManager into the overlay so it can load from ui.snpk
+            // Wire AssetManager into the legacy overlay
             if (UiOverlay is UI.Ultralight.UltralightOverlay ulOverlay && _host.AssetManager != null)
             {
                 ulOverlay.SetAssetManager(_host.AssetManager);
+            }
+
+            // Wire AssetManager into all elements in the new Ui system
+            if (_host.Ui != null && _host.AssetManager != null)
+            {
+                foreach (var element in _host.Ui.Elements)
+                {
+                    if (element is UI.Ultralight.UltralightHtmlElement htmlElement)
+                    {
+                        htmlElement.SetAssetManager(_host.AssetManager);
+                    }
+                }
             }
 
             OnInitialized?.Invoke();
@@ -113,41 +277,6 @@ public static class SNEngine
     /// Example:
     ///     SNEngine.LoadScreen("mainmenu");   // loads "mainmenu/index.html" from ui.snpk
     ///     SNEngine.LoadScreen("dialog");     // loads "dialog/index.html"
-    /// </summary>
-    public static void LoadScreen(string screenName)
-    {
-        if (_host == null)
-        {
-            Debug.LogError("Cannot load screen before Run()");
-            return;
-        }
-
-        if (UiOverlay is UI.Ultralight.UltralightOverlay ulOverlay)
-        {
-            ulOverlay.LoadScreen(screenName);
-            Console.WriteLine($"[SNEngine.API] Loaded UI screen: {screenName}");
-        }
-        else if (UiOverlay != null)
-        {
-            Debug.LogWarning("[SNEngine.API] Current UiOverlay does not support LoadScreen (only Ultralight is supported).");
-        }
-    }
-
-    /// <summary>
-    /// Clears any currently loaded UI screen.
-    /// </summary>
-    public static void ClearScreen()
-    {
-        if (_host == null) return;
-
-        if (UiOverlay is UI.Ultralight.UltralightOverlay ulOverlay)
-        {
-            // Load empty content to clear the view
-            ulOverlay.LoadScreen(string.Empty);
-            Console.WriteLine("[SNEngine.API] Cleared UI screen.");
-        }
-    }
-
     // ================================================================
     // ====================== GAME CONTROL ============================
     // ================================================================

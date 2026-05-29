@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>Novel Dialog</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+      background: transparent;
+      font-family: 'Segoe UI', 'Noto Sans', sans-serif;
+      font-size: 20px;
+      color: #f0e6d2;
+      overflow: hidden;
+      height: 100vh;
+      width: 100vw;
+    }
+
+    #dialog-container {
+      position: fixed;
+      bottom: 30px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 85%;
+      max-width: 1100px;
+      background: linear-gradient(180deg, rgba(20, 15, 10, 0.92) 0%, rgba(10, 8, 5, 0.95) 100%);
+      border: 2px solid #c5a26f;
+      border-radius: 8px;
+      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.7),
+                  inset 0 1px 0 rgba(255, 255, 255, 0.1);
+      padding: 16px 24px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    #speaker {
+      font-weight: 700;
+      font-size: 22px;
+      color: #f8d9a0;
+      text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.8);
+      margin-bottom: 4px;
+      letter-spacing: 0.5px;
+    }
+
+    #dialog-text {
+      font-size: 19px;
+      line-height: 1.45;
+      min-height: 70px;
+      color: #f0e6d2;
+      text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.6);
+    }
+
+    /* Optional: subtle nameplate style */
+    #speaker::before {
+      content: "▶ ";
+      color: #c5a26f;
+      font-size: 16px;
+    }
+  </style>
+</head>
+<body>
+  <div id="dialog-container">
+    <div id="speaker">Имя персонажа</div>
+    <div id="dialog-text">
+      Здесь будет отображаться текст диалога. Можно обновлять через JavaScript.
+    </div>
+  </div>
+
+  <script>
+    // Пример API для управления диалогом извне (через Ultralight)
+    window.DialogUI = {
+      setSpeaker(name) {
+        document.getElementById('speaker').textContent = name || '';
+      },
+      setText(text) {
+        document.getElementById('dialog-text').innerHTML = text || '';
+      },
+      clear() {
+        document.getElementById('speaker').textContent = '';
+        document.getElementById('dialog-text').innerHTML = '';
+      }
+    };
+
+    // Для теста можно раскомментировать:
+    // DialogUI.setSpeaker("Юки");
+    // DialogUI.setText("Привет... Это тестовый диалог для визуальной новеллы.");
+  </script>
+</body>
+</html>

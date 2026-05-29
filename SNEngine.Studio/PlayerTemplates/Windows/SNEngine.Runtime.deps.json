@@ -247,6 +247,112 @@
           }
         }
       },
+      "UltralightNet/1.3.0": {
+        "dependencies": {
+          "UltralightNet.Binaries": "1.3.0"
+        },
+        "runtime": {
+          "lib/net7.0/UltralightNet.dll": {
+            "assemblyVersion": "1.3.0.0",
+            "fileVersion": "1.3.0.0"
+          }
+        }
+      },
+      "UltralightNet.AppCore/1.3.0": {
+        "dependencies": {
+          "UltralightNet": "1.3.0",
+          "UltralightNet.AppCore.Binaries": "1.3.0"
+        },
+        "runtime": {
+          "lib/net7.0/UltralightNet.AppCore.dll": {
+            "assemblyVersion": "1.3.0.0",
+            "fileVersion": "1.3.0.0"
+          }
+        }
+      },
+      "UltralightNet.AppCore.Binaries/1.3.0": {
+        "dependencies": {
+          "UltralightNet.Binaries": "1.3.0"
+        },
+        "runtime": {
+          "lib/netstandard2.0/UltralightNet.AppCore.Binaries.dll": {
+            "assemblyVersion": "1.3.0.0",
+            "fileVersion": "1.3.0.0"
+          }
+        },
+        "runtimeTargets": {
+          "runtimes/linux-x64/native/libAppCore.so": {
+            "rid": "linux-x64",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0"
+          },
+          "runtimes/osx-x64/native/libAppCore.dylib": {
+            "rid": "osx-x64",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0"
+          },
+          "runtimes/win-x64/native/AppCore.dll": {
+            "rid": "win-x64",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0"
+          }
+        }
+      },
+      "UltralightNet.Binaries/1.3.0": {
+        "runtime": {
+          "lib/netstandard2.0/UltralightNet.Binaries.dll": {
+            "assemblyVersion": "1.3.0.0",
+            "fileVersion": "1.3.0.0"
+          }
+        },
+        "runtimeTargets": {
+          "runtimes/linux-x64/native/libUltralight.so": {
+            "rid": "linux-x64",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0"
+          },
+          "runtimes/linux-x64/native/libUltralightCore.so": {
+            "rid": "linux-x64",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0"
+          },
+          "runtimes/linux-x64/native/libWebCore.so": {
+            "rid": "linux-x64",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0"
+          },
+          "runtimes/osx-x64/native/libUltralight.dylib": {
+            "rid": "osx-x64",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0"
+          },
+          "runtimes/osx-x64/native/libUltralightCore.dylib": {
+            "rid": "osx-x64",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0"
+          },
+          "runtimes/osx-x64/native/libWebCore.dylib": {
+            "rid": "osx-x64",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0"
+          },
+          "runtimes/win-x64/native/Ultralight.dll": {
+            "rid": "win-x64",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0"
+          },
+          "runtimes/win-x64/native/UltralightCore.dll": {
+            "rid": "win-x64",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0"
+          },
+          "runtimes/win-x64/native/WebCore.dll": {
+            "rid": "win-x64",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0"
+          }
+        }
+      },
       "Ultz.Native.GLFW/3.4.0": {
         "runtimeTargets": {
           "runtimes/linux-arm/native/libglfw.so.3": {
@@ -294,7 +400,8 @@
       "SNEngine.API/1.0.0": {
         "dependencies": {
           "SNEngine.Core": "1.0.0",
-          "SNEngine.Data": "1.0.0"
+          "SNEngine.Data": "1.0.0",
+          "SNEngine.UI": "1.0.0"
         },
         "runtime": {
           "SNEngine.API.dll": {
@@ -324,6 +431,21 @@
       "SNEngine.Data/1.0.0": {
         "runtime": {
           "SNEngine.Data.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.0.0"
+          }
+        }
+      },
+      "SNEngine.UI/1.0.0": {
+        "dependencies": {
+          "SNEngine.Core": "1.0.0",
+          "System.Text.Json": "10.0.7",
+          "UltralightNet": "1.3.0",
+          "UltralightNet.AppCore": "1.3.0",
+          "UltralightNet.Binaries": "1.3.0"
+        },
+        "runtime": {
+          "SNEngine.UI.dll": {
             "assemblyVersion": "1.0.0.0",
             "fileVersion": "1.0.0.0"
           }
@@ -484,6 +606,34 @@
       "path": "trippygl.imagesharp/1.2.2",
       "hashPath": "trippygl.imagesharp.1.2.2.nupkg.sha512"
     },
+    "UltralightNet/1.3.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-EuHn/6nhydhs1PK+vcSbE6kObbKL8vfchV8ggNVCSv5lFCQwuz28as9dgOBk5kfnRGwJaDiMFwbAazMtFBDDTw==",
+      "path": "ultralightnet/1.3.0",
+      "hashPath": "ultralightnet.1.3.0.nupkg.sha512"
+    },
+    "UltralightNet.AppCore/1.3.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-denQJwVf9iXEHw4w0A7pxM+YLCR51VEILurpIJsEUWfUtqV/dKKB7/J91DpvZHl6C3mYZ4zS9jHwdpXjDwvL8Q==",
+      "path": "ultralightnet.appcore/1.3.0",
+      "hashPath": "ultralightnet.appcore.1.3.0.nupkg.sha512"
+    },
+    "UltralightNet.AppCore.Binaries/1.3.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-olYgkC3GhL43HsgwGD1iQkv6ujH/fYEtf/aDbMF0oAEhVAMt7PwLeLX/VdbzdJsJw7zUz6A37Zm8RkIFDAlWlA==",
+      "path": "ultralightnet.appcore.binaries/1.3.0",
+      "hashPath": "ultralightnet.appcore.binaries.1.3.0.nupkg.sha512"
+    },
+    "UltralightNet.Binaries/1.3.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-SXfuMEDkym84wgy92q/KQGJAHVHXicB6ymyI1oQZ6V2IWiOd/FGVwUdTs3Mc9fBLicvyMfkNwdGcLZ01TEFq6g==",
+      "path": "ultralightnet.binaries/1.3.0",
+      "hashPath": "ultralightnet.binaries.1.3.0.nupkg.sha512"
+    },
     "Ultz.Native.GLFW/3.4.0": {
       "type": "package",
       "serviceable": true,
@@ -502,6 +652,11 @@
       "sha512": ""
     },
     "SNEngine.Data/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "SNEngine.UI/1.0.0": {
       "type": "project",
       "serviceable": false,
       "sha512": ""

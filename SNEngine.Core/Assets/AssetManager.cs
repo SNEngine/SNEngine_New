@@ -188,6 +188,65 @@ public class AssetManager : IDisposable
         return 0f;
     }
 
+    /// <summary>
+    /// Loads a text asset (HTML, CSS, JS, JSON, etc.) from the UI package or other packages.
+    /// This is the main way to load UI screens from ui.snpk.
+    /// Example: LoadText("fps/index.html", AssetType.UI)
+    /// </summary>
+    public string? LoadText(string path, AssetType preferredPackage = AssetType.UI)
+    {
+        if (string.IsNullOrEmpty(path))
+            return null;
+
+        string normalized = path.Replace('\\', '/').TrimStart('/');
+
+        if (_packages.TryGetValue(preferredPackage, out var pkg))
+        {
+            var data = TryGetAssetFromPackage(pkg, normalized);
+            if (data != null)
+                return System.Text.Encoding.UTF8.GetString(data);
+        }
+
+        // Fallback to other packages
+        foreach (var kvp in _packages)
+        {
+            if (kvp.Key == preferredPackage) continue;
+
+            var data = TryGetAssetFromPackage(kvp.Value, normalized);
+            if (data != null)
+                return System.Text.Encoding.UTF8.GetString(data);
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Loads raw bytes for any asset (useful for UI resources: images, css, js, fonts inside ui.snpk).
+    /// Returns null if not found.
+    /// </summary>
+    public byte[]? GetRawAsset(string path, AssetType preferredPackage = AssetType.UI)
+    {
+        if (string.IsNullOrEmpty(path))
+            return null;
+
+        string normalized = path.Replace('\\', '/').TrimStart('/');
+
+        if (_packages.TryGetValue(preferredPackage, out var pkg))
+        {
+            var data = TryGetAssetFromPackage(pkg, normalized);
+            if (data != null) return data;
+        }
+
+        foreach (var kvp in _packages)
+        {
+            if (kvp.Key == preferredPackage) continue;
+            var data = TryGetAssetFromPackage(kvp.Value, normalized);
+            if (data != null) return data;
+        }
+
+        return null;
+    }
+
     public void ClearCache()
     {
         foreach (var tex in _textureCache.Values)

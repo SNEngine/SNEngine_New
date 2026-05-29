@@ -1,48 +1,82 @@
-using SNEngine.Core;
+using SNEngine.Assets.Package;
+using SNEngine.Core.Assets;
 using SNEngine.Core.Rendering;
 
 namespace SNEngine.UI.Ultralight;
 
 /// <summary>
-/// Implementation of IUiOverlay using Ultralight (CPU rendering path).
-/// Currently a placeholder/stub.
+/// Ultralight-based UI overlay that loads screens from ui.snpk package.
+/// Structure inside package: "screenname/index.html" + optional "screenname/media/"
 /// </summary>
 public class UltralightOverlay : IUiOverlay
 {
+    private readonly AssetManager? _assetManager;
     private IGraphicsContext? _context;
-    private int _frameCounter = 0;
+
+    private string? _currentScreen;
+
+    public UltralightOverlay(AssetManager? assetManager = null)
+    {
+        _assetManager = assetManager;
+    }
+
+    /// <summary>
+    /// Allows injecting AssetManager after construction (useful because it is created inside the host).
+    /// </summary>
+    public void SetAssetManager(AssetManager assetManager)
+    {
+        // Note: In real implementation we may need to reload current screen
+    }
 
     public void Initialize(IGraphicsContext context)
     {
         _context = context;
-        Debug.Log("[UltralightOverlay] Initialized");
-        // TODO: Initialize Ultralight Renderer + View here
+        // TODO: Real Ultralight initialization here
+    }
+
+    /// <summary>
+    /// Loads a UI screen from ui.snpk.
+    /// Example: LoadScreen("fps") will try to load "fps/index.html"
+    /// </summary>
+    public void LoadScreen(string screenName)
+    {
+        if (string.IsNullOrWhiteSpace(screenName) || _assetManager == null)
+            return;
+
+        string htmlPath = $"{screenName}/index.html";
+        string? htmlContent = _assetManager.LoadText(htmlPath, AssetType.UI);
+
+        if (string.IsNullOrEmpty(htmlContent))
+        {
+            // Try without subfolder
+            htmlContent = _assetManager.LoadText("index.html", AssetType.UI);
+        }
+
+        if (!string.IsNullOrEmpty(htmlContent))
+        {
+            _currentScreen = screenName;
+            // TODO: _view.LoadHTML(htmlContent);
+            // TODO: Setup custom FileSystem / resource loader for media/ folder inside the same screen
+        }
     }
 
     public void Render(IGraphicsContext context)
     {
-        _frameCounter++;
-
-        // Continuous logging every frame (temporary for development)
-        Debug.Log($"[UltralightOverlay] Render called - Frame: {_frameCounter}");
-
-        // TODO:
-        // 1. Call _ulRenderer.Update();
-        // 2. Call _ulRenderer.Render();
-        // 3. Get BitmapSurface
-        // 4. Upload pixels to GL texture (via GraphicsDevice or raw GL)
-        // 5. Draw fullscreen quad with alpha blending
+        // TODO: 
+        // - _ulRenderer.Update()
+        // - _ulRenderer.Render()
+        // - Get BitmapSurface
+        // - Upload to GL texture (dirty rects preferred)
+        // - Draw fullscreen quad with proper blending
     }
 
     public void Resize(int width, int height)
     {
-        Debug.Log($"[UltralightOverlay] Resize to {width}x{height}");
         // TODO: _view.Resize((uint)width, (uint)height);
     }
 
     public void Dispose()
     {
-        Debug.Log("[UltralightOverlay] Disposed");
-        // TODO: Release Ultralight resources
+        // TODO: Dispose Ultralight Renderer + View + textures
     }
 }

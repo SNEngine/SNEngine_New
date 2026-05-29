@@ -59,6 +59,12 @@ public static class SNEngine
 
         _host.OnInitialized += () =>
         {
+            // Wire AssetManager into the overlay so it can load from ui.snpk
+            if (UiOverlay is UI.Ultralight.UltralightOverlay ulOverlay && _host.AssetManager != null)
+            {
+                ulOverlay.SetAssetManager(_host.AssetManager);
+            }
+
             OnInitialized?.Invoke();
             Console.WriteLine("[SNEngine.API] Engine fully initialized and ready.");
         };

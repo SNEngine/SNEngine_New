@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using SNEngine.Core.Assets;
 using UltralightNet;
 using UltralightNet.AppCore;
 
@@ -27,12 +28,18 @@ public sealed class UltralightRendererHost : IDisposable
     /// Initializes the shared Renderer (with platform font loader and file system).
     /// Should be called once, early in the UI initialization.
     /// </summary>
-    public void Initialize(string baseDirectory)
+    public void Initialize(AssetManager assetManager)
     {
         if (_initialized) return;
 
+        if (assetManager == null)
+            throw new ArgumentNullException(nameof(assetManager));
+
         AppCoreMethods.SetPlatformFontLoader();
-        AppCoreMethods.ulEnablePlatformFileSystem(baseDirectory);
+
+        // Use our custom filesystem that can read from .snpk packages.
+        // This is the clean way to support fully packaged games.
+        ULPlatform.FileSystem = new SnpkFileSystem(assetManager);
 
         var config = new ULConfig();
         _renderer = ULPlatform.CreateRenderer(config);

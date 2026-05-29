@@ -32,6 +32,8 @@ public unsafe class UltralightOverlay : IUiOverlay
     {
         _assetManager = assetManager;
         _isTransparent = transparent;
+        var ass = assetManager;
+
     }
 
     /// <summary>
@@ -51,11 +53,25 @@ public unsafe class UltralightOverlay : IUiOverlay
     {
         _context = context ?? throw new ArgumentNullException(nameof(context));
 
-        // 1. Настройка платформы (шрифты + файловая система) через AppCore
+        // 1. Настройка платформы (шрифты + кастомная файловая система)
         AppCoreMethods.SetPlatformFontLoader();
-        AppCoreMethods.ulEnablePlatformFileSystem(AppContext.BaseDirectory);
 
-        // 2. Создание рендерера (API 1.3.0: через ULPlatform, не статический Create)
+        // Используем SnpkFileSystem, если AssetManager доступен.
+        // Это позволяет загружать ресурсы (включая icudt67l.dat в будущем) из .snpk пакетов.
+
+        
+        if (_assetManager != null)
+        {
+            ULPlatform.FileSystem = new SnpkFileSystem(_assetManager);
+        }
+        else
+        {
+            // Fallback на обычную файловую систему (для разработки / loose files)
+            AppCoreMethods.ulEnablePlatformFileSystem(AppContext.BaseDirectory);
+        }
+        Console.WriteLine($"[UltralightOverlay] Using {(_assetManager != null ? "SnpkFileSystem" : "platform file system")} for Ultralight.");
+
+        // 2. Создание рендерера
         ULConfig config = new ULConfig();
         _ulRenderer = ULPlatform.CreateRenderer(config);
 

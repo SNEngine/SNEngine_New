@@ -95,6 +95,12 @@ public class AssetManager : IDisposable
 
     private Texture2D CreateTextureFromBytes(byte[] data, string logPath)
     {
+        if (data == null || data.Length == 0)
+        {
+            Debug.LogError($"[AssetManager] Empty or null data for texture: {logPath}");
+            throw new InvalidOperationException($"Cannot load texture '{logPath}': data is empty (0 bytes). The file might be corrupted or missing in the package.");
+        }
+
         using var image = Image.Load<Rgba32>(data);
 
         // Automatically compute bounce (feet/ground line) from the raw image pixels.
@@ -204,7 +210,14 @@ public class AssetManager : IDisposable
         {
             var data = TryGetAssetFromPackage(pkg, normalized);
             if (data != null)
+            {
+                if (data.Length == 0)
+                {
+                    Debug.LogError($"[AssetManager] Empty text asset: {normalized}");
+                    return null;
+                }
                 return System.Text.Encoding.UTF8.GetString(data);
+            }
         }
 
         // Fallback to other packages
@@ -214,7 +227,14 @@ public class AssetManager : IDisposable
 
             var data = TryGetAssetFromPackage(kvp.Value, normalized);
             if (data != null)
+            {
+                if (data.Length == 0)
+                {
+                    Debug.LogError($"[AssetManager] Empty text asset: {normalized}");
+                    return null;
+                }
                 return System.Text.Encoding.UTF8.GetString(data);
+            }
         }
 
         return null;

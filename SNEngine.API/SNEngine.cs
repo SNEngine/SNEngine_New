@@ -55,11 +55,17 @@ public static class SNEngine
         // Using the shared renderer host ensures all HTML elements share one Ultralight Renderer.
         var rendererHost = UI.Ultralight.UltralightRendererHost.Shared;
 
+        // Initialize the shared host with AssetManager if it hasn't been initialized yet.
+        if (!rendererHost.IsInitialized && _host.AssetManager != null)
+        {
+            rendererHost.Initialize(_host.AssetManager);
+        }
+
         var element = new UI.Ultralight.UltralightHtmlElement(rendererHost, _host.AssetManager);
 
         element.ZIndex = zIndex;
 
-        // Ensure the shared Ultralight renderer performs its Update+Render pass
+        // Wire the central Update+Render hook the first time
         if (_host.Ui.PreRenderHook == null)
         {
             _host.Ui.PreRenderHook = rendererHost.GetPreRenderHook();
@@ -188,6 +194,29 @@ public static class SNEngine
     {
         _host = new SNEngineHost(windowTitle, width, height, useSharedMemoryPreview, graphicsApi, DefaultRenderSettings);
 
+        // Wire AssetManager as soon as the host creates it (this is the reliable moment
+        // for SnpkFileSystem to be applied before any Ultralight Initialize() calls).
+        _host.AssetManagerInitialized += assetManager =>
+        {
+            // Wire the manager to existing overlays/elements for SnpkFileSystem
+            if (UiOverlay is UI.Ultralight.UltralightOverlay ulOverlay)
+            {
+                ulOverlay.SetAssetManager(assetManager);
+            }
+
+            if (_host.Ui != null)
+            {
+                foreach (var el in _host.Ui.Elements.OfType<UI.Ultralight.UltralightHtmlElement>())
+                {
+                    el.SetAssetManager(assetManager);
+                }
+            }
+
+            // Load packages as early as possible (right after AssetManager is created).
+            // This is required for Ultralight to find icudt67l.dat etc. during Renderer creation.
+            LoadDefaultPackages();
+        };
+
         // Подписываемся на ресайз, чтобы обновлять размеры экранов из LoadScreen
         _host.Resized += (w, h) =>
         {
@@ -211,27 +240,26 @@ public static class SNEngine
         // Auto-initialize default Ultralight overlay if none was provided (convenience for development)
         if (UiOverlay == null)
         {
-            UiOverlay = new UI.Ultralight.UltralightOverlay(transparent: UiTransparentBackground);
+            UiOverlay = new UI.Ultralight.UltralightOverlay(assetManager: _host.AssetManager, transparent: UiTransparentBackground);
         }
 
         _host.UiOverlay = UiOverlay;
 
         _host.OnInitialized += () =>
         {
-            // Wire AssetManager into the legacy overlay
-            if (UiOverlay is UI.Ultralight.UltralightOverlay ulOverlay && _host.AssetManager != null)
+            // Safety net: re-wire AssetManager after packages are loaded (in case it was null at creation time)
+            if (_host.AssetManager != null)
             {
-                ulOverlay.SetAssetManager(_host.AssetManager);
-            }
-
-            // Wire AssetManager into all elements in the new Ui system
-            if (_host.Ui != null && _host.AssetManager != null)
-            {
-                foreach (var element in _host.Ui.Elements)
+                if (UiOverlay is UI.Ultralight.UltralightOverlay ulOverlay)
                 {
-                    if (element is UI.Ultralight.UltralightHtmlElement htmlElement)
+                    ulOverlay.SetAssetManager(_host.AssetManager);
+                }
+
+                if (_host.Ui != null)
+                {
+                    foreach (var element in _host.Ui.Elements.OfType<UI.Ultralight.UltralightHtmlElement>())
                     {
-                        htmlElement.SetAssetManager(_host.AssetManager);
+                        element.SetAssetManager(_host.AssetManager);
                     }
                 }
             }

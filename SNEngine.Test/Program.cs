@@ -21,7 +21,6 @@ class Program
             ? "SNEngine Test (Preview)" 
             : "SNEngine Test Window";
 
-        // Пример использования API (выполняется после инициализации движка)
         SNEngine.API.SNEngine.OnInitialized += () =>
         {
             SNEngine.Core.Debug.Log("Engine initialized! Loading visual novel scene...");

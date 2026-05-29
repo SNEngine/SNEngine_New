@@ -66,7 +66,10 @@ public class UltralightHtmlElement : UiElementBase
 
         if (!_rendererHost.IsInitialized)
         {
-            _rendererHost.Initialize(AppContext.BaseDirectory);
+            if (_assetManager == null)
+                throw new InvalidOperationException("AssetManager must be set before initializing UltralightHtmlElement.");
+
+            _rendererHost.Initialize(_assetManager);
         }
 
         // Create our View from the shared renderer

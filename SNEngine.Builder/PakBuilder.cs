@@ -2,6 +2,7 @@
 using System;
 using System.IO;
 using System.IO.Compression;
+using System.Linq;
 
 namespace SNEngine.Assets.Package;
 
@@ -48,6 +49,10 @@ public static class PakBuilder
         string miscPath = Path.Combine(outputDir, "misc.snpk");
         int miscCount = PackRootAndUnknown(inputRoot, miscPath);
         totalFiles += miscCount;
+
+        // Place icudt67l.dat under resources/ inside ui.snpk (matches Ultralight ResourcePathPrefix)
+        string uiPakPath = Path.Combine(outputDir, "ui.snpk");
+        PackIcuDataIfFound(inputRoot, uiPakPath);
 
         Debug.Log($"[PakBuilder] Smart pack completed. Total files: {totalFiles}");
         Console.WriteLine($"\nSmart packing finished → {outputDir}");
@@ -112,5 +117,44 @@ public static class PakBuilder
         }
 
         return count;
+    }
+
+    /// <summary>
+    /// Searches for icudt67l.dat anywhere under the assets folder and places it inside the target .snpk
+    /// under the "resources/" path (resources/icudt67l.dat).
+    /// This matches Ultralight's default ResourcePathPrefix = "resources/".
+    /// </summary>
+    private static void PackIcuDataIfFound(string inputRoot, string outputPakPath)
+    {
+        const string icuFileName = "icudt67l.dat";
+        const string targetEntryPath = "resources/icudt67l.dat";
+
+        // Recursively search for the file
+        string? icuSourcePath = Directory
+            .GetFiles(inputRoot, icuFileName, SearchOption.AllDirectories)
+            .FirstOrDefault();
+
+        if (icuSourcePath == null)
+            return;
+
+        // Open the existing archive and inject the file under resources/
+        using var fs = File.Open(outputPakPath, FileMode.OpenOrCreate, FileAccess.ReadWrite);
+        using var zip = new ZipArchive(fs, ZipArchiveMode.Update, true);
+
+        // Skip if already present
+        if (zip.Entries.Any(e => e.FullName.Equals(targetEntryPath, StringComparison.OrdinalIgnoreCase)))
+        {
+            Debug.Log($"[PakBuilder] {targetEntryPath} already present in {Path.GetFileName(outputPakPath)}");
+            return;
+        }
+
+        var entry = zip.CreateEntry(targetEntryPath, CompressionLevel.Optimal);
+
+        using var entryStream = entry.Open();
+        using var fileStream = File.OpenRead(icuSourcePath);
+        fileStream.CopyTo(entryStream);
+
+        Debug.Log($"[PakBuilder] {targetEntryPath} placed in {Path.GetFileName(outputPakPath)} (source: {Path.GetRelativePath(inputRoot, icuSourcePath)})");
+        Console.WriteLine($"  ✓ {icuFileName} → {Path.GetFileName(outputPakPath)} (as {targetEntryPath})");
     }
 }

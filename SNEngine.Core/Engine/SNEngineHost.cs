@@ -58,6 +58,12 @@ public class SNEngineHost : IDisposable
     public event Action<int, int>? Resized;
 
     /// <summary>
+    /// Fired when the AssetManager has been created and is ready to receive packages.
+    /// UI systems should subscribe to this to wire SnpkFileSystem early.
+    /// </summary>
+    public event Action<AssetManager>? AssetManagerInitialized;
+
+    /// <summary>
     /// Render settings used by the engine. Can be customized before or after initialization.
     /// </summary>
     public RenderSettings RenderSettings { get; private set; } = new RenderSettings();
@@ -150,6 +156,10 @@ public class SNEngineHost : IDisposable
         // Asset managers now use GraphicsDevice (with legacy GL fallback inside)
         AssetManager = new AssetManager(GraphicsDevice);
         FileManager = new FileManager(GraphicsDevice);
+
+        // Notify that AssetManager is ready. The API layer (SNEngine) will use this
+        // to wire it to any UI overlays/elements so that SnpkFileSystem gets applied.
+        AssetManagerInitialized?.Invoke(AssetManager);
 
         Renderer = new Renderer();
         // Preferred path: pass existing GraphicsDevice + our settings

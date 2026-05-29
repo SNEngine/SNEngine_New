@@ -68,6 +68,8 @@ public class UltralightOverlay : IUiOverlay
         // - Get BitmapSurface
         // - Upload to GL texture (dirty rects preferred)
         // - Draw fullscreen quad with proper blending
+
+        Console.WriteLine("UltralightOverlay.Render called - implement actual rendering logic here");   
     }
 
     public void Resize(int width, int height)

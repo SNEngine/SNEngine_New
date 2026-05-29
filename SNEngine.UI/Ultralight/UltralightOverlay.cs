@@ -212,11 +212,45 @@ public unsafe class UltralightOverlay : IUiOverlay
 
     public void Dispose()
     {
-        _uiTexture?.Dispose();
-        _uiBatcher?.Dispose();
-        _uiShader?.Dispose();
+        // TrippyGL GL objects (_uiTexture, _uiBatcher, _uiShader) require an active OpenGL context
+        // to delete their resources. During normal application shutdown the context is already destroyed,
+        // which causes Silk.NET to throw "NoContext". This is expected and safe to ignore.
+        try
+        {
+            _uiTexture?.Dispose();
+            _uiBatcher?.Dispose();
+            _uiShader?.Dispose();
+        }
+        catch (Exception ex) when (IsNoContextError(ex))
+        {
+            // Expected on shutdown — OpenGL context has already been destroyed.
+        }
+        catch (Exception ex)
+        {
+            // Log unexpected errors at warning level so they don't spam as errors.
+            SNEngine.Core.Debug.LogWarning($"[UltralightOverlay] Non-critical dispose error: {ex.Message}");
+        }
 
-        _ulView?.Dispose();
-        _ulRenderer?.Dispose();
+        // Ultralight native objects are generally safer, but we still protect them.
+        try
+        {
+            _ulView?.Dispose();
+            _ulRenderer?.Dispose();
+        }
+        catch (Exception ex)
+        {
+            SNEngine.Core.Debug.LogWarning($"[UltralightOverlay] Ultralight dispose warning: {ex.Message}");
+        }
+    }
+
+    private static bool IsNoContextError(Exception ex)
+    {
+        if (ex is null) return false;
+
+        // Silk.NET throws this when trying to resolve GL entry points after context destruction.
+        string message = ex.Message ?? string.Empty;
+        return message.Contains("NoContext", StringComparison.OrdinalIgnoreCase) ||
+               message.Contains("current OpenGL", StringComparison.OrdinalIgnoreCase) ||
+               message.Contains("entry point", StringComparison.OrdinalIgnoreCase);
     }
 }

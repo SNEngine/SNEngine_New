@@ -285,8 +285,24 @@ public class SNEngineHost : IDisposable
             // UI Overlay (dispose first before heavy graphics resources)
             if (UiOverlay != null)
             {
-                try { UiOverlay.Dispose(); }
-                catch (Exception ex) { Debug.LogError($"UiOverlay dispose error: {ex.Message}"); }
+                try
+                {
+                    UiOverlay.Dispose();
+                }
+                catch (Exception ex)
+                {
+                    // "NoContext" errors during shutdown are normal and expected.
+                    // The OpenGL context is already destroyed by the time we reach Dispose.
+                    if (ex.Message?.Contains("NoContext", StringComparison.OrdinalIgnoreCase) == true ||
+                        ex.Message?.Contains("current OpenGL", StringComparison.OrdinalIgnoreCase) == true)
+                    {
+                        Debug.Log($"[Shutdown] UiOverlay disposed after context was destroyed (normal).");
+                    }
+                    else
+                    {
+                        Debug.LogError($"UiOverlay dispose error: {ex.Message}");
+                    }
+                }
                 UiOverlay = null;
             }
 

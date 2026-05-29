@@ -120,6 +120,6 @@ const emit = defineEmits<{
 .fullscreen-preview {
   flex: 1;
   overflow: hidden;
-  background: white;
+  background: transparent;
 }
 </style>

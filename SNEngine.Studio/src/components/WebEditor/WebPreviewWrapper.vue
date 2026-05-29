@@ -39,7 +39,7 @@ defineExpose({
   width: 100%;
   height: 100%;
   overflow: hidden;
-  background: #ffffff;
+  background: transparent;
   position: relative;
 }
 
@@ -47,6 +47,6 @@ defineExpose({
   width: 100%;
   height: 100%;
   border: none;
-  background: white;
+  background: transparent;
 }
 </style>

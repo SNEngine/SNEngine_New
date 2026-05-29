@@ -31,6 +31,10 @@ const updatePreview = () => {
   <meta charset="UTF-8">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      background: transparent;
+      color: #ffffff;
+    }
     body { 
       min-height: 100vh;
       font-family: system-ui, sans-serif;
@@ -39,7 +43,7 @@ const updatePreview = () => {
   </style>
 </head>
 <body>
-  ${html || '<div style="text-align:center; padding:80px; color:#aaa; font-size:18px;">Превью пустое.<br>Напишите HTML и CSS в редакторе слева.</div>'}
+  ${html || '<div style="text-align:center; padding:80px; color:#eeeeee; font-size:18px;">Превью пустое.<br>Напишите HTML и CSS в редакторе слева.</div>'}
 </body>
 </html>`
 }
@@ -51,7 +55,11 @@ onMounted(updatePreview)
 <style scoped>
 .web-preview {
   height: 100%;
-  background: #ffffff;
+  background-color: #202020;
+  background-image:
+    linear-gradient(#2c2c2c 1px, transparent 1px),
+    linear-gradient(90deg, #2c2c2c 1px, transparent 1px);
+  background-size: 20px 20px;
   overflow: hidden;
 }
 
@@ -64,6 +72,6 @@ onMounted(updatePreview)
   width: 100%;
   height: 100%;
   border: none;
-  background: white;
+  background: transparent;
 }
 </style>

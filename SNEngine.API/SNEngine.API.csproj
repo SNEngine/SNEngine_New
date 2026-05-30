@@ -11,6 +11,25 @@
     <ProjectReference Include="..\SNEngine.Core\SNEngine.Core.csproj" />
     <ProjectReference Include="..\SNEngine.Data\SNEngine.Data.csproj" />
     <ProjectReference Include="..\SNEngine.UI\SNEngine.UI.csproj" />
+
+    <!-- Roslyn Source Generator for JS bindings (sn.ShowCharacter etc.) -->
+    <ProjectReference Include="..\SNEngine.API.Generators\SNEngine.API.Generators.csproj"
+                        OutputItemType="Analyzer"
+                        ReferenceOutputAssembly="false" />
   </ItemGroup>
+
+  <!-- ============================================================ -->
+  <!-- Print generated JS facade to build output (for development)    -->
+  <!-- Usage: dotnet build ... -p:PrintGeneratedJs=true               -->
+  <!-- ============================================================ -->
+  <Target Name="PrintGeneratedJsFacade"
+          AfterTargets="CoreCompile"
+          Condition="'$(DesignTimeBuild)' != 'true' And '$(PrintGeneratedJs)' == 'true'">
+
+    <Message Text="Printing generated JS facade..." Importance="high" />
+
+    <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildThisFileDirectory)PrintGeneratedJsFacade.ps1&quot; -IntermediateOutputPath &quot;$(IntermediateOutputPath)&quot;" />
+
+  </Target>
 
 </Project>

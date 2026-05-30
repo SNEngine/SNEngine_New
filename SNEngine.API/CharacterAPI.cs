@@ -21,6 +21,7 @@ public static class CharacterAPI
     /// <summary>
     /// Sets root folder for characters.
     /// </summary>
+    [JSExclude]
     public static void SetRoot(string rootPath)
     {
         _charactersRoot = rootPath;
@@ -31,6 +32,7 @@ public static class CharacterAPI
     /// <summary>
     /// Adds or updates a character (creates folder + .sncd file).
     /// </summary>
+    [JSExclude]
     public static void AddCharacter(CharacterData character)
     {
         if (character == null || string.IsNullOrEmpty(character.Name))
@@ -233,6 +235,7 @@ public static class CharacterAPI
     /// <summary>
     /// Quick example
     /// </summary>
+    [JSExclude]
     public static void AddExampleYuki()
     {
         var yuki = new CharacterData

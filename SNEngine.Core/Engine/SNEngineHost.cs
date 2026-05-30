@@ -71,6 +71,13 @@ public class SNEngineHost : IDisposable
 
     public event Action? OnInitialized;
 
+    /// <summary>
+    /// Optional JavaScript bridge (e.g. Ultralight).
+    /// Set this from SNEngine.API or your application after creating the host
+    /// if you want JavaScript code to be able to call C# APIs.
+    /// </summary>
+    public Core.JS.IJSBridge? JavaScriptBridge { get; set; }
+
     private bool _isDisposing = false;
     private bool _disposed = false;
 
@@ -246,6 +253,12 @@ public class SNEngineHost : IDisposable
         {
             // Update UI elements (logic, JS, animations, etc.)
             Ui?.Update(deltaTime);
+        });
+
+        // Process any pending calls from JavaScript (e.g. from Ultralight)
+        _profiler.Time("Update/JSBridge", () =>
+        {
+            JavaScriptBridge?.ProcessPendingCalls();
         });
 
         _profiler.EndUpdate();

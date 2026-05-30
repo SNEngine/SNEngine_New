@@ -84,6 +84,9 @@ public unsafe class UltralightOverlay : IUiOverlay
         };
         _ulView = _ulRenderer.CreateView((uint)_context.ViewportWidth, (uint)_context.ViewportHeight, viewConfig);
 
+        // TODO: Wire SNEngineLoadListener here for proper OnFinishLoading timing
+        // _ulView.SetLoadListener(new SNEngineLoadListener());
+
         // 4. Создание текстуры в TrippyGL (6-параметровый ctor: device, w, h, genMips, samples, format)
         _uiTexture = new Texture2D(_context.GraphicsDevice, (uint)_context.ViewportWidth, (uint)_context.ViewportHeight, false, 0, TextureImageFormat.Color4b);
         _uiTexture.SetTextureFilters(TrippyGL.TextureMinFilter.Linear, TrippyGL.TextureMagFilter.Linear);

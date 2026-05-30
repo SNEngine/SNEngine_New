@@ -77,6 +77,10 @@ public class UltralightHtmlElement : UiElementBase
             (uint)context.ViewportWidth,
             (uint)context.ViewportHeight);
 
+        // TODO: Wire SNEngineLoadListener here once the correct attachment method for your UltralightNet version is known
+        // Example: _ulView.SetLoadListener(new SNEngineLoadListener());
+        // For now we rely on immediate injection in SNEngineJSBridge.
+
         // Create our own rendering resources for this element's surface
         int viewW = context.ViewportWidth;
         int viewH = context.ViewportHeight;
@@ -122,6 +126,8 @@ public class UltralightHtmlElement : UiElementBase
         {
             _currentScreen = screenName;
             _ulView.HTML = htmlContent;
+
+            // Injection will be handled by SNEngineLoadListener when the main frame finishes loading
         }
     }
 
@@ -133,6 +139,8 @@ public class UltralightHtmlElement : UiElementBase
         if (_ulView == null) return;
         _ulView.HTML = html ?? string.Empty;
         _currentScreen = null;
+
+        // Injection will be handled by SNEngineLoadListener
     }
 
     /// <summary>
@@ -149,6 +157,8 @@ public class UltralightHtmlElement : UiElementBase
         {
             _ulView.HTML = htmlContent;
             _currentScreen = null;
+
+            // Injection will be handled by SNEngineLoadListener
         }
     }
 

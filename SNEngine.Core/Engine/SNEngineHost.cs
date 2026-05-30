@@ -93,6 +93,8 @@ public class SNEngineHost : IDisposable
     /// </summary>
     public GraphicsAPI GraphicsApi { get; }
 
+    public double NativeFps => _profiler.NativeFps;
+
     /// <summary>
     /// Основной конструктор
     /// </summary>
@@ -508,6 +510,8 @@ public class SNEngineHost : IDisposable
         private double _currentUpdateScene;
         private double _currentUpdateUi;
 
+        public double NativeFps { get; private set; }
+
         public FrameProfiler()
         {
             _frameSw.Start();
@@ -585,7 +589,7 @@ public class SNEngineHost : IDisposable
 
                 double totalAccounted = avgUpdateScene + avgUpdateUi + avgRenderScene + avgRenderUi;
                 double fpsFromInterFrame = avgFrame > 0 ? 1000.0 / avgFrame : 0;
-
+                NativeFps = fpsFromInterFrame;
                 Debug.Log(
                     $"[FrameProfiler] FPS~{fpsFromInterFrame:F1} | " +
                     $"Frame: {avgFrame:F2}ms | " +

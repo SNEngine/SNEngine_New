@@ -289,23 +289,6 @@ public static class SNEngine
         LoadScene(empty);
     }
 
-    // ================================================================
-    // ====================== UI SCREENS ==============================
-    // ================================================================
-
-    /// <summary>
-    /// Loads and displays a UI screen (HTML-based) from the ui.snpk package.
-    /// The overlay must be an UltralightOverlay (default).
-    ///
-    /// The screenName corresponds to a subfolder inside the UI package.
-    /// It will first try "{screenName}/index.html", then fall back to "index.html".
-    ///
-    /// Example:
-    ///     SNEngine.LoadScreen("mainmenu");   // loads "mainmenu/index.html" from ui.snpk
-    ///     SNEngine.LoadScreen("dialog");     // loads "dialog/index.html"
-    // ================================================================
-    // ====================== GAME CONTROL ============================
-    // ================================================================
 
     /// <summary>
     /// Exit the game (Unity-like)
@@ -394,6 +377,7 @@ public static class SNEngine
     // ================================================================
     // ====================== UTILITY =================================
     // ================================================================
+
 
     public static SNEngineHost Host => _host!;
     public static Scene? CurrentScene => Host?.SceneManager?.CurrentScene;

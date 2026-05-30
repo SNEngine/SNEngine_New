@@ -147,18 +147,18 @@ public class SNEngineJSGenerator : IIncrementalGenerator
                 }
                 js.AppendLine("){");
 
+                js.AppendLine("    if (window.SNEngineHost && typeof SNEngineHost.call === 'function') {");
+
                 if (returnsValue)
                 {
-                    string getterName = m.Name.StartsWith("Get") ? m.Name.Substring(3) : m.Name;
-                    js.AppendLine($"    return typeof window.__sn_get{getterName} === 'function' ? window.__sn_get{getterName}() : null;");
+                    js.AppendLine($"      return SNEngineHost.call('{api.ClassName}.{m.Name}', Array.prototype.slice.call(arguments));");
                 }
                 else
                 {
-                    js.AppendLine("    if (window.SNEngineHost && typeof SNEngineHost.call === 'function') {");
                     js.AppendLine($"      SNEngineHost.call('{api.ClassName}.{m.Name}', Array.prototype.slice.call(arguments));");
-                    js.AppendLine("    }");
                 }
 
+                js.AppendLine("    }");
                 js.AppendLine("  };");
             }
             js.AppendLine();

@@ -37,25 +37,19 @@ public static class SNEngineHostAPI
             var parts = methodName.Split('.');
             if (parts.Length != 2)
             {
-                Console.WriteLine($"[SNEngineHost] Invalid method name format: {methodName}. Expected 'ClassName.MethodName'");
+                Console.WriteLine($"[SNEngineHost] Invalid method name format: {methodName}");
                 return null;
             }
 
             string className = parts[0];
             string method = parts[1];
 
-            // Currently we only support classes from SNEngine.API
             var apiAssembly = typeof(SNEngineHostAPI).Assembly;
 
-            // Find the type (e.g. BackgroundAPI, CharacterAPI)
-            var type = apiAssembly.GetTypes()
-                .FirstOrDefault(t => t.Name == className && t.IsPublic && t.IsClass && t.IsAbstract && t.IsSealed); // static class
-
-            if (type == null)
-            {
-                // Try without the static class check (in case someone made it non-static)
-                type = apiAssembly.GetType($"SNEngine.API.{className}");
-            }
+            // Более надёжный поиск типа
+            var type = apiAssembly.GetType($"SNEngine.API.{className}", false, true)
+                    ?? apiAssembly.GetTypes()
+                        .FirstOrDefault(t => t.Name.Equals(className, StringComparison.OrdinalIgnoreCase));
 
             if (type == null)
             {
@@ -63,7 +57,6 @@ public static class SNEngineHostAPI
                 return null;
             }
 
-            // Find the method
             var methodInfo = type.GetMethod(method, BindingFlags.Public | BindingFlags.Static);
             if (methodInfo == null)
             {
@@ -71,13 +64,9 @@ public static class SNEngineHostAPI
                 return null;
             }
 
-            // Convert JS arguments to .NET types (very basic conversion for now)
             object?[] convertedArgs = ConvertArguments(methodInfo, args);
-
-            // Invoke
             var result = methodInfo.Invoke(null, convertedArgs);
 
-            // For now we don't return values to JS (most API methods are fire-and-forget)
             return result;
         }
         catch (Exception ex)

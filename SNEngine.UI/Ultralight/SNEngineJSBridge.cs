@@ -202,6 +202,7 @@ public static class SNEngineJSBridge
 
         try
         {
+            // 1. Находим SNEngineHostAPI
             var apiAssembly = AppDomain.CurrentDomain.GetAssemblies()
                 .FirstOrDefault(a => a.GetName().Name == "SNEngine.API");
 
@@ -213,44 +214,77 @@ public static class SNEngineJSBridge
             var callMethod = hostType.GetMethod("Call", BindingFlags.Public | BindingFlags.Static);
             if (callMethod == null) return;
 
-            // Read the current queue from JS
-            string? resultJson = null;
+            // 2. Читаем очередь из JavaScript
             string? ex = null;
-
-            view.EvaluateScript("JSON.stringify(window.__sn_callQueue || [])", out ex);
-            // Note: EvaluateScript returns the result as string in some versions.
-            // For safety we use a two-step approach below.
-
-            // Better: use two evaluations
-            string getQueue = @"
-                (function() {
-                    const q = window.__sn_callQueue || [];
-                    const json = JSON.stringify(q);
-                    window.__sn_callQueue = [];   // clear after reading
-                    return json;
-                })();
-            ";
+            string getQueueScript = @"
+            (function() {
+                const queue = window.__sn_callQueue || [];
+                const json = JSON.stringify(queue);
+                window.__sn_callQueue = []; // очищаем сразу
+                return json;
+            })();
+        ";
 
             string? queueJson = null;
-            view.EvaluateScript(getQueue, out ex);
+            view.EvaluateScript(getQueueScript, out ex);
 
-            // In many UltralightNet versions EvaluateScript result goes to the out exception in some builds,
-            // or we can use a different technique. For robustness we read it back via another property.
+            if (string.IsNullOrWhiteSpace(queueJson))
+                return;
 
-            // Simpler robust version for 1.3.0:
-            view.EvaluateScript("window.__sn_lastQueueJson = JSON.stringify(window.__sn_callQueue || []); window.__sn_callQueue = [];", out ex);
+            // 3. Парсим JSON и вызываем C# методы
+            using var doc = System.Text.Json.JsonDocument.Parse(queueJson);
+            var root = doc.RootElement;
 
-            string readBack = "window.__sn_lastQueueJson || '[]'";
-            
+            if (root.ValueKind != System.Text.Json.JsonValueKind.Array)
+                return;
 
-            // Temporary: just clear the queue so it doesn't grow infinitely
-            view.EvaluateScript("if (window.__sn_callQueue) window.__sn_callQueue.length = 0;", out ex);
+            foreach (var item in root.EnumerateArray())
+            {
+                if (!item.TryGetProperty("method", out var methodProp))
+                    continue;
 
+                string methodName = methodProp.GetString() ?? "";
+                if (string.IsNullOrEmpty(methodName))
+                    continue;
+
+                object[] args = Array.Empty<object>();
+
+                if (item.TryGetProperty("args", out var argsProp) && argsProp.ValueKind == System.Text.Json.JsonValueKind.Array)
+                {
+                    args = argsProp.EnumerateArray()
+                        .Select(el => ConvertJsonElement(el))
+                        .ToArray();
+                }
+
+                // 4. Вызываем реальный C# метод
+                try
+                {
+                    callMethod.Invoke(null, new object[] { methodName, args });
+                }
+                catch (Exception invokeEx)
+                {
+                    Console.WriteLine($"[SNEngineJSBridge] Error calling {methodName}: {invokeEx.Message}");
+                }
+            }
         }
         catch (Exception ex)
         {
             Console.WriteLine($"[SNEngineJSBridge] Error processing JS calls: {ex.Message}");
         }
+    }
+
+    // Вспомогательный метод для конвертации JsonElement в object
+    private static object ConvertJsonElement(System.Text.Json.JsonElement element)
+    {
+        return element.ValueKind switch
+        {
+            System.Text.Json.JsonValueKind.String => element.GetString()!,
+            System.Text.Json.JsonValueKind.Number => element.TryGetInt64(out long l) ? l : element.GetDouble(),
+            System.Text.Json.JsonValueKind.True => true,
+            System.Text.Json.JsonValueKind.False => false,
+            System.Text.Json.JsonValueKind.Null => null!,
+            _ => element.ToString()
+        };
     }
 
     private static string? TryGetGeneratedFacade()

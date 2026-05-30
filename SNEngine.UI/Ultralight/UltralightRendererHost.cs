@@ -63,7 +63,26 @@ public sealed class UltralightRendererHost : IDisposable
         };
 
         var view = _renderer.CreateView(width, height, viewConfig);
+        view.OnAddConsoleMessage += (source, level, message, line, column, sourceId) =>
+        {
+            string levelStr = level switch
+            {
+                ULMessageLevel.Log => "LOG",
+                ULMessageLevel.Warning => "WARN",
+                ULMessageLevel.Error => "ERROR",
+                ULMessageLevel.Info => "INFO",
+                ULMessageLevel.Debug => "DEBUG",
+                _ => level.ToString()
+            };
+
+            Console.WriteLine($"[JS {levelStr}] {message} (at {line}:{column})");
+
+            // Опционально дублируем в Debug
+            // Debug.Log($"[JS {levelStr}] {message}");
+        };
         _ownedViews.Add(view);
+
+
         return view;
     }
 

@@ -77,27 +77,6 @@ public class UltralightHtmlElement : UiElementBase
             (uint)context.ViewportWidth,
             (uint)context.ViewportHeight);
 
-        // === ПЕРЕХВАТ console.log / error / warn ===
-        _ulView.OnAddConsoleMessage += (source, level, message, line, column, sourceId) =>
-        {
-            string levelStr = level switch
-            {
-                ULMessageLevel.Log => "LOG",
-                ULMessageLevel.Warning => "WARN",
-                ULMessageLevel.Error => "ERROR",
-                ULMessageLevel.Info => "INFO",
-                ULMessageLevel.Debug => "DEBUG",
-                _ => level.ToString()
-            };
-
-            string fullMessage = $"[JS {levelStr}] {message} (at {line}:{column})";
-
-            SNEngine.Core.Debug.Log(fullMessage);
-
-            // Дублируем в Debug, если нужно
-            // Debug.Log(fullMessage);
-        };
-
 
         SNEngineJSBridge.Inject(_ulView);
 

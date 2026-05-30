@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>FPS Counter - Native</title>
+    <title>FPS Counter</title>
     <style>
         body {
             margin: 0;
@@ -18,16 +18,15 @@
             position: fixed;
             top: 12px;
             left: 12px;
-            padding: 6px 12px;
-            background: rgba(0, 0, 0, 0.7);
+            padding: 8px 14px;
+            background: rgba(0, 0, 0, 0.75);
             border-radius: 4px;
             border: 1px solid rgba(255, 255, 255, 0.3);
             user-select: none;
             pointer-events: none;
             z-index: 9999;
             font-weight: bold;
-            letter-spacing: 1px;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
         }
 
         .native {
@@ -41,32 +40,55 @@
     <script>
         const fpsDisplay = document.getElementById('fps');
 
-        console.log("[FPS] Инициализация FPS счетчика...");
+        // === ДИАГНОСТИКА ===
+        console.log("[FPS] Script started");
 
-        async function updateNativeFPS() {
+        if (typeof sn !== "undefined") {
+            console.log("[FPS] 'sn' object exists. Keys:", Object.keys(sn));
+        } else {
+            console.error("[FPS] 'sn' object is NOT defined!");
+        }
+
+        if (typeof sn !== "undefined" && typeof sn.Native !== "undefined") {
+            console.log("[FPS] sn.Native exists. Methods:", Object.keys(sn.Native));
+        } else {
+            console.warn("[FPS] sn.Native is NOT available");
+        }
+
+        if (typeof SNEngineHost !== "undefined") {
+            console.log("[FPS] SNEngineHost is available");
+        }
+
+        // Основная функция обновления
+        function updateNativeFPS() {
             try {
-                // Вызываем C# (даже если метод синхронный — оборачиваем в Promise)
-                const nativeFps = await Promise.resolve(SNEngineHost.call("GetNativeFps"));
+                if (typeof sn === "undefined" || typeof sn.Native === "undefined" || typeof sn.Native.GetFPS !== "function") {
+                    console.warn("[FPS] sn.Native.GetFPS is not ready yet");
+                    fpsDisplay.textContent = "FPS: WAIT";
+                    setTimeout(updateNativeFPS, 500);
+                    return;
+                }
 
-                console.log("[FPS] Полученный Native FPS:", nativeFps);
+                const fps = sn.Native.GetFPS();
 
-                if (typeof nativeFps === "number" && !isNaN(nativeFps)) {
-                    const fpsRounded = Math.round(nativeFps);
-                    fpsDisplay.innerHTML = `FPS: <span class="native">${fpsRounded}</span> <span style="font-size:14px;color:#aaa;">(native)</span>`;
+                console.log("[FPS] sn.Native.GetFPS() returned:", fps);
+
+                if (typeof fps === "number" && !isNaN(fps)) {
+                    const rounded = Math.round(fps);
+                    fpsDisplay.innerHTML = `FPS: <span class="native">${rounded}</span> <span style="font-size:14px;color:#aaa;">(native)</span>`;
                 } else {
                     fpsDisplay.textContent = "FPS: ---";
                 }
             } catch (e) {
-                console.error("[FPS] Ошибка получения Native FPS:", e);
+                console.error("[FPS] Error calling sn.Native.GetFPS():", e);
                 fpsDisplay.textContent = "FPS: ERR";
             }
 
-            // Обновляем каждые 200 мс
             setTimeout(updateNativeFPS, 200);
         }
 
         // Запуск
-        updateNativeFPS();
+        setTimeout(updateNativeFPS, 150);
     </script>
 </body>
 </html>

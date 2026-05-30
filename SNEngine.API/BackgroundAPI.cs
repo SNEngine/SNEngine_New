@@ -12,6 +12,8 @@ public static class BackgroundAPI
     /// <summary>
     /// Shows a background image in the current scene.
     /// </summary>
+    /// 
+    [JSExclude]
     public static void Show(string filePath, float alpha = 1.0f)
     {
         var scene = SNEngine.CurrentScene;
@@ -38,6 +40,7 @@ public static class BackgroundAPI
     /// <summary>
     /// Hides the current background (sets alpha to 0).
     /// </summary>
+    [JSExclude]
     public static void Hide()
     {
         var bgObj = SNEngine.CurrentScene?.GetGameObject("Background");
@@ -52,6 +55,7 @@ public static class BackgroundAPI
     /// <summary>
     /// Changes background with fade effect (planned).
     /// </summary>
+    [JSExclude]
     public static void Change(string filePath, float fadeTime = 0.5f)
     {
         // TODO: later implement smooth transition

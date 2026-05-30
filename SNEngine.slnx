@@ -1,5 +1,6 @@
 <Solution>
   <Project Path="E:/repos/SNEngine/SNEngine.Core/SNEngine.Core.csproj" />
+  <Project Path="SNEngine.API.Generators/SNEngine.API.Generators.csproj" />
   <Project Path="SNEngine.API/SNEngine.API.csproj" Id="ca1ba8ab-9b98-4e2a-8189-6a11d52e2b14" />
   <Project Path="SNEngine.Backend/SNEngine.Backend.csproj" />
   <Project Path="SNEngine.Build/SNEngine.Build.csproj" Id="606fd1e3-6fd8-4a34-8052-bc07129909f5" />

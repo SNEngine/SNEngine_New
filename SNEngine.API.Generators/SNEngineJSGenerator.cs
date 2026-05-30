@@ -8,15 +8,6 @@ using System.Text;
 
 namespace SNEngine.API.Generators;
 
-/// <summary>
-/// Roslyn Source Generator for SNEngine JS facade.
-/// 
-/// It only emits C# source (a string constant containing the JS).
-/// Physical .js files are not written by the generator itself (forbidden + bad for incremental builds).
-/// 
-/// If you want a visible .js file after build, add an MSBuild Target in SNEngine.API.csproj
-/// that extracts SNEngineJSBindings.GeneratedFacade and writes it to bin/js/.
-/// </summary>
 [Generator]
 public class SNEngineJSGenerator : IIncrementalGenerator
 {
@@ -56,17 +47,22 @@ public class SNEngineJSGenerator : IIncrementalGenerator
                             var methodSymbol = semanticModel.GetDeclaredSymbol(methodSyntax, ct) as IMethodSymbol;
                             if (methodSymbol == null) continue;
 
-                            // Respect [JSExclude] attribute
+                            // Исключаем по атрибуту [JSExclude]
                             bool isExcluded = methodSymbol.GetAttributes()
                                 .Any(attr => attr.AttributeClass?.ToDisplayString() == "SNEngine.API.JSExcludeAttribute");
 
                             if (isExcluded)
                                 continue;
 
+                            // Исключаем сложные методы
+                            if (IsComplexMethod(methodSymbol))
+                                continue;
+
                             methods.Add(new ApiMethodInfo
                             {
                                 Name = methodSymbol.Name,
-                                ParameterCount = methodSymbol.Parameters.Length
+                                ParameterCount = methodSymbol.Parameters.Length,
+                                ReturnType = methodSymbol.ReturnType.ToDisplayString()
                             });
                         }
 
@@ -97,6 +93,27 @@ public class SNEngineJSGenerator : IIncrementalGenerator
         });
     }
 
+    private bool IsComplexMethod(IMethodSymbol method)
+    {
+        string name = method.Name;
+
+        // Исключаем методы, которые выглядят как внутренние/служебные
+        if (name.Contains("Example") || name.StartsWith("Add") && name.Length > 10 ||
+            name.StartsWith("Set") && !name.StartsWith("SetRoot"))
+            return true;
+
+        // Исключаем методы с сложными параметрами
+        foreach (var param in method.Parameters)
+        {
+            string type = param.Type.ToDisplayString();
+            if (type.Contains("Data") || type.Contains("class") || type.Contains("Dictionary") ||
+                type.Contains("List<") || type.Contains("IEnumerable"))
+                return true;
+        }
+
+        return false;
+    }
+
     private string BuildJs(IEnumerable<ApiClassInfo> apiClasses)
     {
         var js = new StringBuilder();
@@ -110,23 +127,38 @@ public class SNEngineJSGenerator : IIncrementalGenerator
 
         foreach (var api in apiClasses)
         {
-            // Skip editor/tooling APIs in the runtime JS facade
             if (api.ClassName == "ProjectAPI")
                 continue;
 
-            string shortName = api.ClassName.Replace("API", ""); // Background, Character, etc.
+            string shortName = api.ClassName.Replace("API", "");
 
             js.AppendLine($"  sn.{shortName} = sn.{shortName} || {{}};");
             js.AppendLine($"  // {api.ClassName}");
 
             foreach (var m in api.Methods)
             {
+                bool returnsValue = m.ReturnType != "void" && m.ReturnType != "System.Void";
+
                 js.Append($"  sn.{shortName}.{m.Name} = function(");
-                for (int i = 0; i < m.ParameterCount; i++) { if (i > 0) js.Append(", "); js.Append("a" + i); }
+                for (int i = 0; i < m.ParameterCount; i++)
+                {
+                    if (i > 0) js.Append(", ");
+                    js.Append("a" + i);
+                }
                 js.AppendLine("){");
-                js.AppendLine("    if (window.SNEngineHost && typeof SNEngineHost.call === 'function') {");
-                js.AppendLine($"      SNEngineHost.call('{api.ClassName}.{m.Name}', Array.prototype.slice.call(arguments));");
-                js.AppendLine("    }");
+
+                if (returnsValue)
+                {
+                    string getterName = m.Name.StartsWith("Get") ? m.Name.Substring(3) : m.Name;
+                    js.AppendLine($"    return typeof window.__sn_get{getterName} === 'function' ? window.__sn_get{getterName}() : null;");
+                }
+                else
+                {
+                    js.AppendLine("    if (window.SNEngineHost && typeof SNEngineHost.call === 'function') {");
+                    js.AppendLine($"      SNEngineHost.call('{api.ClassName}.{m.Name}', Array.prototype.slice.call(arguments));");
+                    js.AppendLine("    }");
+                }
+
                 js.AppendLine("  };");
             }
             js.AppendLine();
@@ -148,6 +180,16 @@ public static partial class SNEngineJSBindings {{
 }}";
     }
 
-    private sealed class ApiClassInfo { public string ClassName { get; set; } = ""; public List<ApiMethodInfo> Methods { get; set; } = new(); }
-    private sealed class ApiMethodInfo { public string Name { get; set; } = ""; public int ParameterCount { get; set; } }
+    private sealed class ApiClassInfo
+    {
+        public string ClassName { get; set; } = "";
+        public List<ApiMethodInfo> Methods { get; set; } = new();
+    }
+
+    private sealed class ApiMethodInfo
+    {
+        public string Name { get; set; } = "";
+        public int ParameterCount { get; set; }
+        public string ReturnType { get; set; } = "";
+    }
 }

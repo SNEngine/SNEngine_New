@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>FPS Counter</title>
+    <title>FPS Counter - Native</title>
     <style>
         body {
             margin: 0;
@@ -40,38 +40,22 @@
     <script>
         const fpsDisplay = document.getElementById('fps');
 
-        // === ДИАГНОСТИКА ===
         console.log("[FPS] Script started");
 
         if (typeof sn !== "undefined") {
-            console.log("[FPS] 'sn' object exists. Keys:", Object.keys(sn));
-        } else {
-            console.error("[FPS] 'sn' object is NOT defined!");
+            console.log("[FPS] 'sn' object found");
         }
 
-        if (typeof sn !== "undefined" && typeof sn.Native !== "undefined") {
-            console.log("[FPS] sn.Native exists. Methods:", Object.keys(sn.Native));
-        } else {
-            console.warn("[FPS] sn.Native is NOT available");
+        if (typeof sn.Native !== "undefined") {
+            console.log("[FPS] 'sn.Native' object found");
         }
 
-        if (typeof SNEngineHost !== "undefined") {
-            console.log("[FPS] SNEngineHost is available");
-        }
-
-        // Основная функция обновления
         function updateNativeFPS() {
             try {
-                if (typeof sn === "undefined" || typeof sn.Native === "undefined" || typeof sn.Native.GetFPS !== "function") {
-                    console.warn("[FPS] sn.Native.GetFPS is not ready yet");
-                    fpsDisplay.textContent = "FPS: WAIT";
-                    setTimeout(updateNativeFPS, 500);
-                    return;
-                }
-
+                // Теперь работает просто и синхронно благодаря генератору
                 const fps = sn.Native.GetFPS();
 
-                console.log("[FPS] sn.Native.GetFPS() returned:", fps);
+                console.log("[FPS] Received:", fps);
 
                 if (typeof fps === "number" && !isNaN(fps)) {
                     const rounded = Math.round(fps);
@@ -88,7 +72,7 @@
         }
 
         // Запуск
-        setTimeout(updateNativeFPS, 150);
+        setTimeout(updateNativeFPS, 100);
     </script>
 </body>
 </html>

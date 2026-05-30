@@ -242,7 +242,7 @@ public static class SNEngine
         }
 
         _host.UiOverlay = UiOverlay;
-        _host.JavaScriptBridge = new UI.Ultralight.SNEngineJSBridgeAdapter();
+        _host.JavaScriptBridge = new UI.Ultralight.SNEngineJSBridgeAdapter(_host);
 
         _host.OnInitialized += () =>
         {

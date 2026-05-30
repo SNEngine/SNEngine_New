@@ -99,6 +99,9 @@ public static class CharacterAPI
     /// Common values: 0.5 = center (default), 0.25 = leftish, 0.75 = rightish.
     /// </param>
     /// <param name="horizontalOffset">Pixel offset from the horizontal anchor point.</param>
+    /// 
+    [JSExclude]
+
     public static CharacterObject Show(
         string characterName, 
         string emotion = "happy",
@@ -211,6 +214,9 @@ public static class CharacterAPI
     /// <summary>
     /// Hides character from the scene.
     /// </summary>
+    /// 
+    [JSExclude]
+
     public static void Hide(string characterName)
     {
         if (_activeCharacters.TryGetValue(characterName, out var character))
@@ -224,6 +230,7 @@ public static class CharacterAPI
     /// <summary>
     /// Changes emotion of active character.
     /// </summary>
+    [JSExclude]
     public static void ChangeEmotion(string characterName, string emotion)
     {
         if (_activeCharacters.TryGetValue(characterName, out var character))

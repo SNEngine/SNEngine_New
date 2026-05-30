@@ -1,3 +1,4 @@
+using Silk.NET.Core.Native;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -96,43 +97,32 @@ public static class SNEngineJSBridge
     {
         try
         {
-            // Define SNEngineHost in JavaScript.
-            // Its .call method forwards to a global __sn_dispatch that we can hook from C#.
-            // This approach works reliably with UltralightNet 1.3.0 without depending on high-level JS bindings.
             string hostDefinition = @"
-                (function() {
-                    if (typeof window.SNEngineHost !== 'undefined') return;
+            (function() {
+                if (typeof window.SNEngineHost !== 'undefined') return;
 
-                    window.SNEngineHost = {
-                        call: function(methodName, args) {
+                window.SNEngineHost = {
+                    call: function(methodName, args) {
+                        return new Promise((resolve, reject) => {
                             try {
-                                if (typeof window.__sn_dispatch === 'function') {
-                                    return window.__sn_dispatch(methodName, args || []);
-                                } else {
-                                    console.log('[SNEngineHost] call ->', methodName, args);
+                                if (!window.__sn_callQueue) {
+                                    window.__sn_callQueue = [];
                                 }
+                                
+                                window.__sn_callQueue.push({
+                                    method: methodName,
+                                    args: args || [],
+                                    resolve: resolve,
+                                    reject: reject
+                                });
                             } catch (e) {
-                                console.error('[SNEngineHost] Error in call:', e);
+                                reject(e);
                             }
-                        }
-                    };
-
-                    // Real dispatcher: push calls into a queue that C# will process every frame
-                    window.__sn_dispatch = function(methodName, args) {
-                        try {
-                            if (!window.__sn_callQueue) {
-                                window.__sn_callQueue = [];
-                            }
-                            window.__sn_callQueue.push({
-                                method: methodName,
-                                args: args || []
-                            });
-                        } catch (e) {
-                            console.error('[SNEngine] Dispatch error:', e);
-                        }
-                    };
-                })();
-            ";
+                        });
+                    }
+                };
+            })();
+        ";
 
             string? exception = null;
             view.EvaluateScript(hostDefinition, out exception);
@@ -141,13 +131,10 @@ public static class SNEngineJSBridge
             {
                 Console.WriteLine($"[SNEngineJSBridge] Error defining SNEngineHost: {exception}");
             }
-
-            // Wire the real C# dispatcher so that JS calls actually reach SNEngine.API.SNEngineHostAPI.Call
-            WireRealDispatcher(view);
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[SNEngineJSBridge] Failed to register SNEngineHost object: {ex.Message}");
+            Console.WriteLine($"[SNEngineJSBridge] Failed to register SNEngineHost: {ex.Message}");
         }
     }
 
@@ -203,10 +190,9 @@ public static class SNEngineJSBridge
     public static void ProcessPendingJSCalls(View view)
     {
         if (view == null) return;
-
+        
         try
         {
-            // 1. Находим SNEngineHostAPI
             var apiAssembly = AppDomain.CurrentDomain.GetAssemblies()
                 .FirstOrDefault(a => a.GetName().Name == "SNEngine.API");
 
@@ -218,36 +204,47 @@ public static class SNEngineJSBridge
             var callMethod = hostType.GetMethod("Call", BindingFlags.Public | BindingFlags.Static);
             if (callMethod == null) return;
 
-            // 2. Читаем очередь из JavaScript
-            string? ex = null;
+            // 1. Читаем очередь (сохраняем resolve/reject)
             string getQueueScript = @"
             (function() {
                 const queue = window.__sn_callQueue || [];
-                const json = JSON.stringify(queue);
-                window.__sn_callQueue = []; // очищаем сразу
+                if (queue.length === 0) return '[]';
+
+                // Сохраняем промисы во временный массив
+                window.__sn_pendingPromises = queue.map(item => ({
+                    resolve: item.resolve,
+                    reject: item.reject
+                }));
+
+                const json = JSON.stringify(queue.map(item => ({
+                    method: item.method,
+                    args: item.args || []
+                })));
+
+                window.__sn_callQueue = [];
                 return json;
             })();
         ";
 
+            string? ex = null;
             string? queueJson = null;
             view.EvaluateScript(getQueueScript, out ex);
 
-            if (string.IsNullOrWhiteSpace(queueJson))
+            if (string.IsNullOrWhiteSpace(queueJson) || queueJson == "[]")
                 return;
 
-            // 3. Парсим JSON и вызываем C# методы
             using var doc = System.Text.Json.JsonDocument.Parse(queueJson);
             var root = doc.RootElement;
 
             if (root.ValueKind != System.Text.Json.JsonValueKind.Array)
                 return;
 
-            foreach (var item in root.EnumerateArray())
+            // 2. Обрабатываем каждый вызов
+            for (int i = 0; i < root.GetArrayLength(); i++)
             {
-                if (!item.TryGetProperty("method", out var methodProp))
-                    continue;
+                var item = root[i];
+                string methodName = item.GetProperty("method").GetString() ?? "";
 
-                string methodName = methodProp.GetString() ?? "";
                 if (string.IsNullOrEmpty(methodName))
                     continue;
 
@@ -260,15 +257,31 @@ public static class SNEngineJSBridge
                         .ToArray();
                 }
 
-                // 4. Вызываем реальный C# метод
+                // 3. Вызываем C# метод
+                object? result = null;
                 try
                 {
-                    callMethod.Invoke(null, new object[] { methodName, args });
+                    result = callMethod.Invoke(null, new object[] { methodName, args });
                 }
                 catch (Exception invokeEx)
                 {
                     Console.WriteLine($"[SNEngineJSBridge] Error calling {methodName}: {invokeEx.Message}");
                 }
+
+                // 4. Разрешаем Promise в JS
+                string returnScript = $@"
+                (function() {{
+                    if (window.__sn_pendingPromises && window.__sn_pendingPromises[{i}]) {{
+                        const pending = window.__sn_pendingPromises[{i}];
+                        if (pending.resolve) {{
+                            pending.resolve({(result == null ? "null" : result.ToString())});
+                        }}
+                        window.__sn_pendingPromises[{i}] = null;
+                    }}
+                }})();
+            ";
+
+                view.EvaluateScript(returnScript, out ex);
             }
         }
         catch (Exception ex)

@@ -15,7 +15,7 @@ namespace SNEngine.Core.Engine;
 /// <summary>
 /// Главный хост движка с поддержкой обычного режима и Shared Memory превью.
 /// </summary>
-public class SNEngineHost : IDisposable
+public class SNEngineHost : IDisposable, IFrameDataProvider
 {
     private IWindow? _window;
     private GL? _gl;
@@ -492,7 +492,7 @@ public class SNEngineHost : IDisposable
     // Use this to answer "what exactly is eating the frame time?"
     // It never touches Ultralight code — only measures call sites.
     // ============================================================
-    private sealed class FrameProfiler
+    private sealed class FrameProfiler : IFrameDataProvider
     {
         private readonly Stopwatch _frameSw = new();
         private readonly Stopwatch _sectionSw = new();

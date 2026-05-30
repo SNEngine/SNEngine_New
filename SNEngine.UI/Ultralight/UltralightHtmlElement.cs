@@ -86,23 +86,21 @@ public class UltralightHtmlElement : UiElementBase
                 ULMessageLevel.Warning => "WARN",
                 ULMessageLevel.Error => "ERROR",
                 ULMessageLevel.Info => "INFO",
+                ULMessageLevel.Debug => "DEBUG",
                 _ => level.ToString()
             };
 
-            Console.WriteLine($"[JS {levelStr}] {message} (at {line}:{column})");
+            string fullMessage = $"[JS {levelStr}] {message} (at {line}:{column})";
 
-            // Опционально: можно отправлять в твой Debug.Log
-            // Debug.Log($"[JS {levelStr}] {message}");
-        };// Debug.Log($"{prefix} {message}");
-    
+            SNEngine.Core.Debug.Log(fullMessage);
+
+            // Дублируем в Debug, если нужно
+            // Debug.Log(fullMessage);
+        };
+
 
         SNEngineJSBridge.Inject(_ulView);
 
-        // TODO: Wire SNEngineLoadListener here once the correct attachment method for your UltralightNet version is known
-        // Example: _ulView.SetLoadListener(new SNEngineLoadListener());
-        // For now we rely on immediate injection in SNEngineJSBridge.
-
-        // Create our own rendering resources for this element's surface
         int viewW = context.ViewportWidth;
         int viewH = context.ViewportHeight;
 

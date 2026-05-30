@@ -1,72 +1,72 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-  <meta charset="UTF-8">
-  <title>FPS Counter - Native</title>
-  <style>
-    body {
-      margin: 0;
-      padding: 0;
-      background: transparent;
-      font-family: Consolas, monospace;
-      font-size: 18px;
-      color: #ffffff;
-      overflow: hidden;
-    }
+    <meta charset="UTF-8">
+    <title>FPS Counter - Native</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: transparent;
+            font-family: Consolas, monospace;
+            font-size: 18px;
+            color: #ffffff;
+            overflow: hidden;
+        }
 
-    #fps {
-      position: fixed;
-      top: 12px;
-      left: 12px;
-      padding: 6px 12px;
-      background: rgba(0, 0, 0, 0.7);
-      border-radius: 4px;
-      border: 1px solid rgba(255, 255, 255, 0.3);
-      user-select: none;
-      pointer-events: none;
-      z-index: 9999;
-      font-weight: bold;
-      letter-spacing: 1px;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-    }
+        #fps {
+            position: fixed;
+            top: 12px;
+            left: 12px;
+            padding: 6px 12px;
+            background: rgba(0, 0, 0, 0.7);
+            border-radius: 4px;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            user-select: none;
+            pointer-events: none;
+            z-index: 9999;
+            font-weight: bold;
+            letter-spacing: 1px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+        }
 
-    .native {
-      color: #00ffaa;
-    }
-  </style>
+        .native {
+            color: #00ffaa;
+        }
+    </style>
 </head>
 <body>
-  <div id="fps">FPS: -- <span style="font-size:14px;color:#aaa;">(native)</span></div>
+    <div id="fps">FPS: -- <span style="font-size:14px;color:#aaa;">(native)</span></div>
 
-  <script>
-      const fpsDisplay = document.getElementById('fps');
+    <script>
+        const fpsDisplay = document.getElementById('fps');
 
-      console.log("[FPS] Инициализация FPS счетчика...");
-    
-    let lastUpdate = performance.now();
+        console.log("[FPS] Инициализация FPS счетчика...");
 
-    async function updateNativeFPS() {
-      try {
-        // Вызываем C# через JS Bridge
-          const nativeFps = await SNEngineHost.call("GetNativeFps");
-          console.log("[FPS] Полученный Native FPS:", nativeFps);
-        if (typeof nativeFps === "number" && !isNaN(nativeFps)) {
-          const fpsRounded = Math.round(nativeFps);
-          fpsDisplay.innerHTML = `FPS: <span class="native">${fpsRounded}</span> <span style="font-size:14px;color:#aaa;">(native)</span>`;
-        } else {
-          fpsDisplay.textContent = "FPS: ---";
+        async function updateNativeFPS() {
+            try {
+                // Вызываем C# (даже если метод синхронный — оборачиваем в Promise)
+                const nativeFps = await Promise.resolve(SNEngineHost.call("GetNativeFps"));
+
+                console.log("[FPS] Полученный Native FPS:", nativeFps);
+
+                if (typeof nativeFps === "number" && !isNaN(nativeFps)) {
+                    const fpsRounded = Math.round(nativeFps);
+                    fpsDisplay.innerHTML = `FPS: <span class="native">${fpsRounded}</span> <span style="font-size:14px;color:#aaa;">(native)</span>`;
+                } else {
+                    fpsDisplay.textContent = "FPS: ---";
+                }
+            } catch (e) {
+                console.error("[FPS] Ошибка получения Native FPS:", e);
+                fpsDisplay.textContent = "FPS: ERR";
+            }
+
+            // Обновляем каждые 200 мс
+            setTimeout(updateNativeFPS, 200);
         }
-      } catch (e) {
-        console.warn("[FPS] Не удалось получить Native FPS:", e);
-        fpsDisplay.textContent = "FPS: ERR";
-      }
 
-      // Обновляем каждые 200 мс (достаточно плавно и не нагружает)
-      setTimeout(updateNativeFPS, 200);
-    }
-
-    // Запуск
-    updateNativeFPS();
-  </script>
+        // Запуск
+        updateNativeFPS();
+    </script>
 </body>
 </html>

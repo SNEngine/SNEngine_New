@@ -1,121 +1,71 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-  <meta charset="UTF-8">
-  <title>Novel Dialog</title>
-  <style>
-    * {
-      box-sizing: border-box;
-    }
+    <meta charset="UTF-8">
+    <title>FPS Counter - Native</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: transparent;
+            font-family: Consolas, monospace;
+            font-size: 18px;
+            color: #ffffff;
+            overflow: hidden;
+        }
 
-    html, body {
-      margin: 0;
-      padding: 0;
-      height: 100%;
-      width: 100%;
-      background: transparent;
-      position: relative;
-      overflow: hidden;
-    }
+        #fps {
+            position: fixed;
+            top: 12px;
+            left: 12px;
+            padding: 6px 12px;
+            background: rgba(0, 0, 0, 0.75);
+            border-radius: 4px;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            user-select: none;
+            pointer-events: none;
+            z-index: 9999;
+            font-weight: bold;
+            letter-spacing: 1px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+        }
 
-    body {
-      font-family: 'Segoe UI', system-ui, sans-serif;
-      font-size: 20px;
-      color: #eeeeee;
-    }
-
-    #dialog-container {
-      position: absolute;
-      bottom: 5%;
-      left: 50%;
-      transform: translateX(-50%);
-      width: 85%;
-      max-width: 1100px;
-      background: #1e1e1e;
-      border: 3px solid #FF5252;
-      border-radius: 24px; /* более скруглённый */
-      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.8);
-      padding: 14px 24px 18px;
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-      animation: dialog-outline-blink 1.1s infinite ease-in-out;
-    }
-
-    @keyframes dialog-outline-blink {
-      0%, 100% {
-        border-color: #FF5252;
-        outline: 6px solid rgba(255, 82, 82, 0.0);
-        outline-offset: 0px;
-      }
-      50% {
-        border-color: #ff9999;
-        outline: 6px solid rgba(255, 82, 82, 0.6);
-        outline-offset: 5px;
-      }
-    }
-
-    #speaker {
-      font-weight: 600;
-      font-size: 20px;
-      color: #ffffff;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .speaker-triangle {
-      color: #FF5252;
-      font-size: 15px;
-      line-height: 1;
-      animation: blink 1.1s infinite ease-in-out; /* синхронизировано с рамкой */
-      flex-shrink: 0;
-    }
-
-    #dialog-text {
-      font-size: 19px;
-      line-height: 1.4;
-      min-height: 60px;
-      color: #eeeeee;
-    }
-
-    @keyframes blink {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.2; }
-    }
-  </style>
+        .native {
+            color: #00ffaa;
+        }
+    </style>
 </head>
 <body>
-  <div id="dialog-container">
-    <div id="speaker">
-      <span class="speaker-triangle">▶</span>
-      <span id="speaker-name">Имя персонажа</span>
-    </div>
-    <div id="dialog-text">
-      Здесь будет отображаться текст диалога. Можно обновлять через JavaScript.
-    </div>
-  </div>
+    <div id="fps">FPS: -- <span style="font-size:14px;color:#aaa;">(native)</span></div>
 
-  <script>
-    // Пример API для управления диалогом извне (через Ultralight)
-    window.DialogUI = {
-      setSpeaker(name) {
-        const nameEl = document.getElementById('speaker-name');
-        if (nameEl) nameEl.textContent = name || '';
-      },
-      setText(text) {
-        document.getElementById('dialog-text').innerHTML = text || '';
-      },
-      clear() {
-        const nameEl = document.getElementById('speaker-name');
-        if (nameEl) nameEl.textContent = '';
-        document.getElementById('dialog-text').innerHTML = '';
-      }
-    };
+    <script>
+        const fpsDisplay = document.getElementById('fps');
 
-    // Для теста можно раскомментировать:
-    // DialogUI.setSpeaker("Юки");
-    // DialogUI.setText("Привет... Это тестовый диалог для визуальной новеллы.");
-  </script>
+        console.log("[FPS] FPS Counter initialized");
+
+        function updateNativeFPS() {
+            try {
+                // Используем сгенерированный фасад
+                const fps = sn.Native.GetFPS();
+
+                console.log("[FPS] Native FPS received:", fps);
+
+                if (typeof fps === "number" && !isNaN(fps)) {
+                    const rounded = Math.round(fps);
+                    fpsDisplay.innerHTML = `FPS: <span class="native">${rounded}</span> <span style="font-size:14px;color:#aaa;">(native)</span>`;
+                } else {
+                    fpsDisplay.textContent = "FPS: ---";
+                }
+            } catch (e) {
+                console.error("[FPS] Error getting native FPS:", e);
+                fpsDisplay.textContent = "FPS: ERR";
+            }
+
+            setTimeout(updateNativeFPS, 200);
+        }
+
+        // Запуск
+        updateNativeFPS();
+    </script>
 </body>
 </html>

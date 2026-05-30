@@ -77,6 +77,27 @@ public class UltralightHtmlElement : UiElementBase
             (uint)context.ViewportWidth,
             (uint)context.ViewportHeight);
 
+        // === ПЕРЕХВАТ console.log / error / warn ===
+        _ulView.OnAddConsoleMessage += (source, level, message, line, column, sourceId) =>
+        {
+            string levelStr = level switch
+            {
+                ULMessageLevel.Log => "LOG",
+                ULMessageLevel.Warning => "WARN",
+                ULMessageLevel.Error => "ERROR",
+                ULMessageLevel.Info => "INFO",
+                _ => level.ToString()
+            };
+
+            Console.WriteLine($"[JS {levelStr}] {message} (at {line}:{column})");
+
+            // Опционально: можно отправлять в твой Debug.Log
+            // Debug.Log($"[JS {levelStr}] {message}");
+        };// Debug.Log($"{prefix} {message}");
+    
+
+        SNEngineJSBridge.Inject(_ulView);
+
         // TODO: Wire SNEngineLoadListener here once the correct attachment method for your UltralightNet version is known
         // Example: _ulView.SetLoadListener(new SNEngineLoadListener());
         // For now we rely on immediate injection in SNEngineJSBridge.

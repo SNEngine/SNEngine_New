@@ -74,8 +74,6 @@ public static class SNEngine
 
         _host.Ui.Add(element);
 
-        SNEngineJSBridge.Inject(element.GetRendererHost().Renderer.View);
-
         return element;
     }
 

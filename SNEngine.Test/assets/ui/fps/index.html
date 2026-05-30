@@ -39,15 +39,17 @@
   <div id="fps">FPS: -- <span style="font-size:14px;color:#aaa;">(native)</span></div>
 
   <script>
-    const fpsDisplay = document.getElementById('fps');
+      const fpsDisplay = document.getElementById('fps');
+
+      console.log("[FPS] Инициализация FPS счетчика...");
     
     let lastUpdate = performance.now();
 
     async function updateNativeFPS() {
       try {
         // Вызываем C# через JS Bridge
-        const nativeFps = await SNEngineHost.call("GetNativeFps");
-        
+          const nativeFps = await SNEngineHost.call("GetNativeFps");
+          console.log("[FPS] Полученный Native FPS:", nativeFps);
         if (typeof nativeFps === "number" && !isNaN(nativeFps)) {
           const fpsRounded = Math.round(nativeFps);
           fpsDisplay.innerHTML = `FPS: <span class="native">${fpsRounded}</span> <span style="font-size:14px;color:#aaa;">(native)</span>`;

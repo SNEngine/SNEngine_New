@@ -43,41 +43,6 @@ public static class SNEngineJSBridge
         PerformInjection(view);
     }
 
-    public static void InjectConsoleHandler(View view)
-    {
-        if (view == null) return;
-
-        const string consoleHandler = @"
-        (function() {
-            const originalConsole = window.console || {};
-            
-            window.console = {
-                log: function(...args) {
-                    SNEngineHost.call('ConsoleLog', args);
-                    originalConsole.log?.apply(originalConsole, args);
-                },
-                error: function(...args) {
-                    SNEngineHost.call('ConsoleError', args);
-                    originalConsole.error?.apply(originalConsole, args);
-                },
-                warn: function(...args) {
-                    SNEngineHost.call('ConsoleWarn', args);
-                    originalConsole.warn?.apply(originalConsole, args);
-                },
-                info: function(...args) {
-                    SNEngineHost.call('ConsoleLog', args);
-                    originalConsole.info?.apply(originalConsole, args);
-                }
-            };
-        })();
-    ";
-
-        string? ex = null;
-        view.EvaluateScript(consoleHandler, out ex);
-
-        if (!string.IsNullOrEmpty(ex))
-            Console.WriteLine($"[JSBridge] Console handler injection error: {ex}");
-    }
 
     internal static void PerformInjection(View view)
     {
@@ -107,7 +72,6 @@ public static class SNEngineJSBridge
                 }
             }
 
-            InjectConsoleHandler(view);
         }
 
 

@@ -232,9 +232,6 @@ public static class SNEngine
         // Apply user-configured default settings
         if (_host.RenderSettings != null)
         {
-            // Copy relevant defaults (user can further customize via _host.RenderSettings before Run blocks)
-            // For simplicity we just ensure the instance exists; user can modify _host.RenderSettings directly
-            // if they access it before calling Run (advanced scenario).
         }
 
         // Auto-initialize default Ultralight overlay if none was provided (convenience for development)
@@ -244,6 +241,7 @@ public static class SNEngine
         }
 
         _host.UiOverlay = UiOverlay;
+        _host.JavaScriptBridge = new UI.Ultralight.SNEngineJSBridgeAdapter();
 
         _host.OnInitialized += () =>
         {

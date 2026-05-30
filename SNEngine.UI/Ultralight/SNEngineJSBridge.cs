@@ -185,6 +185,17 @@ public static class SNEngineJSBridge
     /// It reads the call queue that JavaScript pushed via SNEngineHost.call(...)
     /// and executes the real C# methods via SNEngineHostAPI.
     /// </summary>
+    /// 
+    public static void ProcessPendingCalls()
+    {
+        foreach (var weakRef in _activeViews.ToArray())
+        {
+            if (weakRef.TryGetTarget(out var view) && view != null)
+            {
+                ProcessPendingJSCalls(view);
+            }
+        }
+    }
     public static void ProcessPendingJSCalls(View view)
     {
         if (view == null) return;
@@ -230,26 +241,7 @@ public static class SNEngineJSBridge
             view.EvaluateScript("window.__sn_lastQueueJson = JSON.stringify(window.__sn_callQueue || []); window.__sn_callQueue = [];", out ex);
 
             string readBack = "window.__sn_lastQueueJson || '[]'";
-            // We can't easily get the return value, so we use a different reliable pattern:
-
-            // Alternative reliable pattern for this version:
-            // We will store calls in a way that C# can read via EvaluateScript + we process known calls.
-            // For a first working version, let's use direct reflection call when we know calls happened.
-
-            // Practical working solution:
-            // Instead of complex JSON roundtrip, we process calls immediately inside the JS call if possible.
-            // Since we can't bind C# functions easily, the queue + processing is the way.
-
-            // Let's use a different, simpler reliable mechanism for now:
-            // The JS facade already pushes to __sn_callQueue.
-            // We read it by evaluating and then manually parsing on C# side is hard without return value.
-
-            // Best practical solution for UltralightNet 1.3.0:
-            // Make the JS call the C# dispatcher synchronously by using a global object we control.
-
-            // For this implementation we provide ProcessPendingJSCalls as the official API.
-            // Real automatic dispatch requires either polling the queue (possible with extra work)
-            // or upgrading the binding.
+            
 
             // Temporary: just clear the queue so it doesn't grow infinitely
             view.EvaluateScript("if (window.__sn_callQueue) window.__sn_callQueue.length = 0;", out ex);

@@ -127,8 +127,7 @@ public class SNEngineJSGenerator : IIncrementalGenerator
 
         foreach (var api in apiClasses)
         {
-            if (api.ClassName == "ProjectAPI")
-                continue;
+            if (api.ClassName == "ProjectAPI") continue;
 
             string shortName = api.ClassName.Replace("API", "");
 
@@ -147,18 +146,20 @@ public class SNEngineJSGenerator : IIncrementalGenerator
                 }
                 js.AppendLine("){");
 
-                js.AppendLine("    if (window.SNEngineHost && typeof SNEngineHost.call === 'function') {");
-
-                if (returnsValue)
+                if (shortName == "Native" && m.Name == "GetFPS")
                 {
-                    js.AppendLine($"      return SNEngineHost.call('{api.ClassName}.{m.Name}', Array.prototype.slice.call(arguments));");
+                    // Самое простое и надёжное решение для FPS
+                    js.AppendLine("    return window.__currentFPS || 0;");
+                }
+                else if (returnsValue)
+                {
+                    js.AppendLine($"    return SNEngineHost.call('{api.ClassName}.{m.Name}', Array.prototype.slice.call(arguments));");
                 }
                 else
                 {
-                    js.AppendLine($"      SNEngineHost.call('{api.ClassName}.{m.Name}', Array.prototype.slice.call(arguments));");
+                    js.AppendLine($"    SNEngineHost.call('{api.ClassName}.{m.Name}', Array.prototype.slice.call(arguments));");
                 }
 
-                js.AppendLine("    }");
                 js.AppendLine("  };");
             }
             js.AppendLine();

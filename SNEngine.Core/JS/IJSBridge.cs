@@ -15,4 +15,6 @@ public interface IJSBridge
     /// This method should be called once per frame from the main game loop.
     /// </summary>
     void ProcessPendingCalls();
+
+    void UpdateWindowData();           // ← должен быть
 }

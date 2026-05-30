@@ -49,4 +49,5 @@ public interface IUiElement : IDisposable
     /// Called when the game window or viewport size changes.
     /// </summary>
     void Resize(int width, int height);
+    void TickJsHelpers();
 }

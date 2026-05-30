@@ -171,6 +171,7 @@ public sealed class UiManager : IDisposable
             try
             {
                 element.Render(context);
+                element.TickJsHelpers();
             }
             catch (Exception ex)
             {

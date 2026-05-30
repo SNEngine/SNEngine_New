@@ -2,77 +2,79 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>FPS Counter - Native</title>
+    <title>FPS Debug</title>
     <style>
         body {
             margin: 0;
             padding: 0;
             background: transparent;
-            font-family: Consolas, monospace;
-            font-size: 18px;
-            color: #ffffff;
-            overflow: hidden;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            -webkit-user-select: none;
+            user-select: none;
         }
 
         #fps {
             position: fixed;
-            top: 12px;
-            left: 12px;
-            padding: 8px 14px;
-            background: rgba(0, 0, 0, 0.75);
-            border-radius: 4px;
-            border: 1px solid rgba(255, 255, 255, 0.3);
-            user-select: none;
-            pointer-events: none;
-            z-index: 9999;
-            font-weight: bold;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+            top: 10px;
+            left: 10px;
+            font-size: 13px;
+            font-weight: 700;
+            color: #ffffff;
+            background: #1e1e1e;
+            border: 2px solid #FF5252;
+            border-radius: 8px;
+            padding: 4px 10px;
+            display: inline-flex;
+            align-items: center;
+            white-space: nowrap;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.6);
+            z-index: 10000;
+            animation: fps-outline-blink 1.1s infinite ease-in-out;
         }
 
-        .native {
-            color: #00ffaa;
+        @keyframes fps-outline-blink {
+            0%, 100% {
+                border-color: #FF5252;
+                outline: 3px solid rgba(255, 82, 82, 0.0);
+                outline-offset: 0px;
+            }
+
+            50% {
+                border-color: #ff9999;
+                outline: 3px solid rgba(255, 82, 82, 0.5);
+                outline-offset: 2px;
+            }
+        }
+
+        .fps-label {
+            color: #eeeeee;
+            opacity: 0.8;
+            margin-right: 5px;
+        }
+
+        #fps-value {
+            color: #FF5252;
+            font-variant-numeric: tabular-nums;
+            display: inline-block;
+            min-width: 20px;
+            text-align: left;
         }
     </style>
 </head>
 <body>
-    <div id="fps">FPS: -- <span style="font-size:14px;color:#aaa;">(native)</span></div>
+
+    <div id="fps"><span class="fps-label">FPS:</span><span id="fps-value">--</span></div>
 
     <script>
-        const fpsDisplay = document.getElementById('fps');
+        const fpsValueElement = document.getElementById('fps-value');
 
-        console.log("[FPS] Script started");
-
-        if (typeof sn !== "undefined") {
-            console.log("[FPS] 'sn' object found");
+        function updateFPS() {
+            const fps = window.fps || 0;
+            fpsValueElement.textContent = Math.round(fps);
         }
 
-        if (typeof sn.Native !== "undefined") {
-            console.log("[FPS] 'sn.Native' object found");
-        }
+        setInterval(updateFPS, 100);
 
-        function updateNativeFPS() {
-            try {
-                // Теперь работает просто и синхронно благодаря генератору
-                const fps = sn.Native.GetFPS();
-
-                console.log("[FPS] Received:", fps);
-
-                if (typeof fps === "number" && !isNaN(fps)) {
-                    const rounded = Math.round(fps);
-                    fpsDisplay.innerHTML = `FPS: <span class="native">${rounded}</span> <span style="font-size:14px;color:#aaa;">(native)</span>`;
-                } else {
-                    fpsDisplay.textContent = "FPS: ---";
-                }
-            } catch (e) {
-                console.error("[FPS] Error calling sn.Native.GetFPS():", e);
-                fpsDisplay.textContent = "FPS: ERR";
-            }
-
-            setTimeout(updateNativeFPS, 200);
-        }
-
-        // Запуск
-        setTimeout(updateNativeFPS, 100);
     </script>
 </body>
 </html>

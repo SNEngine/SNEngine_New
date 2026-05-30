@@ -1,5 +1,5 @@
 using SNEngine.Core.JS;
-using SNEngine.Core;                    // ← важно
+using SNEngine.Core;
 
 namespace SNEngine.UI.Ultralight;
 
@@ -17,8 +17,13 @@ public sealed class SNEngineJSBridgeAdapter : IJSBridge
         SNEngineJSBridge.ProcessPendingCalls();
     }
 
-    public void UpdateFps()
+    public void UpdateWindowData()
     {
-        double fps = _frameData?.NativeFps ?? 0.0;
+        if (_frameData == null) return;
+
+        double fps = _frameData.NativeFps;
+
+        // Обновляем глобальную переменную для всех активных views
+        SNEngineJSBridge.UpdateGlobalFps(fps);
     }
 }

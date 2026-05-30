@@ -2,6 +2,7 @@ using System;
 using System.Numerics;
 using Silk.NET.OpenGL;
 using SNEngine.Assets.Package;
+using SNEngine.Core;
 using SNEngine.Core.Assets;
 using SNEngine.Core.Rendering;
 using SNEngine.Core.UI;
@@ -21,6 +22,7 @@ public class UltralightHtmlElement : UiElementBase
 {
     private readonly UltralightRendererHost _rendererHost;
     private AssetManager? _assetManager;
+    private IFrameDataProvider _frameDataProvider;
 
     /// <summary>
     /// Exposes the renderer host for integration with UiManager (auto PreRenderHook wiring).
@@ -34,6 +36,9 @@ public class UltralightHtmlElement : UiElementBase
     private IGraphicsContext? _context;
 
     private string? _currentScreen;
+
+    private UltralightJsInterop? _jsInterop;
+    private FpsJsTickable _fpsTickable;
 
     // Simple static cache for HTML content loaded from asset packages.
     // Key = normalized asset path (e.g. "ui/mainmenu/index.html")
@@ -49,10 +54,11 @@ public class UltralightHtmlElement : UiElementBase
     /// </summary>
     public Vector2 Size { get; private set; }
 
-    public UltralightHtmlElement(UltralightRendererHost rendererHost, AssetManager? assetManager = null)
+    public UltralightHtmlElement(UltralightRendererHost rendererHost, AssetManager? assetManager = null, IFrameDataProvider? frameDataProvider = null)
     {
         _rendererHost = rendererHost ?? throw new ArgumentNullException(nameof(rendererHost));
         _assetManager = assetManager;
+        _frameDataProvider = frameDataProvider;
     }
 
     public void SetAssetManager(AssetManager assetManager)
@@ -76,6 +82,14 @@ public class UltralightHtmlElement : UiElementBase
         _ulView = _rendererHost.CreateView(
             (uint)context.ViewportWidth,
             (uint)context.ViewportHeight);
+
+        _jsInterop = new UltralightJsInterop(_ulView);
+
+        if (_ulView != null)
+        {
+            _fpsTickable = new FpsJsTickable(_ulView, _frameDataProvider);
+            _fpsTickable.Initialize();
+        }
 
 
         SNEngineJSBridge.Inject(_ulView);
@@ -279,5 +293,10 @@ public class UltralightHtmlElement : UiElementBase
             _rendererHost.ReleaseView(_ulView);
             _ulView.Dispose();
         }
+    }
+
+    public override void TickJsHelpers()
+    {
+        _fpsTickable?.Tick();
     }
 }

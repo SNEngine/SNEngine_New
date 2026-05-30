@@ -62,7 +62,7 @@ public static class SNEngine
             rendererHost.Initialize(_host.AssetManager);
         }
 
-        var element = new UI.Ultralight.UltralightHtmlElement(rendererHost, _host.AssetManager);
+        var element = new UI.Ultralight.UltralightHtmlElement(rendererHost, _host.AssetManager, _host);
 
         element.ZIndex = zIndex;
 

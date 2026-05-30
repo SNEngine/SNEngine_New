@@ -39,4 +39,6 @@ public abstract class UiElementBase : IUiElement
     public virtual void Resize(int width, int height) { }
 
     public virtual void Dispose() { }
+
+    public virtual void TickJsHelpers() { }
 }

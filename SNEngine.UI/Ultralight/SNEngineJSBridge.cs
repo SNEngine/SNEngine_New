@@ -190,7 +190,7 @@ public static class SNEngineJSBridge
     public static void ProcessPendingJSCalls(View view)
     {
         if (view == null) return;
-        
+
         try
         {
             var apiAssembly = AppDomain.CurrentDomain.GetAssemblies()
@@ -204,14 +204,12 @@ public static class SNEngineJSBridge
             var callMethod = hostType.GetMethod("Call", BindingFlags.Public | BindingFlags.Static);
             if (callMethod == null) return;
 
-            // 1. Читаем очередь (сохраняем resolve/reject)
             string getQueueScript = @"
             (function() {
                 const queue = window.__sn_callQueue || [];
                 if (queue.length === 0) return '[]';
 
-                // Сохраняем промисы во временный массив
-                window.__sn_pendingPromises = queue.map(item => ({
+                const promises = queue.map(item => ({
                     resolve: item.resolve,
                     reject: item.reject
                 }));
@@ -222,13 +220,14 @@ public static class SNEngineJSBridge
                 })));
 
                 window.__sn_callQueue = [];
+                window.__sn_pendingPromises = promises;
+
                 return json;
             })();
         ";
 
-            string? ex = null;
             string? queueJson = null;
-            view.EvaluateScript(getQueueScript, out ex);
+            view.EvaluateScript(getQueueScript, out queueJson);
 
             if (string.IsNullOrWhiteSpace(queueJson) || queueJson == "[]")
                 return;
@@ -239,14 +238,12 @@ public static class SNEngineJSBridge
             if (root.ValueKind != System.Text.Json.JsonValueKind.Array)
                 return;
 
-            // 2. Обрабатываем каждый вызов
             for (int i = 0; i < root.GetArrayLength(); i++)
             {
                 var item = root[i];
                 string methodName = item.GetProperty("method").GetString() ?? "";
 
-                if (string.IsNullOrEmpty(methodName))
-                    continue;
+                if (string.IsNullOrEmpty(methodName)) continue;
 
                 object[] args = Array.Empty<object>();
 
@@ -257,36 +254,51 @@ public static class SNEngineJSBridge
                         .ToArray();
                 }
 
-                // 3. Вызываем C# метод
                 object? result = null;
                 try
                 {
                     result = callMethod.Invoke(null, new object[] { methodName, args });
                 }
-                catch (Exception invokeEx)
+                catch (Exception ex)
                 {
-                    Console.WriteLine($"[SNEngineJSBridge] Error calling {methodName}: {invokeEx.Message}");
+                    Console.WriteLine($"[SNEngineJSBridge] Error calling {methodName}: {ex.Message}");
                 }
 
-                // 4. Разрешаем Promise в JS
+                // Простой и надёжный resolve
                 string returnScript = $@"
                 (function() {{
-                    if (window.__sn_pendingPromises && window.__sn_pendingPromises[{i}]) {{
-                        const pending = window.__sn_pendingPromises[{i}];
-                        if (pending.resolve) {{
-                            pending.resolve({(result == null ? "null" : result.ToString())});
+                    const promises = window.__sn_pendingPromises;
+                    if (promises && promises[{i}]) {{
+                        const p = promises[{i}];
+                        if (p && p.resolve) {{
+                            p.resolve({(result == null ? "null" : result)});
                         }}
-                        window.__sn_pendingPromises[{i}] = null;
+                        promises[{i}] = null;
                     }}
                 }})();
-            ";
+                ";
 
-                view.EvaluateScript(returnScript, out ex);
+                string? dummy = null;
+                view.EvaluateScript(returnScript, out dummy);
             }
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[SNEngineJSBridge] Error processing JS calls: {ex.Message}");
+            Console.WriteLine($"[SNEngineJSBridge] Critical error: {ex.Message}");
+        }
+    }
+
+    public static void UpdateGlobalFps(double fps)
+    {
+        string script = $"window.__currentFPS = {fps.ToString(System.Globalization.CultureInfo.InvariantCulture)};";
+
+        foreach (var weakRef in _activeViews.ToArray())
+        {
+            if (weakRef.TryGetTarget(out var view))
+            {
+                string? err = null;
+                view.EvaluateScript(script, out err);
+            }
         }
     }
 

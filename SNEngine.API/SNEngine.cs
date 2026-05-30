@@ -10,6 +10,7 @@ using Silk.NET.Windowing;
 using System;
 using System.IO;
 using SNEngine.Core.UI;
+using SNEngine.UI.Ultralight;
 
 namespace SNEngine.API;
 
@@ -72,6 +73,8 @@ public static class SNEngine
         }
 
         _host.Ui.Add(element);
+
+        SNEngineJSBridge.Inject(element.GetRendererHost().Renderer.View);
 
         return element;
     }

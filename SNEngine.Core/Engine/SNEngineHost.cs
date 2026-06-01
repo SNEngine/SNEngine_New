@@ -177,6 +177,10 @@ public class SNEngineHost : IDisposable, IFrameDataProvider
         Input.Input.KeyUp += OnGlobalKeyUp;
         Input.Input.TextInput += OnGlobalTextInput;
 
+        // Reliable mouse down for dialogue advance (polling GetMouseButtonDown can miss edges
+        // due to frame timing vs Silk callbacks + Ultralight input forwarding).
+        Input.Input.MouseButtonDown += OnGlobalMouseButtonDown;
+
         Debug.Log("[SNEngineHost] Input system initialized (Silk.NET).");
 
         if (!_useSharedMemory)
@@ -266,6 +270,13 @@ public class SNEngineHost : IDisposable, IFrameDataProvider
 
         // === Forward mouse input to Ultralight views ===
         ProcessInputToUltralightViews();
+
+        // Dialogue advance on left mouse button is handled via the MouseButtonDown event
+        // (see OnGlobalMouseButtonDown + subscription in OnLoad). This is more reliable
+        // than polling GetMouseButtonDown because of callback timing vs frame Update().
+        //
+        // The HTML dialog also calls Advance() on its container for clicks inside the box.
+        // Time-based debounce in DialogueSystem.Advance() prevents duplicates.
 
         _profiler.BeginUpdate();
 
@@ -397,6 +408,20 @@ public class SNEngineHost : IDisposable, IFrameDataProvider
         Console.WriteLine($"[SNEngineHost] Text input: '{character}'");
     }
 
+    /// <summary>
+    /// Handles left mouse button down globally for dialogue advance.
+    /// Using the event instead of polling GetMouseButtonDown ensures we catch the edge
+    /// reliably regardless of when Silk delivers the callback relative to our Update() call
+    /// and Ultralight input forwarding.
+    /// </summary>
+    private void OnGlobalMouseButtonDown(MouseButton button)
+    {
+        if (button == MouseButton.Left && DialogueSystem.IsVisible)
+        {
+            DialogueSystem.Advance();
+        }
+    }
+
     private void OnRenderFrame(double deltaTime)
     {
         if (Renderer == null || _isDisposing) return;
@@ -507,6 +532,13 @@ public class SNEngineHost : IDisposable, IFrameDataProvider
     {
         if (_disposed) return;
         _disposed = true;
+
+        // Unsubscribe from input events
+        try
+        {
+            Input.Input.MouseButtonDown -= OnGlobalMouseButtonDown;
+        }
+        catch { }
 
         if (_window == null) return;
 

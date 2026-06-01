@@ -88,7 +88,17 @@ public static class DialogueSystem
     public static void Clear()
     {
         CompleteCurrentTcs(false);
+        HideCurrentDialogueInternal();
+        Debug.Log("[DialogueSystem] Cleared");
+    }
 
+    /// <summary>
+    /// Internal helper that hides the dialog UI state without touching the TCS.
+    /// The next runtime snapshot push will send visible=false → dialog=null to JS,
+    /// so the HTML sees "no data" and performs its normal hide (container.style.display = 'none').
+    /// </summary>
+    private static void HideCurrentDialogueInternal()
+    {
         _visible = false;
         _speaker = string.Empty;
         _fullText = string.Empty;
@@ -98,8 +108,6 @@ public static class DialogueSystem
         _color = "#FFFFFF";
 
         _displayBuilder.Clear();
-
-        Debug.Log("[DialogueSystem] Cleared");
     }
 
     private static void CompleteCurrentTcs(bool result)
@@ -117,14 +125,17 @@ public static class DialogueSystem
     }
 
     /// <summary>
-    /// Returns a task that completes when the current dialogue line finishes typing
-    /// (or immediately if no line is active or typing is already complete).
+    /// Returns a task that completes when the player advances the current dialogue line
+    /// via mouse click (after the typewriter has finished revealing the text or the line was skipped).
+    /// Completes immediately if no line is active.
     /// </summary>
     public static Task WaitForCurrentLineAsync()
     {
-        if (!_visible || IsTypingComplete)
+        if (!_visible)
             return Task.CompletedTask;
 
+        // Even if typing is complete, we now wait for explicit player click (Advance).
+        // Previously this returned early on IsTypingComplete.
         if (_currentLineTcs == null)
         {
             // Defensive: create one if somehow missing
@@ -135,7 +146,8 @@ public static class DialogueSystem
     }
 
     /// <summary>
-    /// Starts a Say (async) and returns a Task that completes only when the typewriter effect finishes.
+    /// Starts a Say (async) and returns a Task that completes only when the player clicks
+    /// to advance (after the typewriter has finished or the text was skipped via click).
     /// This is the recommended way to do dialogue lines.
     /// </summary>
     public static async Task SayAsync(string speaker, string text, string? color = null, float msPerChar = 30f)
@@ -145,8 +157,9 @@ public static class DialogueSystem
     }
 
     /// <summary>
-    /// Immediately finishes the current line (shows full text).
-    /// Useful for skipping.
+    /// Immediately finishes the current line's typewriter effect (shows full text).
+    /// Does NOT advance to the next line — the player still needs to click to proceed.
+    /// Useful for skipping the typing animation.
     /// </summary>
     public static void CompleteCurrentLine()
     {
@@ -160,7 +173,46 @@ public static class DialogueSystem
         _displayBuilder.Clear();
         _displayBuilder.Append(_fullText);
 
-        CompleteCurrentTcs(true);
+        // Note: does NOT resolve the TCS anymore.
+        // The wait for player click is now handled exclusively by Advance().
+    }
+
+    // Debounce for Advance requests (prevents double-advance from JS click + global input)
+    private static float _lastAdvanceRequestTime;
+
+    /// <summary>
+    /// Called when the player clicks to advance the dialogue.
+    /// Behavior:
+    /// - If text is still typing: instantly completes the reveal (skip effect). Player must click again to proceed.
+    /// - If text is already fully shown: resolves the waiter (so the current SayAsync continues),
+    ///   **then auto-hides the dialog** (sets visible=false). The next snapshot push sends
+    ///   dialog=null to the HTML, which reacts by hiding the container (existing "no data" path).
+    ///   This makes consecutive <c>await Say(...)</c> calls look like a natural visual continuation
+    ///   instead of the previous line staying on screen and being instantly replaced.
+    /// Safe to call from both C# input and from JavaScript (DialogueAPI.Advance via bridge).
+    /// </summary>
+    public static void Advance()
+    {
+        if (!_visible) return;
+
+        // Debounce rapid successive calls (e.g. from both HTML click handler and global input)
+        float now = Engine.Time.ElapsedTime;
+        if (now - _lastAdvanceRequestTime < 0.08f)
+            return;
+        _lastAdvanceRequestTime = now;
+
+        if (!IsTypingComplete)
+        {
+            // First click while typing → skip to full text. Do not advance story yet.
+            CompleteCurrentLine();
+        }
+        else
+        {
+            // Text fully visible (or skipped) → this click lets the script proceed
+            // AND we auto-hide so the next Say looks like a clean continuation.
+            CompleteCurrentTcs(true);
+            HideCurrentDialogueInternal();
+        }
     }
 
     /// <summary>
@@ -221,7 +273,8 @@ public static class DialogueSystem
                 _displayBuilder.Append(_fullText);
             }
 
-            CompleteCurrentTcs(true);
+            // IMPORTANT: no longer auto-resolves the TCS here.
+            // The line stays visible until the player explicitly calls Advance() via click.
         }
     }
 

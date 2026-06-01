@@ -34,10 +34,14 @@ class Program
             // Character will sit correctly without legs being cut off.
             CharacterAPI.Show("yuki", "happy");
             SNEngine.API.SNEngine.LoadScreen("dialog");
+            SNEngine.API.SNEngine.LoadScreen("fps");
 
             SNEngine.Core.Debug.Log("Scene loaded via SNEngine.API");
             await Task.Delay(3000);
-            CharacterAPI.Say("yuki", "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.");
+            for (int i = 0; i < 10; i++)
+            {
+                await CharacterAPI.Say("yuki", GenerateRandomText(450)); // примерно как lorem
+            }
         };
 
         // Используем удобный публичный API
@@ -47,6 +51,41 @@ class Program
             height: 720,
             useSharedMemoryPreview: _isPreviewMode
         );
+    }
+
+    private static string GenerateRandomText(int targetLength)
+    {
+        const string loremBase = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.,!? ";
+        var random = new Random();
+        var result = new System.Text.StringBuilder();
+
+        // Генерируем слова разной длины
+        while (result.Length < targetLength)
+        {
+            int wordLength = random.Next(3, 12); // слова от 3 до 12 символов
+
+            for (int i = 0; i < wordLength; i++)
+            {
+                result.Append(loremBase[random.Next(loremBase.Length)]);
+            }
+
+            result.Append(' '); // пробел между словами
+        }
+
+        // Обрезаем до нужной длины и делаем первую букву заглавной
+        string text = result.ToString().TrimEnd();
+        if (text.Length > targetLength)
+        {
+            text = text.Substring(0, targetLength);
+        }
+
+        // Делаем первую букву большой
+        if (text.Length > 0)
+        {
+            text = char.ToUpper(text[0]) + text.Substring(1);
+        }
+
+        return text + ".";
     }
 
     private static void ParseCommandLineArguments(string[] args)

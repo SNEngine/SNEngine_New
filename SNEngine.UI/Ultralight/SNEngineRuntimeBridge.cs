@@ -160,9 +160,10 @@ public sealed class SNEngineRuntimeBridge
     /// <summary>
     /// Специализированный helper для диалоговой системы "Say".
     /// Прямая манипуляция window.SNEngine.runtime.dialog — объект, который
-    /// поллит HTML-диалог (dialog/index.html) через setInterval.
+    /// поллит HTML-диалог (dialog/index.html) через requestAnimationFrame.
+    /// Теперь также передаёт флаг complete (типинг закончен) — UI показывает индикатор ожидания клика.
     /// </summary>
-    public void SetDialogState(string speaker, string text, string color, bool visible)
+    public void SetDialogState(string speaker, string text, string color, bool visible, bool isComplete = false)
     {
         // Прямой скрипт — самый надёжный способ для Ultralight 1.3.0
         string escapedSpeaker = (speaker ?? string.Empty).Replace("\\", "\\\\").Replace("\"", "\\\"").Replace("\n", "\\n");
@@ -170,6 +171,7 @@ public sealed class SNEngineRuntimeBridge
         string escapedColor = (color ?? "#FFFFFF").Replace("\"", "\\\"");
 
         string visibleStr = visible.ToString().ToLowerInvariant();
+        string completeStr = isComplete.ToString().ToLowerInvariant();
 
         string script = $@"
             (function() {{
@@ -181,7 +183,8 @@ public sealed class SNEngineRuntimeBridge
                         speaker: ""{escapedSpeaker}"",
                         text: ""{escapedText}"",
                         color: ""{escapedColor}"",
-                        visible: true
+                        visible: true,
+                        complete: {completeStr}
                     }};
                 }} else {{
                     window.SNEngine.runtime.dialog = null;
@@ -201,5 +204,6 @@ public sealed class SNEngineRuntimeBridge
         _lastValues["dialog_speaker"] = speaker;
         _lastValues["dialog_text"] = text;
         _lastValues["dialog_visible"] = visible;
+        _lastValues["dialog_complete"] = isComplete;
     }
 }

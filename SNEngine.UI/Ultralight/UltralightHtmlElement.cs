@@ -615,6 +615,6 @@ public override void OnMouseMove(float x, float y)
 
         // Push dialogue state (the text here is already the gradually revealed portion)
         var d = data.Dialogue;
-        _runtimeBridge.SetDialogState(d.Speaker, d.Text, d.Color, d.Visible);
+        _runtimeBridge.SetDialogState(d.Speaker, d.Text, d.Color, d.Visible, d.IsComplete);
     }
 }

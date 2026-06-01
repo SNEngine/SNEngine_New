@@ -83,6 +83,22 @@
             line-height: 1.45;
             min-height: 60px;
             color: #eeeeee;
+            padding-bottom: 8px; /* space for the continue indicator */
+        }
+
+        /* Индикатор "клик для продолжения" — показывается когда typing завершён */
+        #continue-indicator {
+            position: absolute;
+            right: 22px;
+            bottom: 10px;
+            font-size: 13px;
+            line-height: 1;
+            color: #FF5252;
+            opacity: 0.85;
+            pointer-events: none; /* не перехватывает клики */
+            animation: blink 0.85s infinite ease-in-out;
+            display: none;
+            z-index: 10;
         }
 
         /* Базовая анимация мигания элементов */
@@ -173,6 +189,7 @@
             <span id="speaker-name">Имя персонажа</span>
         </div>
         <div id="dialog-text" class="anim-pop"></div>
+        <div id="continue-indicator">▼</div>
     </div>
 
     <script>
@@ -231,6 +248,8 @@
                 container.style.display = 'none';
                 currentText = '';
                 lastSpeaker = '';
+                const indicator = document.getElementById('continue-indicator');
+                if (indicator) indicator.style.display = 'none';
                 return;
             }
 
@@ -239,6 +258,12 @@
             // Автоматическая смена анимации, если движок передал новое значение в snapshot
             if (state.animationType) {
                 setAnimationClass(state.animationType);
+            }
+
+            // Показываем индикатор "продолжить" только когда текст полностью напечатан (complete === true)
+            const indicator = document.getElementById('continue-indicator');
+            if (indicator) {
+                indicator.style.display = (state.complete === true) ? 'block' : 'none';
             }
 
             // Логика смены спикера: при новом имени очищаем текстовое поле
@@ -325,6 +350,8 @@
                 if (nameEl) nameEl.textContent = '';
                 currentText = '';
                 lastSpeaker = '';
+                const indicator = document.getElementById('continue-indicator');
+                if (indicator) indicator.style.display = 'none';
             },
             // Принудительное отображение статического состояния диалога
             forceShow(speaker, text, color, animType = 'pop') {
@@ -335,10 +362,42 @@
             }
         };
 
+        /**
+         * Привязывает клик по диалоговому окну к вызову Advance в C#.
+         * Это главный механизм "ожидания клика" вместо автопродолжения по окончанию текста.
+         */
+        function setupClickAdvance() {
+            const container = document.getElementById('dialog-container');
+            if (!container) return;
+
+            container.addEventListener('click', function (ev) {
+                // Защита от кликов по невидимому контейнеру
+                if (container.style.display === 'none') return;
+
+                try {
+                    if (window.SNEngineHost && typeof window.SNEngineHost.call === 'function') {
+                        // Fire-and-forget: не ждём Promise в обработчике клика
+                        window.SNEngineHost.call('DialogueAPI.Advance', []);
+                    } else {
+                        // Fallback для отладки (если хост не подключён)
+                        console.log('[DialogUI] Advance requested (no SNEngineHost)');
+                    }
+                } catch (e) {
+                    console.warn('[DialogUI] Advance call failed', e);
+                }
+            });
+
+            // Делаем курсор pointer когда контейнер видим (улучшает UX)
+            container.style.cursor = 'pointer';
+        }
+
         // Точка входа: инициализация начального состояния
         (function init() {
             const container = document.getElementById('dialog-container');
             if (container) container.style.display = 'none';
+
+            // Подключаем обработчик кликов для advance (новая модель ожидания)
+            setupClickAdvance();
         })();
 
         // По умолчанию активируем режим анимации 'pop'

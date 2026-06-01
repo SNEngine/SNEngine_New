@@ -247,7 +247,7 @@ public static class CharacterAPI
     /// Показать реплику от персонажа (использует DisplayName и Color из CharacterData).
     /// Если персонаж не загружен — использует переданное имя как есть.
     /// </summary>
-    public static void Say(string characterName, string text)
+    public static async Task Say(string characterName, string text)
     {
         if (string.IsNullOrWhiteSpace(text))
         {
@@ -280,7 +280,7 @@ public static class CharacterAPI
             }
         }
 
-        DialogueAPI.SayAsync(speaker, text, msPerChar: 40);
+        await DialogueAPI.SayAsync(speaker, text, msPerChar: 40);
     }
 
     /// <summary>

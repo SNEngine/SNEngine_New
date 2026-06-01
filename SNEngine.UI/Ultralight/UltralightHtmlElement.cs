@@ -6,6 +6,7 @@ using SNEngine.Assets.Package;
 using SNEngine.Core;
 using SNEngine.Core.Assets;
 using SNEngine.Core.Rendering;
+using SNEngine.Core.Engine;
 using SNEngine.Core.UI;
 using TrippyGL;
 using UltralightNet;
@@ -356,6 +357,15 @@ public class UltralightHtmlElement : UiElementBase
         if (_runtimeBridge != null && _frameDataProvider != null)
         {
             _runtimeBridge.SetFps(_frameDataProvider.NativeFps);
+        }
+
+        // === Dialogue / Say system ===
+        // Pushes current dialog line into window.SNEngine.runtime.dialog for every active HTML view.
+        // The dialog screen (dialog/index.html) polls this via setInterval and auto-hides when empty.
+        if (_runtimeBridge != null)
+        {
+            var (speaker, text, color, visible) = DialogueState.GetCurrent();
+            _runtimeBridge.SetDialogState(speaker, text, color, visible);
         }
     }
 

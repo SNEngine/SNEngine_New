@@ -97,7 +97,64 @@
   </div>
 
   <script>
-    // Пример API для управления диалогом извне (через Ultralight)
+    // =====================================================
+    // Авто-скрытие диалога через polling (setInterval)
+    // Читает window.SNEngine.runtime.dialog, который пушится
+    // из C# через SNEngineRuntimeBridge.SetDialogState()
+    //
+    // Если dialog == null / visible == false / нет текста — контейнер скрывается.
+    // Это "костыль", но по требованию заказчика — через интервалы.
+    // =====================================================
+
+    const DIALOG_POLL_INTERVAL_MS = 80; // достаточно часто, дёшево
+
+    function applyDialogState(state) {
+      const container = document.getElementById('dialog-container');
+      const nameEl = document.getElementById('speaker-name');
+      const textEl = document.getElementById('dialog-text');
+
+      if (!container || !nameEl || !textEl) return;
+
+      const hasContent = state && state.visible !== false &&
+                         (state.speaker || state.text);
+
+      if (!hasContent) {
+        // Скрываем диалог полностью
+        container.style.display = 'none';
+        return;
+      }
+
+      // Показываем
+      container.style.display = 'flex';
+
+      // Имя спикера + цвет (если пришёл из CharacterData.Color)
+      nameEl.textContent = state.speaker || '';
+      if (state.color) {
+        nameEl.style.color = state.color;
+      } else {
+        nameEl.style.color = '#ffffff';
+      }
+
+      // Текст (поддержка простого HTML)
+      textEl.innerHTML = state.text || '';
+    }
+
+    function pollDialogFromRuntime() {
+      try {
+        const runtime = (window.SNEngine && window.SNEngine.runtime) || {};
+        const dialogState = runtime.dialog;   // { speaker, text, color, visible } | null
+
+        applyDialogState(dialogState);
+      } catch (e) {
+        // На всякий случай — не ломать рендер
+        console.warn('[DialogUI] poll error', e);
+      }
+    }
+
+    // Запускаем polling сразу
+    setInterval(pollDialogFromRuntime, DIALOG_POLL_INTERVAL_MS);
+
+    // Публичный API (можно вызывать напрямую из C# через JS facade, если понадобится)
     window.DialogUI = {
       setSpeaker(name) {
         const nameEl = document.getElementById('speaker-name');
@@ -106,16 +163,40 @@
       setText(text) {
         document.getElementById('dialog-text').innerHTML = text || '';
       },
+      setColor(color) {
+        const nameEl = document.getElementById('speaker-name');
+        if (nameEl && color) nameEl.style.color = color;
+      },
       clear() {
         const nameEl = document.getElementById('speaker-name');
-        if (nameEl) nameEl.textContent = '';
-        document.getElementById('dialog-text').innerHTML = '';
+        const textEl = document.getElementById('dialog-text');
+        if (nameEl) {
+          nameEl.textContent = '';
+          nameEl.style.color = '#ffffff';
+        }
+        if (textEl) textEl.innerHTML = '';
+
+        // Явно говорим runtime, что диалога нет (на случай, если polling чуть запаздывает)
+        if (window.SNEngine && window.SNEngine.runtime) {
+          window.SNEngine.runtime.dialog = null;
+        }
+      },
+      // Прямое управление из JS (для отладки)
+      forceShow(speaker, text, color) {
+        applyDialogState({ speaker, text, color, visible: true });
       }
     };
 
-    // Для теста можно раскомментировать:
-    // DialogUI.setSpeaker("Юки");
-    // DialogUI.setText("Привет... Это тестовый диалог для визуальной новеллы.");
+    // Начальное состояние — диалог скрыт
+    (function init() {
+      const container = document.getElementById('dialog-container');
+      if (container) container.style.display = 'none';
+    })();
+
+    // Для быстрого теста в браузере (можно раскомментировать):
+    // setTimeout(() => {
+    //   window.DialogUI.forceShow("Юки", "Привет! Это тестовый диалог.<br>С поллингом и авто-скрытием.", "#FF5252");
+    // }, 800);
   </script>
 </body>
 </html>

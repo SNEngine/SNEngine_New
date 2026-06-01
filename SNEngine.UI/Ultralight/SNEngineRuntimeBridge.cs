@@ -156,4 +156,50 @@ public sealed class SNEngineRuntimeBridge
     {
         _lastValues.Clear();
     }
+
+    /// <summary>
+    /// Специализированный helper для диалоговой системы "Say".
+    /// Прямая манипуляция window.SNEngine.runtime.dialog — объект, который
+    /// поллит HTML-диалог (dialog/index.html) через setInterval.
+    /// </summary>
+    public void SetDialogState(string speaker, string text, string color, bool visible)
+    {
+        // Прямой скрипт — самый надёжный способ для Ultralight 1.3.0
+        string escapedSpeaker = (speaker ?? string.Empty).Replace("\\", "\\\\").Replace("\"", "\\\"").Replace("\n", "\\n");
+        string escapedText = (text ?? string.Empty).Replace("\\", "\\\\").Replace("\"", "\\\"").Replace("\n", "\\n");
+        string escapedColor = (color ?? "#FFFFFF").Replace("\"", "\\\"");
+
+        string visibleStr = visible.ToString().ToLowerInvariant();
+
+        string script = $@"
+            (function() {{
+                if (!window.SNEngine) window.SNEngine = {{}};
+                if (!window.SNEngine.runtime) window.SNEngine.runtime = {{}};
+
+                if ({visibleStr}) {{
+                    window.SNEngine.runtime.dialog = {{
+                        speaker: ""{escapedSpeaker}"",
+                        text: ""{escapedText}"",
+                        color: ""{escapedColor}"",
+                        visible: true
+                    }};
+                }} else {{
+                    window.SNEngine.runtime.dialog = null;
+                }}
+            }})();
+        ";
+
+        string? error = null;
+        _view.EvaluateScript(script, out error);
+
+        if (!string.IsNullOrEmpty(error))
+        {
+            Console.WriteLine($"[RuntimeBridge] SetDialogState error: {error}");
+        }
+
+        // Обновляем кэш (чтобы не спамить одинаковыми значениями)
+        _lastValues["dialog_speaker"] = speaker;
+        _lastValues["dialog_text"] = text;
+        _lastValues["dialog_visible"] = visible;
+    }
 }

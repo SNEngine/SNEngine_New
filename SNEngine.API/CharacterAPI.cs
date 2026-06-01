@@ -239,6 +239,66 @@ public static class CharacterAPI
         }
     }
 
+    // ============================================================
+    // SAY / DIALOGUE HELPERS (используют CharacterData для имени + цвета)
+    // ============================================================
+
+    /// <summary>
+    /// Показать реплику от персонажа (использует DisplayName и Color из CharacterData).
+    /// Если персонаж не загружен — использует переданное имя как есть.
+    /// </summary>
+    public static void Say(string characterName, string text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            DialogueAPI.Clear();
+            return;
+        }
+
+        string speaker = characterName;
+        string color = "#FFFFFF";
+
+        // Пытаемся взять красивые данные из загруженного персонажа
+        if (_activeCharacters.TryGetValue(characterName, out var activeChar) && activeChar.Data != null)
+        {
+            if (!string.IsNullOrEmpty(activeChar.Data.DisplayName))
+                speaker = activeChar.Data.DisplayName;
+
+            if (!string.IsNullOrEmpty(activeChar.Data.Color))
+                color = activeChar.Data.Color;
+        }
+        else
+        {
+            // Фоллбек — пробуем загрузить по имени (на случай, если только Show не вызывался)
+            var data = SNEngine.Host?.AssetManager?.LoadCharacter(characterName);
+            if (data != null)
+            {
+                if (!string.IsNullOrEmpty(data.DisplayName))
+                    speaker = data.DisplayName;
+                if (!string.IsNullOrEmpty(data.Color))
+                    color = data.Color;
+            }
+        }
+
+        DialogueAPI.Say(speaker, text, color);
+    }
+
+    /// <summary>
+    /// Прямая реплика без привязки к персонажу (для narrator и т.п.).
+    /// </summary>
+    public static void SayDirect(string speaker, string text, string color = "#FFFFFF")
+    {
+        DialogueAPI.Say(speaker, text, color);
+    }
+
+    /// <summary>
+    /// Скрыть текущее диалоговое окно (очистить Say).
+    /// </summary>
+    public static void ClearSay()
+    {
+        DialogueAPI.Clear();
+    }
+
     /// <summary>
     /// Quick example
     /// </summary>

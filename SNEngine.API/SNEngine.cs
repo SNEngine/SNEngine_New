@@ -62,7 +62,7 @@ public static class SNEngine
             rendererHost.Initialize(_host.AssetManager);
         }
 
-        var element = new UI.Ultralight.UltralightHtmlElement(rendererHost, _host.AssetManager, _host);
+        var element = new UI.Ultralight.UltralightHtmlElement(rendererHost, _host.AssetManager);
 
         element.ZIndex = zIndex;
 
@@ -205,13 +205,6 @@ public static class SNEngine
                 ulOverlay.SetAssetManager(assetManager);
             }
 
-            if (_host.Ui != null)
-            {
-                foreach (var el in _host.Ui.Elements.OfType<UI.Ultralight.UltralightHtmlElement>())
-                {
-                    el.SetAssetManager(assetManager);
-                }
-            }
 
             // Load packages as early as possible (right after AssetManager is created).
             // This is required for Ultralight to find icudt67l.dat etc. during Renderer creation.
@@ -252,14 +245,6 @@ public static class SNEngine
                 if (UiOverlay is UI.Ultralight.UltralightOverlay ulOverlay)
                 {
                     ulOverlay.SetAssetManager(_host.AssetManager);
-                }
-
-                if (_host.Ui != null)
-                {
-                    foreach (var element in _host.Ui.Elements.OfType<UI.Ultralight.UltralightHtmlElement>())
-                    {
-                        element.SetAssetManager(_host.AssetManager);
-                    }
                 }
             }
 

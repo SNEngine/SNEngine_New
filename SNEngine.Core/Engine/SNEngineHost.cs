@@ -257,15 +257,60 @@ public class SNEngineHost : IDisposable, IFrameDataProvider
             Ui?.Update(deltaTime);
         });
 
+        // Drive Core-level systems that produce runtime data for UI
+        _profiler.Time("Update/DialogueSystem", () =>
+        {
+            DialogueSystem.Update(deltaTime);
+        });
+
+        // Push runtime data (FPS + current dialogue with typewriter progress, etc.)
+        // from Core into all active UI elements. The elements themselves no longer
+        // decide what data to collect or push — they only receive.
+        _profiler.Time("Update/RuntimeDataPush", () =>
+        {
+            PushRuntimeDataToUiElements();
+        });
+
         // Process any pending calls from JavaScript (e.g. from Ultralight)
         _profiler.Time("Update/JSBridge", () =>
         {
             JavaScriptBridge?.ProcessPendingCalls();
-            // Note: Runtime data (FPS etc.) is now delivered per-element
-            // via SNEngineRuntimeBridge inside UltralightHtmlElement.TickJsHelpers().
         });
 
         _profiler.EndUpdate();
+    }
+
+    /// <summary>
+    /// Collects current runtime data from Core systems (FPS from profiler, dialogue from DialogueSystem)
+    /// and pushes the snapshot to every active UI element.
+    /// 
+    /// This is the central place where "what runtime data UI sees" is decided.
+    /// Individual UI elements only receive — they do not hardcode knowledge of FPS or dialogue.
+    /// </summary>
+    private void PushRuntimeDataToUiElements()
+    {
+        if (Ui == null || Ui.Elements.Count == 0)
+            return;
+
+        var snapshot = new RuntimeSnapshot
+        {
+            Fps = this.NativeFps,
+            Dialogue = DialogueSystem.GetSnapshot()
+        };
+
+        foreach (var element in Ui.Elements)
+        {
+            if (!element.Visible) continue;
+
+            try
+            {
+                element.ReceiveRuntimeData(in snapshot);
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[SNEngineHost] Error pushing runtime data to UI element: {ex.Message}");
+            }
+        }
     }
 
     private void OnRenderFrame(double deltaTime)

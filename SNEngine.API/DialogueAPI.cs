@@ -1,25 +1,38 @@
 using SNEngine.Core.Engine;
 using System;
+using System.Threading.Tasks;
 
 namespace SNEngine.API;
 
 /// <summary>
-/// Simple dialogue / "Say" system.
-/// Writes to the neutral DialogueState (Core) so that every UltralightHtmlElement
-/// can push the data into window.SNEngine.runtime.dialog via SNEngineRuntimeBridge.
-/// The dialog HTML (dialog/index.html) polls the window object and auto-hides when empty.
+/// High-level dialogue facade. Delegates to the Core DialogueSystem which handles
+/// Say + gradual (typewriter) text reveal.
 /// </summary>
 public static class DialogueAPI
 {
     /// <summary>
-    /// Show a dialogue line. Speaker name, text and optional color (for UI).
+    /// Fire-and-forget version (starts the line but does not wait).
+    /// For proper waiting until typing finishes, use <see cref="SayAsync"/>.
     /// </summary>
-    public static void Say(string speaker, string text, string? color = null)
+    public static void Say(string speaker, string text, string? color = null, float msPerChar = 30f)
     {
-        string finalColor = string.IsNullOrWhiteSpace(color) ? "#FFFFFF" : color!;
-        DialogueState.Set(speaker ?? string.Empty, text ?? string.Empty, finalColor, true);
+        DialogueSystem.SayInternal(speaker, text, color, msPerChar);
+    }
 
-        Console.WriteLine($"[DialogueAPI] Say: {speaker} → {text}");
+    /// <summary>
+    /// Asynchronous Say. The Task completes only after Core has finished the gradual reveal (typewriter).
+    /// </summary>
+    public static Task SayAsync(string speaker, string text, string? color = null, float msPerChar = 30f)
+    {
+        return DialogueSystem.SayAsync(speaker, text, color, msPerChar);
+    }
+
+    /// <summary>
+    /// Immediately finish revealing the current line (useful for skipping).
+    /// </summary>
+    public static void CompleteLine()
+    {
+        DialogueSystem.CompleteCurrentLine();
     }
 
     /// <summary>
@@ -27,15 +40,22 @@ public static class DialogueAPI
     /// </summary>
     public static void Clear()
     {
-        DialogueState.Clear();
-        Console.WriteLine("[DialogueAPI] Dialog cleared");
+        DialogueSystem.Clear();
     }
 
     /// <summary>
     /// Quick helper: Say using raw display name + color (no character lookup).
     /// </summary>
-    public static void SayDirect(string speaker, string text, string color = "#FFFFFF")
+    public static void SayDirect(string speaker, string text, string color = "#FFFFFF", float msPerChar = 30f)
     {
-        Say(speaker, text, color);
+        DialogueSystem.SayInternal(speaker, text, color, msPerChar);
+    }
+
+    /// <summary>
+    /// Async version of SayDirect.
+    /// </summary>
+    public static Task SayDirectAsync(string speaker, string text, string color = "#FFFFFF", float msPerChar = 30f)
+    {
+        return DialogueSystem.SayAsync(speaker, text, color, msPerChar);
     }
 }

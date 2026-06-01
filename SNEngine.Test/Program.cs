@@ -21,7 +21,7 @@ class Program
             ? "SNEngine Test (Preview)" 
             : "SNEngine Test Window";
 
-        SNEngine.API.SNEngine.OnInitialized += () =>
+        SNEngine.API.SNEngine.OnInitialized += async () =>
         {
             SNEngine.Core.Debug.Log("Engine initialized! Loading visual novel scene...");
             SNEngine.API.SNEngine.LoadDefaultPackages();
@@ -33,11 +33,12 @@ class Program
             // Bounce (feet line) is calculated from the actual pixel data of the sprite.
             // Character will sit correctly without legs being cut off.
             CharacterAPI.Show("yuki", "happy");
-            CharacterAPI.Say("yuki", "Привет... Это работает через window и polling.");
             SNEngine.API.SNEngine.LoadScreen("fps");
             SNEngine.API.SNEngine.LoadScreen("dialog");
 
             SNEngine.Core.Debug.Log("Scene loaded via SNEngine.API");
+            await Task.Delay(3000);
+            CharacterAPI.Say("yuki", "Привет... Это работает через window и polling.");
         };
 
         // Используем удобный публичный API

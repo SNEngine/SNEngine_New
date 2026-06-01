@@ -5,8 +5,8 @@ using Silk.NET.OpenGL;
 using SNEngine.Assets.Package;
 using SNEngine.Core;
 using SNEngine.Core.Assets;
-using SNEngine.Core.Rendering;
 using SNEngine.Core.Engine;
+using SNEngine.Core.Rendering;
 using SNEngine.Core.UI;
 using TrippyGL;
 using UltralightNet;
@@ -349,25 +349,29 @@ public class UltralightHtmlElement : UiElementBase
     }
 
     /// <summary>
-    /// Pushes runtime data (FPS, etc.) to JavaScript via SNEngineRuntimeBridge.
-    /// Must be called from the Update phase, not during rendering.
+    /// Element update hook. 
+    /// 
+    /// NOTE: This element no longer contains hardcoded runtime data pushing logic (FPS, dialogue, etc.).
+    /// Runtime data pushing is now the responsibility of the Core layer (typically SNEngineHost or a
+    /// dedicated RuntimeDataDispatcher). The element only provides the bridge mechanism.
     /// </summary>
     public override void Update(double deltaTime)
     {
-        if (_runtimeBridge != null && _frameDataProvider != null)
-        {
-            _runtimeBridge.SetFps(_frameDataProvider.NativeFps);
-        }
-
-        // === Dialogue / Say system ===
-        // Pushes current dialog line into window.SNEngine.runtime.dialog for every active HTML view.
-        // The dialog screen (dialog/index.html) polls this via setInterval and auto-hides when empty.
-        if (_runtimeBridge != null)
-        {
-            var (speaker, text, color, visible) = DialogueState.GetCurrent();
-            _runtimeBridge.SetDialogState(speaker, text, color, visible);
-        }
+        // Intentionally left minimal.
+        // Specific data (FPS, current dialogue line with typewriter progress, etc.)
+        // is pushed from higher-level Core code that has a full picture of the game state.
     }
+
+    /// <summary>
+    /// Exposes the runtime bridge for this view.
+    /// 
+    /// The Core engine (typically SNEngineHost or a dedicated runtime dispatcher)
+    /// uses this to push FPS, current dialogue (with typewriter progress), game variables, etc.
+    /// into <c>window.SNEngine.runtime.*</c> for JavaScript consumption.
+    /// 
+    /// UI elements themselves should remain agnostic to what specific data is being sent.
+    /// </summary>
+    public SNEngineRuntimeBridge? RuntimeBridge => _runtimeBridge;
 
     /// <summary>
     /// Legacy hook. Runtime data pushing has been moved to Update() to follow
@@ -421,5 +425,28 @@ public class UltralightHtmlElement : UiElementBase
             return (int)field.GetValue(obj)!;
 
         return null;
+    }
+
+    // ============================================================
+    // Runtime data reception (Core → UI direction)
+    // ============================================================
+
+    /// <summary>
+    /// Receives aggregated runtime data from the Core engine (FPS + current dialogue line
+    /// with typewriter progress already applied). Forwards it into this view's JavaScript
+    /// context via the SNEngineRuntimeBridge.
+    /// 
+    /// The element does not decide what data to collect — it only receives and pushes.
+    /// </summary>
+    public override void ReceiveRuntimeData(in RuntimeSnapshot data)
+    {
+        if (_runtimeBridge == null) return;
+
+        // Push FPS (used by many HTML screens)
+        _runtimeBridge.SetFps(data.Fps);
+
+        // Push dialogue state (the text here is already the gradually revealed portion)
+        var d = data.Dialogue;
+        _runtimeBridge.SetDialogState(d.Speaker, d.Text, d.Color, d.Visible);
     }
 }

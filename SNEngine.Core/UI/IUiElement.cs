@@ -1,3 +1,4 @@
+using SNEngine.Core.Engine;
 using SNEngine.Core.Rendering;
 
 namespace SNEngine.Core.UI;
@@ -60,4 +61,15 @@ public interface IUiElement : IDisposable
     /// to respect the proper Silk.NET Update/Render separation (OnUpdateFrame vs OnRenderFrame).
     /// </summary>
     void TickJsHelpers();
+
+    /// <summary>
+    /// Receives a snapshot of runtime data (FPS, current dialogue with typewriter progress, etc.)
+    /// from the Core engine. Called after Update() every frame.
+    /// 
+    /// Concrete implementations (e.g. HTML elements using SNEngineRuntimeBridge) use this
+    /// to write values into their JavaScript context (window.SNEngine.runtime.*).
+    /// 
+    /// The element should not decide *what* global data to collect — it only receives and forwards.
+    /// </summary>
+    void ReceiveRuntimeData(in RuntimeSnapshot data) { }
 }

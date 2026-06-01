@@ -1,32 +1,42 @@
+using System;
+
 namespace SNEngine.Core.Engine;
 
 /// <summary>
-/// Minimal shared dialogue state for pushing "Say" lines into all active Ultralight views.
-/// Lives in Core so both SNEngine.API (writer) and SNEngine.UI (reader/pusher to JS) can access it
-/// without creating circular references.
+/// [Obsolete] Legacy compatibility shim.
+/// 
+/// All new code should use <see cref="DialogueSystem"/> directly.
+/// This class now forwards to the real Core dialogue system (with typewriter support).
+/// 
+/// Will be removed in a future version.
 /// </summary>
+[Obsolete("Use DialogueSystem instead. This is a temporary compatibility layer.")]
 public static class DialogueState
 {
-    public static string Speaker { get; private set; } = string.Empty;
-    public static string Text { get; private set; } = string.Empty;
-    public static string Color { get; private set; } = "#FFFFFF";
-    public static bool Visible { get; private set; } = false;
-
+    [Obsolete("Use DialogueSystem.Say instead.")]
     public static void Set(string speaker, string text, string color, bool visible)
     {
-        Speaker = speaker ?? string.Empty;
-        Text = text ?? string.Empty;
-        Color = string.IsNullOrWhiteSpace(color) ? "#FFFFFF" : color;
-        Visible = visible;
+        if (visible)
+        {
+            DialogueSystem.SayInternal(speaker, text, color);
+        }
+        else
+        {
+            DialogueSystem.Clear();
+        }
     }
 
+    [Obsolete("Use DialogueSystem.Clear instead.")]
     public static void Clear()
     {
-        Visible = false;
-        Speaker = string.Empty;
-        Text = string.Empty;
+        DialogueSystem.Clear();
     }
 
+    [Obsolete("Use DialogueSystem.GetSnapshot instead.")]
     public static (string Speaker, string Text, string Color, bool Visible) GetCurrent()
-        => (Speaker, Text, Color, Visible);
+    {
+        var snap = DialogueSystem.GetSnapshot();
+        return (snap.Speaker, snap.Text, snap.Color, snap.Visible);
+    }
+
 }

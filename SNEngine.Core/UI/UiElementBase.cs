@@ -1,3 +1,4 @@
+using SNEngine.Core.Engine;
 using SNEngine.Core.Rendering;
 
 namespace SNEngine.Core.UI;
@@ -45,4 +46,10 @@ public abstract class UiElementBase : IUiElement
     /// New code should do JS runtime updates inside Update(double deltaTime).
     /// </summary>
     public virtual void TickJsHelpers() { }
+
+    /// <summary>
+    /// Default (no-op) implementation. Concrete elements that care about runtime data
+    /// (FPS, dialogue, etc.) override this to forward data into their JS bridge.
+    /// </summary>
+    public virtual void ReceiveRuntimeData(in RuntimeSnapshot data) { }
 }

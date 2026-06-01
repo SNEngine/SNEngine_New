@@ -1,202 +1,350 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-  <meta charset="UTF-8">
-  <title>Novel Dialog</title>
-  <style>
-    * {
-      box-sizing: border-box;
-    }
+    <meta charset="UTF-8">
+    <title>Novel Dialog</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
 
-    html, body {
-      margin: 0;
-      padding: 0;
-      height: 100%;
-      width: 100%;
-      background: transparent;
-      position: relative;
-      overflow: hidden;
-    }
+        html, body {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            width: 100%;
+            background: transparent;
+            position: relative;
+            overflow: hidden;
+        }
 
-    body {
-      font-family: 'Segoe UI', system-ui, sans-serif;
-      font-size: 20px;
-      color: #eeeeee;
-    }
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            font-size: 20px;
+            color: #eeeeee;
+        }
 
-    #dialog-container {
-      position: absolute;
-      bottom: 5%;
-      left: 50%;
-      transform: translateX(-50%);
-      width: 85%;
-      max-width: 1100px;
-      background: #1e1e1e;
-      border: 3px solid #FF5252;
-      border-radius: 24px; /* более скруглённый */
-      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.8);
-      padding: 14px 24px 18px;
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-      animation: dialog-outline-blink 1.1s infinite ease-in-out;
-    }
+        /* Главное диалоговое окно */
+        #dialog-container {
+            position: absolute;
+            bottom: 5%;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 85%;
+            max-width: 1100px;
+            background: #1e1e1e;
+            border: 3px solid #FF5252;
+            border-radius: 24px;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.8);
+            padding: 14px 24px 18px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            animation: dialog-outline-blink 1.1s infinite ease-in-out;
+        }
 
-    @keyframes dialog-outline-blink {
-      0%, 100% {
-        border-color: #FF5252;
-        outline: 6px solid rgba(255, 82, 82, 0.0);
-        outline-offset: 0px;
-      }
-      50% {
-        border-color: #ff9999;
-        outline: 6px solid rgba(255, 82, 82, 0.6);
-        outline-offset: 5px;
-      }
-    }
+        /* Пульсирующее свечение рамки окна */
+        @keyframes dialog-outline-blink {
+            0%, 100% {
+                border-color: #FF5252;
+                outline: 6px solid rgba(255, 82, 82, 0.0);
+                outline-offset: 0px;
+            }
 
-    #speaker {
-      font-weight: 600;
-      font-size: 20px;
-      color: #ffffff;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
+            50% {
+                border-color: #ff9999;
+                outline: 6px solid rgba(255, 82, 82, 0.6);
+                outline-offset: 5px;
+            }
+        }
 
-    .speaker-triangle {
-      color: #FF5252;
-      font-size: 15px;
-      line-height: 1;
-      animation: blink 1.1s infinite ease-in-out; /* синхронизировано с рамкой */
-      flex-shrink: 0;
-    }
+        /* Блок имени говорящего */
+        #speaker {
+            font-weight: 600;
+            font-size: 20px;
+            color: #ffffff;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
 
-    #dialog-text {
-      font-size: 19px;
-      line-height: 1.4;
-      min-height: 60px;
-      color: #eeeeee;
-    }
+        /* Мигающий маркер рядом с именем */
+        .speaker-triangle {
+            color: #FF5252;
+            font-size: 15px;
+            line-height: 1;
+            animation: blink 1.1s infinite ease-in-out;
+            flex-shrink: 0;
+        }
 
-    @keyframes blink {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.2; }
-    }
-  </style>
+        /* Контейнер для отображения текста диалога */
+        #dialog-text {
+            font-size: 19px;
+            line-height: 1.45;
+            min-height: 60px;
+            color: #eeeeee;
+        }
+
+        /* Базовая анимация мигания элементов */
+        @keyframes blink {
+            0%, 100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.2;
+            }
+        }
+
+        /* ==========================================================================
+           АНИМАЦИИ ПОЯВЛЕНИЯ СИМВОЛОВ (Применяются автоматически к новым тегам span)
+           ========================================================================== */
+
+        .char {
+            display: inline-block;
+        }
+
+        /* 1. Эффект: Pop (Плавное выталкивание вверх) */
+        #dialog-text.anim-pop .char {
+            opacity: 0;
+            transform: translateY(8px);
+            animation: charPop 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+
+        @keyframes charPop {
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* 2. Эффект: Fade (Простое плавное появление) */
+        #dialog-text.anim-fade .char {
+            opacity: 0;
+            animation: charFade 0.2s ease-out forwards;
+        }
+
+        @keyframes charFade {
+            to {
+                opacity: 1;
+            }
+        }
+
+        /* 3. Эффект: Scale (Мягкое разрастание из центра) */
+        #dialog-text.anim-scale .char {
+            opacity: 0;
+            transform: scale(0.6);
+            animation: charScale 0.2s ease-out forwards;
+        }
+
+        @keyframes charScale {
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        /* 4. Эффект: Pop-Fade (Комбинированный: мягкое выталкивание + плавное появление) */
+        #dialog-text.anim-pop-fade .char {
+            opacity: 0;
+            transform: translateY(6px);
+            animation: charPopFade 0.25s ease-out forwards;
+        }
+
+        @keyframes charPopFade {
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* 5. Вариант: None (Без анимации — символы видны сразу) */
+        #dialog-text.anim-none .char {
+            opacity: 1;
+            transform: none;
+            animation: none;
+        }
+    </style>
 </head>
 <body>
-  <div id="dialog-container">
-    <div id="speaker">
-      <span class="speaker-triangle">▶</span>
-      <span id="speaker-name">Имя персонажа</span>
+    <div id="dialog-container">
+        <div id="speaker">
+            <span class="speaker-triangle">▶</span>
+            <span id="speaker-name">Имя персонажа</span>
+        </div>
+        <div id="dialog-text" class="anim-pop"></div>
     </div>
-    <div id="dialog-text">
-      Здесь будет отображаться текст диалога. Можно обновлять через JavaScript.
-    </div>
-  </div>
 
-  <script>
-    // =====================================================
-    // Авто-скрытие диалога через polling (setInterval)
-    // Читает window.SNEngine.runtime.dialog, который пушится
-    // из C# через SNEngineRuntimeBridge.SetDialogState()
-    //
-    // Если dialog == null / visible == false / нет текста — контейнер скрывается.
-    // Это "костыль", но по требованию заказчика — через интервалы.
-    // =====================================================
+    <script>
+        // Глобальные переменные состояния UI
+        let rafId = null;              // ID запущенного requestAnimationFrame
+        let currentText = '';         // Текущий выведенный текст (для отслеживания инкремента)
+        let lastSpeaker = '';         // Имя предыдущего спикера (для отслеживания смены персонажа)
 
-    const DIALOG_POLL_INTERVAL_MS = 80; // достаточно часто, дёшево
+        // Доступные типы анимаций: 'pop', 'fade', 'scale', 'pop-fade', 'none'
+        let currentAnimationType = 'pop';
 
-    function applyDialogState(state) {
-      const container = document.getElementById('dialog-container');
-      const nameEl = document.getElementById('speaker-name');
-      const textEl = document.getElementById('dialog-text');
-
-      if (!container || !nameEl || !textEl) return;
-
-      const hasContent = state && state.visible !== false &&
-                         (state.speaker || state.text);
-
-      if (!hasContent) {
-        // Скрываем диалог полностью
-        container.style.display = 'none';
-        return;
-      }
-
-      // Показываем
-      container.style.display = 'flex';
-
-      // Имя спикера + цвет (если пришёл из CharacterData.Color)
-      nameEl.textContent = state.speaker || '';
-      if (state.color) {
-        nameEl.style.color = state.color;
-      } else {
-        nameEl.style.color = '#ffffff';
-      }
-
-      // Текст (поддержка простого HTML)
-      textEl.innerHTML = state.text || '';
-    }
-
-    function pollDialogFromRuntime() {
-      try {
-        const runtime = (window.SNEngine && window.SNEngine.runtime) || {};
-        const dialogState = runtime.dialog;   // { speaker, text, color, visible } | null
-
-        applyDialogState(dialogState);
-      } catch (e) {
-        // На всякий случай — не ломать рендер
-        console.warn('[DialogUI] poll error', e);
-      }
-    }
-
-    // Запускаем polling сразу
-    setInterval(pollDialogFromRuntime, DIALOG_POLL_INTERVAL_MS);
-
-    // Публичный API (можно вызывать напрямую из C# через JS facade, если понадобится)
-    window.DialogUI = {
-      setSpeaker(name) {
-        const nameEl = document.getElementById('speaker-name');
-        if (nameEl) nameEl.textContent = name || '';
-      },
-      setText(text) {
-        document.getElementById('dialog-text').innerHTML = text || '';
-      },
-      setColor(color) {
-        const nameEl = document.getElementById('speaker-name');
-        if (nameEl && color) nameEl.style.color = color;
-      },
-      clear() {
-        const nameEl = document.getElementById('speaker-name');
-        const textEl = document.getElementById('dialog-text');
-        if (nameEl) {
-          nameEl.textContent = '';
-          nameEl.style.color = '#ffffff';
+        /**
+         * Создает изолированный DOM-узел для одного символа строки.
+         * Обертка в тег span необходима для применения индивидуальных CSS-анимаций.
+         */
+        function createCharNode(char) {
+            const span = document.createElement('span');
+            span.className = 'char';
+            // Замена стандартного пробела на неразрывный для корректного инлайнового отображения
+            span.innerHTML = char === ' ' ? '&nbsp;' : char;
+            return span;
         }
-        if (textEl) textEl.innerHTML = '';
 
-        // Явно говорим runtime, что диалога нет (на случай, если polling чуть запаздывает)
-        if (window.SNEngine && window.SNEngine.runtime) {
-          window.SNEngine.runtime.dialog = null;
+        /**
+         * Переключает CSS-классы анимации на контейнере текста.
+         */
+        function setAnimationClass(type) {
+            const textEl = document.getElementById('dialog-text');
+            if (!textEl) return;
+
+            const validTypes = ['pop', 'fade', 'scale', 'pop-fade', 'none'];
+            const targetType = validTypes.includes(type) ? type : 'none';
+
+            // Переключаем классы только если тип анимации действительно изменился
+            if (currentAnimationType !== targetType) {
+                textEl.classList.remove('anim-pop', 'anim-fade', 'anim-scale', 'anim-pop-fade', 'anim-none');
+                textEl.classList.add(`anim-${targetType}`);
+                currentAnimationType = targetType;
+            }
         }
-      },
-      // Прямое управление из JS (для отладки)
-      forceShow(speaker, text, color) {
-        applyDialogState({ speaker, text, color, visible: true });
-      }
-    };
 
-    // Начальное состояние — диалог скрыт
-    (function init() {
-      const container = document.getElementById('dialog-container');
-      if (container) container.style.display = 'none';
-    })();
+        /**
+         * Основной метод синхронизации состояния. Принимает Snapshot из C# ядра.
+         */
+        function applyDialogState(state) {
+            const container = document.getElementById('dialog-container');
+            const nameEl = document.getElementById('speaker-name');
+            const textEl = document.getElementById('dialog-text');
 
-    // Для быстрого теста в браузере (можно раскомментировать):
-    // setTimeout(() => {
-    //   window.DialogUI.forceShow("Юки", "Привет! Это тестовый диалог.<br>С поллингом и авто-скрытием.", "#FF5252");
-    // }, 800);
-  </script>
+            if (!container || !nameEl || !textEl) return;
+
+            // Проверка валидности данных и флага видимости
+            const hasContent = state && state.visible !== false && (state.speaker || state.text);
+
+            if (!hasContent) {
+                container.style.display = 'none';
+                currentText = '';
+                lastSpeaker = '';
+                return;
+            }
+
+            container.style.display = 'flex';
+
+            // Автоматическая смена анимации, если движок передал новое значение в snapshot
+            if (state.animationType) {
+                setAnimationClass(state.animationType);
+            }
+
+            // Логика смены спикера: при новом имени очищаем текстовое поле
+            if (state.speaker !== lastSpeaker) {
+                nameEl.textContent = state.speaker || '';
+                nameEl.style.color = state.color || '#ffffff';
+                lastSpeaker = state.speaker || '';
+                textEl.innerHTML = '';
+                currentText = '';
+            }
+
+            const newText = state.text || '';
+
+            // Оптимальный рендеринг: посимвольное добавление, если строка просто растет
+            if (newText.length > currentText.length && newText.startsWith(currentText)) {
+                const newPart = newText.slice(currentText.length);
+                for (let char of newPart) {
+                    textEl.appendChild(createCharNode(char));
+                }
+            }
+            // Полная перерисовка, если строка полностью изменилась или сбросилась
+            else if (newText !== currentText) {
+                textEl.innerHTML = '';
+                for (let char of newText) {
+                    textEl.appendChild(createCharNode(char));
+                }
+            }
+
+            currentText = newText;
+        }
+
+        /**
+         * Кадровое чтение данных из глобального объекта моста SNEngine
+         */
+        function updateFromRuntime() {
+            try {
+                const runtime = (window.SNEngine && window.SNEngine.runtime) || {};
+                const dialogState = runtime.dialog;
+                applyDialogState(dialogState);
+            } catch (e) {
+                console.warn('[DialogUI] update error', e);
+            }
+
+            rafId = requestAnimationFrame(updateFromRuntime);
+        }
+
+        /**
+         * Запуск цикла непрерывного обновления интерфейса
+         */
+        function startListening() {
+            if (rafId) cancelAnimationFrame(rafId);
+            rafId = requestAnimationFrame(updateFromRuntime);
+        }
+
+        /**
+         * Публичное API окна диалогов для внешнего управления (из консоли или C#)
+         */
+        window.DialogUI = {
+            // Установка режима анимации букв ('pop', 'fade', 'scale', 'pop-fade', 'none')
+            setAnimation(type) {
+                setAnimationClass(type);
+            },
+            // Принудительная установка имени
+            setSpeaker(name) {
+                const nameEl = document.getElementById('speaker-name');
+                if (nameEl) nameEl.textContent = name || '';
+            },
+            // Мгновенное заполнение текста (в обход стриминга кадров)
+            setText(text) {
+                const textEl = document.getElementById('dialog-text');
+                if (textEl) {
+                    textEl.innerHTML = '';
+                    currentText = text || '';
+                    for (let char of currentText) {
+                        textEl.appendChild(createCharNode(char));
+                    }
+                }
+            },
+            // Полная очистка и скрытие данных
+            clear() {
+                const textEl = document.getElementById('dialog-text');
+                const nameEl = document.getElementById('speaker-name');
+                if (textEl) textEl.innerHTML = '';
+                if (nameEl) nameEl.textContent = '';
+                currentText = '';
+                lastSpeaker = '';
+            },
+            // Принудительное отображение статического состояния диалога
+            forceShow(speaker, text, color, animType = 'pop') {
+                currentText = '';
+                lastSpeaker = '';
+                setAnimationClass(animType);
+                applyDialogState({ speaker, text, color, visible: true, animationType: animType });
+            }
+        };
+
+        // Точка входа: инициализация начального состояния
+        (function init() {
+            const container = document.getElementById('dialog-container');
+            if (container) container.style.display = 'none';
+        })();
+
+        // По умолчанию активируем режим анимации 'pop'
+        window.DialogUI.setAnimation('pop-fade');
+        // Запуск прослушивания изменений кадров движка
+        startListening();
+    </script>
 </body>
 </html>

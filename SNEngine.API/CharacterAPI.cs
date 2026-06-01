@@ -280,7 +280,7 @@ public static class CharacterAPI
             }
         }
 
-        DialogueAPI.Say(speaker, text, color);
+        DialogueAPI.SayAsync(speaker, text, msPerChar: 40);
     }
 
     /// <summary>

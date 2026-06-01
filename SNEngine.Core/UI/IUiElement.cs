@@ -1,4 +1,5 @@
 using SNEngine.Core.Engine;
+using SNEngine.Core.Input;
 using SNEngine.Core.Rendering;
 
 namespace SNEngine.Core.UI;
@@ -72,4 +73,16 @@ public interface IUiElement : IDisposable
     /// The element should not decide *what* global data to collect — it only receives and forwards.
     /// </summary>
     void ReceiveRuntimeData(in RuntimeSnapshot data) { }
+
+    // ==================== Mouse Input (for Ultralight/HTML views) ====================
+
+    /// <summary>
+    /// Called when the mouse moves over this element.
+    /// </summary>
+    void OnMouseMove(float x, float y) { }
+
+    /// <summary>
+    /// Called when a mouse button is pressed or released over this element.
+    /// </summary>
+    void OnMouseButton(SNEngine.Core.Input.MouseButton button, bool isDown, float x, float y) { }
 }

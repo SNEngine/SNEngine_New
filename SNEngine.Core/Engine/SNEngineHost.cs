@@ -3,7 +3,9 @@ using Silk.NET.OpenGL;
 using Silk.NET.Windowing;
 using SNEngine.Core.Assets;
 using SNEngine.Core.Engine;
+using SNEngine.Core.Input;
 using SNEngine.Core.Rendering;
+using MouseButton = SNEngine.Core.Input.MouseButton;
 using System;
 using System.Buffers;
 using System.Diagnostics;
@@ -165,6 +167,11 @@ public class SNEngineHost : IDisposable, IFrameDataProvider
     {
         _gl = GL.GetApi(_window);
 
+        // === INPUT SYSTEM ===
+        var inputProvider = new Input.SilkInputProvider(_window);
+        Input.Input.Initialize(inputProvider);
+        Debug.Log("[SNEngineHost] Input system initialized (Silk.NET).");
+
         if (!_useSharedMemory)
             CenterWindow();
 
@@ -247,6 +254,12 @@ public class SNEngineHost : IDisposable, IFrameDataProvider
         // Update global Time system first (must happen before any system uses delta)
         Engine.Time.Update(deltaTime);
 
+        // Update input state (edge detection for buttons/keys)
+        Input.Input.Update();
+
+        // === Forward mouse input to Ultralight views ===
+        ProcessInputToUltralightViews();
+
         _profiler.BeginUpdate();
 
         _profiler.Time("Update/Scene", () =>
@@ -284,6 +297,9 @@ public class SNEngineHost : IDisposable, IFrameDataProvider
         _profiler.EndUpdate();
     }
 
+    // TODO: Implement proper input routing to Ultralight views
+    // private void ProcessInputToUltralightViews() { ... }
+
     /// <summary>
     /// Collects current runtime data from Core systems (FPS from profiler, dialogue from DialogueSystem)
     /// and pushes the snapshot to every active UI element.
@@ -315,6 +331,44 @@ public class SNEngineHost : IDisposable, IFrameDataProvider
                 Debug.LogError($"[SNEngineHost] Error pushing runtime data to UI element: {ex.Message}");
             }
         }
+    }
+
+    // Simple previous state tracking for mouse button edge detection
+    private bool _prevLeftMouse;
+    private bool _prevRightMouse;
+    private bool _prevMiddleMouse;
+
+    private void ProcessInputToUltralightViews()
+    {
+        if (Ui == null) return;
+
+        var mousePos = Input.Input.MousePosition;
+
+        // Forward mouse movement (important for hover states, cursor changes, etc. in HTML)
+        Ui.ProcessMouseMove(mousePos.X, mousePos.Y);
+
+        // Forward button events
+        bool left = Input.Input.GetMouseButton(MouseButton.Left);
+        if (left && !_prevLeftMouse)
+            Ui.ProcessMouseButton(MouseButton.Left, true, mousePos.X, mousePos.Y);
+        else if (!left && _prevLeftMouse)
+            Ui.ProcessMouseButton(MouseButton.Left, false, mousePos.X, mousePos.Y);
+
+        bool right = Input.Input.GetMouseButton(MouseButton.Right);
+        if (right && !_prevRightMouse)
+            Ui.ProcessMouseButton(MouseButton.Right, true, mousePos.X, mousePos.Y);
+        else if (!right && _prevRightMouse)
+            Ui.ProcessMouseButton(MouseButton.Right, false, mousePos.X, mousePos.Y);
+
+        bool middle = Input.Input.GetMouseButton(MouseButton.Middle);
+        if (middle && !_prevMiddleMouse)
+            Ui.ProcessMouseButton(MouseButton.Middle, true, mousePos.X, mousePos.Y);
+        else if (!middle && _prevMiddleMouse)
+            Ui.ProcessMouseButton(MouseButton.Middle, false, mousePos.X, mousePos.Y);
+
+        _prevLeftMouse = left;
+        _prevRightMouse = right;
+        _prevMiddleMouse = middle;
     }
 
     private void OnRenderFrame(double deltaTime)

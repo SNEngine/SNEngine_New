@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using static SNEngine.Core.Debug;
 using SNEngine.Core.Rendering;
+using SNEngine.Core.Input;
 
 namespace SNEngine.Core.UI;
 
@@ -258,12 +259,23 @@ public sealed class UiManager : IDisposable
     }
 
     /// <summary>
-    /// Sends a mouse move event. Returns the element that should receive it (if any).
+    /// Processes a mouse movement. Finds the topmost element under the cursor
+    /// and forwards the mouse move event if it's an Ultralight view.
     /// </summary>
     public IUiElement? ProcessMouseMove(float x, float y)
     {
         var target = HitTest(x, y);
-        // In the future: call methods on the element or raise events
+        target?.OnMouseMove(x, y);
+        return target;
+    }
+
+    /// <summary>
+    /// Processes a mouse button press or release.
+    /// </summary>
+    public IUiElement? ProcessMouseButton(MouseButton button, bool isDown, float x, float y)
+    {
+        var target = HitTest(x, y);
+        target?.OnMouseButton(button, isDown, x, y);
         return target;
     }
 

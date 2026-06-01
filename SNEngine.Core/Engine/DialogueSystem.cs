@@ -79,8 +79,6 @@ public static class DialogueSystem
         _currentLineTcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
 
         float effectiveCps = 1000f / _msPerChar;
-        Debug.Log($"[DialogueSystem] NEW LINE STARTED | Speaker: '{_speaker}' | Speed: {_msPerChar:F0} ms/char ({effectiveCps:F1} cps) | Full text: \"{_fullText}\"");
-        Debug.Log($"[DialogueSystem] Displayed so far: \"{_displayBuilder}\" (length={_displayBuilder.Length})");
     }
 
     /// <summary>
@@ -162,7 +160,6 @@ public static class DialogueSystem
         _displayBuilder.Clear();
         _displayBuilder.Append(_fullText);
 
-        Debug.Log($"[DialogueSystem] Line was FORCE COMPLETED (skipped): \"{_displayBuilder}\"");
         CompleteCurrentTcs(true);
     }
 
@@ -212,7 +209,6 @@ public static class DialogueSystem
         if (charsRevealedThisFrame > 0)
         {
             float currentCps = 1000f / _msPerChar;
-            Debug.Log($"[DialogueSystem] Typing... +{charsRevealedThisFrame} chars | {_msPerChar:F0}ms/char ({currentCps:F1} cps) | Revealed: {_revealedChars}/{_fullText.Length} | \"{_displayBuilder}\"");
         }
 
         if (_revealedChars >= _fullText.Length)
@@ -225,7 +221,6 @@ public static class DialogueSystem
                 _displayBuilder.Append(_fullText);
             }
 
-            Debug.Log($"[DialogueSystem] ✓ Line COMPLETE: \"{_displayBuilder}\"");
             CompleteCurrentTcs(true);
         }
     }

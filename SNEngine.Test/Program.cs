@@ -33,12 +33,12 @@ class Program
             // Bounce (feet line) is calculated from the actual pixel data of the sprite.
             // Character will sit correctly without legs being cut off.
             CharacterAPI.Show("yuki", "happy");
-            SNEngine.API.SNEngine.LoadScreen("fps");
             SNEngine.API.SNEngine.LoadScreen("dialog");
+            SNEngine.API.SNEngine.LoadScreen("buttons", zIndex: 10);
 
             SNEngine.Core.Debug.Log("Scene loaded via SNEngine.API");
             await Task.Delay(3000);
-            CharacterAPI.Say("yuki", "Привет... Это работает через window и polling.");
+            CharacterAPI.Say("yuki", "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.");
         };
 
         // Используем удобный публичный API

@@ -373,6 +373,55 @@ public class UltralightHtmlElement : UiElementBase
     /// </summary>
     public SNEngineRuntimeBridge? RuntimeBridge => _runtimeBridge;
 
+public override void OnMouseMove(float x, float y)
+    {
+        if (_ulView == null) return;
+
+        try
+        {
+            var evt = new ULMouseEvent
+            {
+                Type = ULMouseEventType.MouseMoved,
+                X = (int)x,
+                Y = (int)y
+            };
+
+            _ulView.FireMouseEvent(evt);
+        }
+        catch (Exception ex)
+        {
+            SNEngine.Core.Debug.LogWarning($"[UltralightHtmlElement] MouseMove failed: {ex.Message}");
+        }
+    }
+
+    public override void OnMouseButton(SNEngine.Core.Input.MouseButton button, bool isDown, float x, float y)
+    {
+        if (_ulView == null) return;
+
+        try
+        {
+            var evt = new ULMouseEvent
+            {
+                Type = isDown ? ULMouseEventType.MouseDown : ULMouseEventType.MouseUp,
+                X = (int)x,
+                Y = (int)y,
+                Button = button switch
+                {
+                    SNEngine.Core.Input.MouseButton.Left => ULMouseEventButton.Left,
+                    SNEngine.Core.Input.MouseButton.Right => ULMouseEventButton.Right,
+                    SNEngine.Core.Input.MouseButton.Middle => ULMouseEventButton.Middle,
+                    _ => ULMouseEventButton.None
+                }
+            };
+
+            _ulView.FireMouseEvent(evt);
+        }
+        catch (Exception ex)
+        {
+            SNEngine.Core.Debug.LogWarning($"[UltralightHtmlElement] MouseButton failed: {ex.Message}");
+        }
+    }
+
     /// <summary>
     /// Legacy hook. Runtime data pushing has been moved to Update() to follow
     /// the proper Silk.NET OnUpdateFrame / OnRenderFrame separation.

@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Button Input Test</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+        
+        html, body {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            width: 100%;
+            background: transparent;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            color: #eeeeee;
+            overflow: hidden;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+
+        body {
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .header {
+            font-size: 18px;
+            font-weight: 600;
+            color: #FF5252;
+            margin-bottom: 8px;
+        }
+
+        .info-panel {
+            background: #1e1e1e;
+            border: 2px solid #FF5252;
+            border-radius: 10px;
+            padding: 12px 16px;
+            font-size: 14px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.6);
+        }
+
+        .mouse-info {
+            display: flex;
+            gap: 24px;
+            flex-wrap: wrap;
+        }
+
+        .info-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .info-label {
+            color: #aaaaaa;
+            font-size: 13px;
+        }
+
+        .info-value {
+            color: #FF5252;
+            font-weight: 600;
+            font-variant-numeric: tabular-nums;
+            min-width: 60px;
+        }
+
+        .buttons-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .test-button {
+            background: #2a2a2a;
+            color: #eeeeee;
+            border: 2px solid #FF5252;
+            border-radius: 8px;
+            padding: 12px 24px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.1s ease;
+            box-shadow: 0 3px 8px rgba(0, 0, 0, 0.4);
+        }
+
+        .test-button:hover {
+            background: #3a3a3a;
+            transform: translateY(-1px);
+        }
+
+        .test-button:active {
+            background: #FF5252;
+            color: #1e1e1e;
+            transform: translateY(1px);
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+        }
+
+        .test-button.secondary {
+            border-color: #4CAF50;
+        }
+
+        .test-button.secondary:active {
+            background: #4CAF50;
+        }
+
+        .log {
+            background: #161616;
+            border: 1px solid #333;
+            border-radius: 6px;
+            padding: 8px 12px;
+            font-family: monospace;
+            font-size: 13px;
+            height: 120px;
+            overflow-y: auto;
+            color: #cccccc;
+        }
+
+        .log-entry {
+            margin: 2px 0;
+        }
+
+        .click-count {
+            font-size: 32px;
+            font-weight: 700;
+            color: #FF5252;
+            text-align: center;
+            margin: 8px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">Mouse Input Test (Ultralight Bridge)</div>
+
+    <div class="info-panel">
+        <div class="mouse-info">
+            <div class="info-item">
+                <span class="info-label">Mouse X:</span>
+                <span id="mouse-x" class="info-value">--</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Mouse Y:</span>
+                <span id="mouse-y" class="info-value">--</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Last Event:</span>
+                <span id="last-event" class="info-value">none</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="buttons-container">
+        <button class="test-button" id="btn-primary">Primary Button</button>
+        <button class="test-button secondary" id="btn-secondary">Secondary Button</button>
+        <button class="test-button" id="btn-reset">Reset Counter</button>
+    </div>
+
+    <div class="info-panel">
+        <div style="margin-bottom: 6px; font-size: 13px; color: #aaaaaa;">Click Counter</div>
+        <div id="click-count" class="click-count">0</div>
+    </div>
+
+    <div class="info-panel">
+        <div style="margin-bottom: 6px; font-size: 13px; color: #aaaaaa;">Event Log</div>
+        <div id="log" class="log"></div>
+    </div>
+
+    <script>
+        let clickCount = 0;
+        const logEl = document.getElementById('log');
+        const countEl = document.getElementById('click-count');
+        const lastEventEl = document.getElementById('last-event');
+        const mouseXEl = document.getElementById('mouse-x');
+        const mouseYEl = document.getElementById('mouse-y');
+
+        function logEvent(text) {
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${text}`;
+            logEl.appendChild(entry);
+            logEl.scrollTop = logEl.scrollHeight;
+
+            // Keep only last 12 entries
+            while (logEl.children.length > 12) {
+                logEl.removeChild(logEl.firstChild);
+            }
+
+            lastEventEl.textContent = text;
+        }
+
+        function updateMousePosition(x, y) {
+            mouseXEl.textContent = Math.round(x);
+            mouseYEl.textContent = Math.round(y);
+        }
+
+        function incrementCounter() {
+            clickCount++;
+            countEl.textContent = clickCount;
+        }
+
+        // Button handlers
+        document.getElementById('btn-primary').addEventListener('click', () => {
+            logEvent('Primary button clicked');
+            incrementCounter();
+        });
+
+        document.getElementById('btn-secondary').addEventListener('click', () => {
+            logEvent('Secondary button clicked');
+            incrementCounter();
+        });
+
+        document.getElementById('btn-reset').addEventListener('click', () => {
+            clickCount = 0;
+            countEl.textContent = '0';
+            logEvent('Counter reset');
+            logEl.innerHTML = '';
+        });
+
+        // Global mouse tracking for testing mousemove forwarding
+        document.addEventListener('mousemove', (e) => {
+            updateMousePosition(e.clientX, e.clientY);
+        });
+
+        document.addEventListener('mousedown', (e) => {
+            logEvent(`MouseDown: button ${e.button}`);
+        });
+
+        document.addEventListener('mouseup', (e) => {
+            logEvent(`MouseUp: button ${e.button}`);
+        });
+
+        // Initial log
+        logEvent('Button test panel ready');
+        logEvent('Try clicking the buttons above');
+    </script>
+</body>
+</html>

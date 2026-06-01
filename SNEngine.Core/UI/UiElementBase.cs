@@ -1,4 +1,5 @@
 using SNEngine.Core.Engine;
+using SNEngine.Core.Input;
 using SNEngine.Core.Rendering;
 
 namespace SNEngine.Core.UI;
@@ -52,4 +53,7 @@ public abstract class UiElementBase : IUiElement
     /// (FPS, dialogue, etc.) override this to forward data into their JS bridge.
     /// </summary>
     public virtual void ReceiveRuntimeData(in RuntimeSnapshot data) { }
+
+    public virtual void OnMouseMove(float x, float y) { }
+    public virtual void OnMouseButton(MouseButton button, bool isDown, float x, float y) { }
 }

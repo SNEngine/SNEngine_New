@@ -177,9 +177,10 @@ public class SNEngineHost : IDisposable, IFrameDataProvider
         Input.Input.KeyUp += OnGlobalKeyUp;
         Input.Input.TextInput += OnGlobalTextInput;
 
-        // Reliable mouse down for dialogue advance (polling GetMouseButtonDown can miss edges
-        // due to frame timing vs Silk callbacks + Ultralight input forwarding).
-        Input.Input.MouseButtonDown += OnGlobalMouseButtonDown;
+        // Dialogue advance on global left mouse clicks is now wired directly to
+        // DialogueSystem.HandleGlobalMouseButtonDown (logic lives in DialogueSystem.cs).
+        // This uses the event for reliable edge detection.
+        Input.Input.MouseButtonDown += DialogueSystem.HandleGlobalMouseButtonDown;
 
         Debug.Log("[SNEngineHost] Input system initialized (Silk.NET).");
 
@@ -271,12 +272,9 @@ public class SNEngineHost : IDisposable, IFrameDataProvider
         // === Forward mouse input to Ultralight views ===
         ProcessInputToUltralightViews();
 
-        // Dialogue advance on left mouse button is handled via the MouseButtonDown event
-        // (see OnGlobalMouseButtonDown + subscription in OnLoad). This is more reliable
-        // than polling GetMouseButtonDown because of callback timing vs frame Update().
-        //
-        // The HTML dialog also calls Advance() on its container for clicks inside the box.
-        // Time-based debounce in DialogueSystem.Advance() prevents duplicates.
+        // (Dialogue advance on global LMB is handled by DialogueSystem.HandleGlobalMouseButtonDown
+        //  which is subscribed in OnLoad. The HTML dialog UI also calls DialogueAPI.Advance on clicks.
+        //  Debounce inside Advance() prevents duplicates from multiple sources.)
 
         _profiler.BeginUpdate();
 
@@ -351,10 +349,34 @@ public class SNEngineHost : IDisposable, IFrameDataProvider
         }
     }
 
-    // Simple previous state tracking for mouse button edge detection
+    // Simple previous state tracking for mouse button edge detection (used only by internal polling path)
     private bool _prevLeftMouse;
     private bool _prevRightMouse;
     private bool _prevMiddleMouse;
+
+    // ============================================================
+    // Public mouse input wrappers (for external drivers: preview, studio, tests, etc.)
+    // These forward to the UiManager which routes to the appropriate topmost interactive element.
+    // ============================================================
+
+    /// <summary>
+    /// Forwards a mouse movement to the UI system (hover, cursor, etc.).
+    /// Safe to call from external code that drives input (e.g. when the engine window is hidden
+    /// in shared-memory preview mode, or for remote/automated input).
+    /// </summary>
+    public void ProcessMouseMove(float x, float y)
+    {
+        Ui?.ProcessMouseMove(x, y);
+    }
+
+    /// <summary>
+    /// Forwards a mouse button press or release to the UI system.
+    /// The caller is responsible for sending proper down/up pairs (edge events).
+    /// </summary>
+    public void ProcessMouseButton(MouseButton button, bool isDown, float x, float y)
+    {
+        Ui?.ProcessMouseButton(button, isDown, x, y);
+    }
 
     private void ProcessInputToUltralightViews()
     {
@@ -363,26 +385,26 @@ public class SNEngineHost : IDisposable, IFrameDataProvider
         var mousePos = Input.Input.MousePosition;
 
         // Forward mouse movement (important for hover states, cursor changes, etc. in HTML)
-        Ui.ProcessMouseMove(mousePos.X, mousePos.Y);
+        ProcessMouseMove(mousePos.X, mousePos.Y);
 
-        // Forward button events
+        // Forward button events (edge detection via previous-state tracking)
         bool left = Input.Input.GetMouseButton(MouseButton.Left);
         if (left && !_prevLeftMouse)
-            Ui.ProcessMouseButton(MouseButton.Left, true, mousePos.X, mousePos.Y);
+            ProcessMouseButton(MouseButton.Left, true, mousePos.X, mousePos.Y);
         else if (!left && _prevLeftMouse)
-            Ui.ProcessMouseButton(MouseButton.Left, false, mousePos.X, mousePos.Y);
+            ProcessMouseButton(MouseButton.Left, false, mousePos.X, mousePos.Y);
 
         bool right = Input.Input.GetMouseButton(MouseButton.Right);
         if (right && !_prevRightMouse)
-            Ui.ProcessMouseButton(MouseButton.Right, true, mousePos.X, mousePos.Y);
+            ProcessMouseButton(MouseButton.Right, true, mousePos.X, mousePos.Y);
         else if (!right && _prevRightMouse)
-            Ui.ProcessMouseButton(MouseButton.Right, false, mousePos.X, mousePos.Y);
+            ProcessMouseButton(MouseButton.Right, false, mousePos.X, mousePos.Y);
 
         bool middle = Input.Input.GetMouseButton(MouseButton.Middle);
         if (middle && !_prevMiddleMouse)
-            Ui.ProcessMouseButton(MouseButton.Middle, true, mousePos.X, mousePos.Y);
+            ProcessMouseButton(MouseButton.Middle, true, mousePos.X, mousePos.Y);
         else if (!middle && _prevMiddleMouse)
-            Ui.ProcessMouseButton(MouseButton.Middle, false, mousePos.X, mousePos.Y);
+            ProcessMouseButton(MouseButton.Middle, false, mousePos.X, mousePos.Y);
 
         _prevLeftMouse = left;
         _prevRightMouse = right;
@@ -406,20 +428,6 @@ public class SNEngineHost : IDisposable, IFrameDataProvider
     {
         Ui?.ProcessTextInput(character);
         Console.WriteLine($"[SNEngineHost] Text input: '{character}'");
-    }
-
-    /// <summary>
-    /// Handles left mouse button down globally for dialogue advance.
-    /// Using the event instead of polling GetMouseButtonDown ensures we catch the edge
-    /// reliably regardless of when Silk delivers the callback relative to our Update() call
-    /// and Ultralight input forwarding.
-    /// </summary>
-    private void OnGlobalMouseButtonDown(MouseButton button)
-    {
-        if (button == MouseButton.Left && DialogueSystem.IsVisible)
-        {
-            DialogueSystem.Advance();
-        }
     }
 
     private void OnRenderFrame(double deltaTime)
@@ -533,10 +541,10 @@ public class SNEngineHost : IDisposable, IFrameDataProvider
         if (_disposed) return;
         _disposed = true;
 
-        // Unsubscribe from input events
+        // Unsubscribe from input events (dialogue advance handler now lives in DialogueSystem)
         try
         {
-            Input.Input.MouseButtonDown -= OnGlobalMouseButtonDown;
+            Input.Input.MouseButtonDown -= DialogueSystem.HandleGlobalMouseButtonDown;
         }
         catch { }
 

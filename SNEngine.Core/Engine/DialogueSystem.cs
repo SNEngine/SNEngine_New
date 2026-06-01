@@ -1,6 +1,7 @@
 using System;
 using System.Text;
 using System.Threading.Tasks;
+using SNEngine.Core.Input;
 
 namespace SNEngine.Core.Engine;
 
@@ -212,6 +213,23 @@ public static class DialogueSystem
             // AND we auto-hide so the next Say looks like a clean continuation.
             CompleteCurrentTcs(true);
             HideCurrentDialogueInternal();
+        }
+    }
+
+    /// <summary>
+    /// Handles left mouse button down globally for dialogue advance.
+    /// Subscribed to by SNEngineHost (after input init) so that any left click
+    /// advances the current dialogue (if visible). This is in addition to the
+    /// per-element click handler inside the dialog HTML that also calls Advance().
+    /// 
+    /// Debounce is handled inside Advance() itself.
+    /// This logic lives here (instead of host) so DialogueSystem owns all its input concerns.
+    /// </summary>
+    internal static void HandleGlobalMouseButtonDown(MouseButton button)
+    {
+        if (button == MouseButton.Left && IsVisible)
+        {
+            Advance();
         }
     }
 

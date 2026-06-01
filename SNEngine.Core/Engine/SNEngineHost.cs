@@ -261,6 +261,8 @@ public class SNEngineHost : IDisposable, IFrameDataProvider
         _profiler.Time("Update/JSBridge", () =>
         {
             JavaScriptBridge?.ProcessPendingCalls();
+            // Note: Runtime data (FPS etc.) is now delivered per-element
+            // via SNEngineRuntimeBridge inside UltralightHtmlElement.TickJsHelpers().
         });
 
         _profiler.EndUpdate();
@@ -353,6 +355,11 @@ public class SNEngineHost : IDisposable, IFrameDataProvider
     private void OnResize(Vector2D<int> newSize)
     {
         if (Renderer == null) return;
+
+        // Many window systems report (0,0) when the window is minimized / iconified.
+        // We must not propagate 0-size down to renderers, textures, or Ultralight views.
+        if (newSize.X <= 0 || newSize.Y <= 0)
+            return;
 
         Renderer.SetViewport(newSize.X, newSize.Y);
         Debug.Log($"Window resized to {newSize.X}x{newSize.Y}");

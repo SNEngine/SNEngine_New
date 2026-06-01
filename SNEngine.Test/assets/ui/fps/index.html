@@ -69,12 +69,12 @@
         const fpsValueElement = document.getElementById('fps-value');
 
         function updateFPS() {
-            const fps = window.fps || 0;
+            // Новый путь: window.SNEngine.runtime.fps (через SNEngineRuntimeBridge)
+            const fps = (window.SNEngine && window.SNEngine.runtime && window.SNEngine.runtime.fps) || 0;
             fpsValueElement.textContent = Math.round(fps);
         }
 
         setInterval(updateFPS, 100);
-
     </script>
 </body>
 </html>

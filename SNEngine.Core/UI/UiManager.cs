@@ -171,7 +171,8 @@ public sealed class UiManager : IDisposable
             try
             {
                 element.Render(context);
-                element.TickJsHelpers();
+                // Note: JS runtime data pushing (FPS etc.) is now done in Update(),
+                // not here. This respects the Update/Render separation at Silk.NET level.
             }
             catch (Exception ex)
             {
@@ -185,6 +186,11 @@ public sealed class UiManager : IDisposable
     /// </summary>
     public void Resize(int width, int height)
     {
+        // Skip resize when minimized (0x0). Many backends (Ultralight, GL textures, etc.)
+        // do not support zero-size resources. The next real resize will restore everything.
+        if (width <= 0 || height <= 0)
+            return;
+
         foreach (var element in _elements)
         {
             try
@@ -240,7 +246,8 @@ public sealed class UiManager : IDisposable
     {
         try
         {
-            LogError($"[UiManager] {message}");
+            // Use fully qualified name to avoid recursion with the local method name
+            SNEngine.Core.Debug.LogError($"[UiManager] {message}");
         }
         catch
         {

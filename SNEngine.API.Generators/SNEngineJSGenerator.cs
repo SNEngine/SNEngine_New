@@ -148,8 +148,10 @@ public class SNEngineJSGenerator : IIncrementalGenerator
 
                 if (shortName == "Native" && m.Name == "GetFPS")
                 {
-                    // Самое простое и надёжное решение для FPS
-                    js.AppendLine("    return window.__currentFPS || 0;");
+                    // Читаем из централизованного runtime bridge (новая система).
+                    // Fallbacks для обратной совместимости со старыми экранами.
+                    js.AppendLine("    const r = (window.SNEngine && window.SNEngine.runtime) || {};");
+                    js.AppendLine("    return r.fps ?? window.__currentFPS ?? window.fps ?? 0;");
                 }
                 else if (returnsValue)
                 {

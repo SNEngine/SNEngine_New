@@ -22,7 +22,7 @@ public class UltralightHtmlElement : UiElementBase
 {
     private readonly UltralightRendererHost _rendererHost;
     private AssetManager? _assetManager;
-    private IFrameDataProvider _frameDataProvider;
+    private readonly IFrameDataProvider? _frameDataProvider;
 
     /// <summary>
     /// Exposes the renderer host for integration with UiManager (auto PreRenderHook wiring).
@@ -37,8 +37,7 @@ public class UltralightHtmlElement : UiElementBase
 
     private string? _currentScreen;
 
-    private UltralightJsInterop? _jsInterop;
-    private FpsJsTickable _fpsTickable;
+    private SNEngineRuntimeBridge? _runtimeBridge;
 
     // Simple static cache for HTML content loaded from asset packages.
     // Key = normalized asset path (e.g. "ui/mainmenu/index.html")
@@ -83,14 +82,10 @@ public class UltralightHtmlElement : UiElementBase
             (uint)context.ViewportWidth,
             (uint)context.ViewportHeight);
 
-        _jsInterop = new UltralightJsInterop(_ulView);
-
         if (_ulView != null)
         {
-            _fpsTickable = new FpsJsTickable(_ulView, _frameDataProvider);
-            _fpsTickable.Initialize();
+            _runtimeBridge = new SNEngineRuntimeBridge(_ulView);
         }
-
 
         SNEngineJSBridge.Inject(_ulView);
 
@@ -263,6 +258,11 @@ public class UltralightHtmlElement : UiElementBase
     {
         if (_ulView == null || _context == null) return;
 
+        // When the window is minimized, many platforms report size 0x0.
+        // Creating 0-size textures or Ultralight views will crash or corrupt state.
+        if (width <= 0 || height <= 0)
+            return;
+
         _ulView.Resize((uint)width, (uint)height);
 
         _uiTexture?.Dispose();
@@ -276,6 +276,7 @@ public class UltralightHtmlElement : UiElementBase
     private void UpdateProjection(int width, int height)
     {
         if (_uiShader == null) return;
+        if (width <= 0 || height <= 0) return;
 
         _uiShader.Projection = Matrix4x4.CreateOrthographicOffCenter(0, width, height, 0, 0, 1);
         _uiShader.World = Matrix4x4.Identity;
@@ -295,8 +296,24 @@ public class UltralightHtmlElement : UiElementBase
         }
     }
 
+    /// <summary>
+    /// Pushes runtime data (FPS, etc.) to JavaScript via SNEngineRuntimeBridge.
+    /// Must be called from the Update phase, not during rendering.
+    /// </summary>
+    public override void Update(double deltaTime)
+    {
+        if (_runtimeBridge != null && _frameDataProvider != null)
+        {
+            _runtimeBridge.SetFps(_frameDataProvider.NativeFps);
+        }
+    }
+
+    /// <summary>
+    /// Legacy hook. Runtime data pushing has been moved to Update() to follow
+    /// the proper Silk.NET OnUpdateFrame / OnRenderFrame separation.
+    /// </summary>
     public override void TickJsHelpers()
     {
-        _fpsTickable?.Tick();
+        // Moved to Update(). This method is kept only for interface compatibility.
     }
 }

@@ -35,7 +35,10 @@ public interface IUiElement : IDisposable
     void Initialize(IGraphicsContext context);
 
     /// <summary>
-    /// Called every frame for logic updates (timers, animations, JS execution, etc.).
+    /// Called every frame for logic updates (timers, animations, JS data pushing, etc.).
+    /// 
+    /// Runtime data synchronization to JavaScript (via SNEngineRuntimeBridge etc.)
+    /// should happen here, not during Render.
     /// </summary>
     void Update(double deltaTime);
 
@@ -49,5 +52,12 @@ public interface IUiElement : IDisposable
     /// Called when the game window or viewport size changes.
     /// </summary>
     void Resize(int width, int height);
+
+    /// <summary>
+    /// Legacy hook for per-frame JS helper updates.
+    /// 
+    /// Do NOT use for new code. Runtime data pushing has moved into Update()
+    /// to respect the proper Silk.NET Update/Render separation (OnUpdateFrame vs OnRenderFrame).
+    /// </summary>
     void TickJsHelpers();
 }

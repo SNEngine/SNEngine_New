@@ -112,6 +112,9 @@ public class Renderer : IDisposable
     /// </summary>
     public void SetViewport(int width, int height)
     {
+        if (width <= 0 || height <= 0)
+            return;
+
         Viewport.SetSize(width, height);
 
         _deviceContext?.SetViewport(0, 0, width, height);

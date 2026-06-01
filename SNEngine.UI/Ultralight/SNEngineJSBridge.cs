@@ -288,19 +288,8 @@ public static class SNEngineJSBridge
         }
     }
 
-    public static void UpdateGlobalFps(double fps)
-    {
-        string script = $"window.__currentFPS = {fps.ToString(System.Globalization.CultureInfo.InvariantCulture)};";
-
-        foreach (var weakRef in _activeViews.ToArray())
-        {
-            if (weakRef.TryGetTarget(out var view))
-            {
-                string? err = null;
-                view.EvaluateScript(script, out err);
-            }
-        }
-    }
+    // UpdateGlobalFps removed — all runtime data (including FPS) is now delivered exclusively
+    // through per-View SNEngineRuntimeBridge instances created by UltralightHtmlElement.
 
     // Вспомогательный метод для конвертации JsonElement в object
     private static object ConvertJsonElement(System.Text.Json.JsonElement element)

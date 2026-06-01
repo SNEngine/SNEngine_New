@@ -40,5 +40,9 @@ public abstract class UiElementBase : IUiElement
 
     public virtual void Dispose() { }
 
+    /// <summary>
+    /// Legacy. See IUiElement.TickJsHelpers for explanation.
+    /// New code should do JS runtime updates inside Update(double deltaTime).
+    /// </summary>
     public virtual void TickJsHelpers() { }
 }

@@ -16,5 +16,9 @@ public interface IJSBridge
     /// </summary>
     void ProcessPendingCalls();
 
-    void UpdateWindowData();           // ← должен быть
+    /// <summary>
+    /// Hook for pushing window/runtime data to JS (FPS, game state, etc.).
+    /// Currently a no-op — data is delivered per-element via SNEngineRuntimeBridge.
+    /// </summary>
+    void UpdateWindowData();
 }

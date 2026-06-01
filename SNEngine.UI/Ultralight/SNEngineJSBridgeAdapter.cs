@@ -19,11 +19,8 @@ public sealed class SNEngineJSBridgeAdapter : IJSBridge
 
     public void UpdateWindowData()
     {
-        if (_frameData == null) return;
-
-        double fps = _frameData.NativeFps;
-
-        // Обновляем глобальную переменную для всех активных views
-        SNEngineJSBridge.UpdateGlobalFps(fps);
+        // FPS and other runtime data are now pushed exclusively through
+        // SNEngineRuntimeBridge (per UltralightHtmlElement / per View).
+        // This method is kept as an extension point for future centralized data if needed.
     }
 }

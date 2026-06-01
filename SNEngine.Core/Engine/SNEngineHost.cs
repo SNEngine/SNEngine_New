@@ -6,6 +6,7 @@ using SNEngine.Core.Engine;
 using SNEngine.Core.Input;
 using SNEngine.Core.Rendering;
 using MouseButton = SNEngine.Core.Input.MouseButton;
+using Key = SNEngine.Core.Input.Key;
 using System;
 using System.Buffers;
 using System.Diagnostics;
@@ -170,6 +171,12 @@ public class SNEngineHost : IDisposable, IFrameDataProvider
         // === INPUT SYSTEM ===
         var inputProvider = new Input.SilkInputProvider(_window);
         Input.Input.Initialize(inputProvider);
+
+        // Subscribe to keyboard events and forward to UI
+        Input.Input.KeyDown += OnGlobalKeyDown;
+        Input.Input.KeyUp += OnGlobalKeyUp;
+        Input.Input.TextInput += OnGlobalTextInput;
+
         Debug.Log("[SNEngineHost] Input system initialized (Silk.NET).");
 
         if (!_useSharedMemory)
@@ -369,6 +376,25 @@ public class SNEngineHost : IDisposable, IFrameDataProvider
         _prevLeftMouse = left;
         _prevRightMouse = right;
         _prevMiddleMouse = middle;
+    }
+
+    // Keyboard forwarding to UI (sends to topmost interactive element for now)
+    private void OnGlobalKeyDown(Key key)
+    {
+        Ui?.ProcessKeyDown(key);
+        Console.WriteLine($"[SNEngineHost] Key down: {key}");
+    }
+
+    private void OnGlobalKeyUp(Key key)
+    {
+        Ui?.ProcessKeyUp(key);
+        Console.WriteLine($"[SNEngineHost] Key up: {key}");
+    }
+
+    private void OnGlobalTextInput(char character)
+    {
+        Ui?.ProcessTextInput(character);
+        Console.WriteLine($"[SNEngineHost] Text input: '{character}'");
     }
 
     private void OnRenderFrame(double deltaTime)

@@ -85,4 +85,21 @@ public interface IUiElement : IDisposable
     /// Called when a mouse button is pressed or released over this element.
     /// </summary>
     void OnMouseButton(SNEngine.Core.Input.MouseButton button, bool isDown, float x, float y) { }
+
+    // ==================== Keyboard Input ====================
+
+    /// <summary>
+    /// Called when a key is pressed.
+    /// </summary>
+    void OnKeyDown(Key key) { }
+
+    /// <summary>
+    /// Called when a key is released.
+    /// </summary>
+    void OnKeyUp(Key key) { }
+
+    /// <summary>
+    /// Called when a character is input (for text fields).
+    /// </summary>
+    void OnTextInput(char character) { }
 }

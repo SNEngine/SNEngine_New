@@ -6,9 +6,6 @@ using Silk.NET.Windowing;
 
 namespace SNEngine.Core.Input;
 
-/// <summary>
-/// Silk.NET implementation of IInputProvider.
-/// </summary>
 public class SilkInputProvider : IInputProvider
 {
     private readonly IInputContext _inputContext;
@@ -37,7 +34,6 @@ public class SilkInputProvider : IInputProvider
     {
         _inputContext = window.CreateInput();
 
-        // Subscribe to first mouse (usually the only one)
         if (_inputContext.Mice.Count > 0)
         {
             var mouse = _inputContext.Mice[0];
@@ -47,7 +43,6 @@ public class SilkInputProvider : IInputProvider
             mouse.Scroll += (m, wheel) => OnScroll(wheel.Y);
         }
 
-        // Subscribe to first keyboard
         if (_inputContext.Keyboards.Count > 0)
         {
             var keyboard = _inputContext.Keyboards[0];
@@ -59,14 +54,13 @@ public class SilkInputProvider : IInputProvider
 
     public void Update()
     {
-        // Copy current state to previous for edge detection
         foreach (var kv in _currentMouse)
             _previousMouse[kv.Key] = kv.Value;
 
         foreach (var kv in _currentKeys)
             _previousKeys[kv.Key] = kv.Value;
 
-        _scrollDelta = 0; // reset every frame
+        _scrollDelta = 0;
     }
 
     public bool IsMouseButtonDown(MouseButton button)
@@ -89,10 +83,7 @@ public class SilkInputProvider : IInputProvider
 
     public void Dispose()
     {
-        // Silk.NET input context is usually disposed with the window
     }
-
-    // ==================== Silk.NET Callbacks ====================
 
     private void OnMouseMove(Vector2 position)
     {
@@ -122,7 +113,7 @@ public class SilkInputProvider : IInputProvider
 
     private void OnKeyDown(Silk.NET.Input.Key silkKey)
     {
-        var key = MapKey(silkKey);
+        var key = KeyMapper.FromSilkKey(silkKey);
         if (key != Key.Unknown)
         {
             _currentKeys[key] = true;
@@ -132,7 +123,7 @@ public class SilkInputProvider : IInputProvider
 
     private void OnKeyUp(Silk.NET.Input.Key silkKey)
     {
-        var key = MapKey(silkKey);
+        var key = KeyMapper.FromSilkKey(silkKey);
         if (key != Key.Unknown)
         {
             _currentKeys[key] = false;
@@ -145,27 +136,11 @@ public class SilkInputProvider : IInputProvider
         TextInput?.Invoke(character);
     }
 
-    // ==================== Mapping Helpers ====================
-
     private static MouseButton MapMouseButton(Silk.NET.Input.MouseButton button) => button switch
     {
         Silk.NET.Input.MouseButton.Left => MouseButton.Left,
         Silk.NET.Input.MouseButton.Right => MouseButton.Right,
         Silk.NET.Input.MouseButton.Middle => MouseButton.Middle,
         _ => MouseButton.Left
-    };
-
-    private static Key MapKey(Silk.NET.Input.Key key) => key switch
-    {
-        Silk.NET.Input.Key.A => Key.A,
-        Silk.NET.Input.Key.B => Key.B,
-        Silk.NET.Input.Key.Escape => Key.Escape,
-        Silk.NET.Input.Key.Enter => Key.Enter,
-        Silk.NET.Input.Key.Space => Key.Space,
-        Silk.NET.Input.Key.Left => Key.Left,
-        Silk.NET.Input.Key.Right => Key.Right,
-        Silk.NET.Input.Key.Up => Key.Up,
-        Silk.NET.Input.Key.Down => Key.Down,
-        _ => Key.Unknown
     };
 }

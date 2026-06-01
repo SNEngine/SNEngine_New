@@ -56,4 +56,9 @@ public abstract class UiElementBase : IUiElement
 
     public virtual void OnMouseMove(float x, float y) { }
     public virtual void OnMouseButton(MouseButton button, bool isDown, float x, float y) { }
+
+    // Keyboard
+    public virtual void OnKeyDown(Key key) { }
+    public virtual void OnKeyUp(Key key) { }
+    public virtual void OnTextInput(char character) { }
 }

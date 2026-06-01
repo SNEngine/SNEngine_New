@@ -6,6 +6,7 @@ using SNEngine.Assets.Package;
 using SNEngine.Core;
 using SNEngine.Core.Assets;
 using SNEngine.Core.Engine;
+using SNEngine.Core.Input;
 using SNEngine.Core.Rendering;
 using SNEngine.Core.UI;
 using TrippyGL;
@@ -419,6 +420,94 @@ public override void OnMouseMove(float x, float y)
         catch (Exception ex)
         {
             SNEngine.Core.Debug.LogWarning($"[UltralightHtmlElement] MouseButton failed: {ex.Message}");
+        }
+    }
+
+    // ==================== Keyboard Support (UltralightNet 1.3.0) ====================
+
+    public override void OnKeyDown(Key key)
+    {
+        if (_ulView == null) return;
+
+        try
+        {
+            int virtualKey = UltralightKeyMapper.ToVirtualKey(key);
+            var modifiers = UltralightKeyMapper.ToUltralightModifiersRaw(SNEngine.Core.Input.KeyMapper.GetCurrentModifiers());
+
+            using var evt = ULKeyEvent.Create(
+                type: ULKeyEventType.KeyDown,
+                modifiers: (UltralightNet.ULKeyEventModifiers)modifiers,
+                virtualKeyCode: virtualKey,
+                nativeKeyCode: 0,
+                text: "",
+                unmodifiedText: "",
+                isKeypad: false,
+                isAutoRepeat: false,
+                isSystemKey: false
+            );
+
+            _ulView.FireKeyEvent(evt);
+        }
+        catch (Exception ex)
+        {
+            SNEngine.Core.Debug.LogWarning($"[UltralightHtmlElement] KeyDown failed: {ex.Message}");
+        }
+    }
+
+    public override void OnKeyUp(Key key)
+    {
+        if (_ulView == null) return;
+
+        try
+        {
+            int virtualKey = UltralightKeyMapper.ToVirtualKey(key);
+            var modifiers = UltralightKeyMapper.ToUltralightModifiersRaw(SNEngine.Core.Input.KeyMapper.GetCurrentModifiers());
+
+            using var evt = ULKeyEvent.Create(
+                type: ULKeyEventType.KeyUp,
+                modifiers: (UltralightNet.ULKeyEventModifiers)modifiers,
+                virtualKeyCode: virtualKey,
+                nativeKeyCode: 0,
+                text: "",
+                unmodifiedText: "",
+                isKeypad: false,
+                isAutoRepeat: false,
+                isSystemKey: false
+            );
+
+            _ulView.FireKeyEvent(evt);
+        }
+        catch (Exception ex)
+        {
+            SNEngine.Core.Debug.LogWarning($"[UltralightHtmlElement] KeyUp failed: {ex.Message}");
+        }
+    }
+
+    public override void OnTextInput(char character)
+    {
+        if (_ulView == null) return;
+
+        try
+        {
+            var modifiers = UltralightKeyMapper.ToUltralightModifiersRaw(SNEngine.Core.Input.KeyMapper.GetCurrentModifiers());
+
+            using var evt = ULKeyEvent.Create(
+                type: ULKeyEventType.Char,
+                modifiers: (UltralightNet.ULKeyEventModifiers)modifiers,
+                virtualKeyCode: 0,
+                nativeKeyCode: 0,
+                text: character.ToString(),
+                unmodifiedText: character.ToString(),
+                isKeypad: false,
+                isAutoRepeat: false,
+                isSystemKey: false
+            );
+
+            _ulView.FireKeyEvent(evt);
+        }
+        catch (Exception ex)
+        {
+            SNEngine.Core.Debug.LogWarning($"[UltralightHtmlElement] TextInput failed: {ex.Message}");
         }
     }
 

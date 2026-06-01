@@ -279,6 +279,45 @@ public sealed class UiManager : IDisposable
         return target;
     }
 
+    // ==================== Keyboard Input ====================
+
+    /// <summary>
+    /// Sends a key down event to the topmost interactive UI element.
+    /// 
+    /// Note: For production, you should track a "focused" element (last clicked UI element)
+    /// and send keyboard input only to it, similar to how browsers work.
+    /// Current simple implementation sends to the highest Z interactive element.
+    /// </summary>
+    public void ProcessKeyDown(Key key)
+    {
+        var target = _elements
+            .Where(e => e.Visible && e.IsInteractive)
+            .OrderByDescending(e => e.ZIndex)
+            .FirstOrDefault();
+
+        target?.OnKeyDown(key);
+    }
+
+    public void ProcessKeyUp(Key key)
+    {
+        var target = _elements
+            .Where(e => e.Visible && e.IsInteractive)
+            .OrderByDescending(e => e.ZIndex)
+            .FirstOrDefault();
+
+        target?.OnKeyUp(key);
+    }
+
+    public void ProcessTextInput(char character)
+    {
+        var target = _elements
+            .Where(e => e.Visible && e.IsInteractive)
+            .OrderByDescending(e => e.ZIndex)
+            .FirstOrDefault();
+
+        target?.OnTextInput(character);
+    }
+
     private static void LogError(string message)
     {
         try

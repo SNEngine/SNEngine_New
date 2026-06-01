@@ -24,7 +24,7 @@ public static class DialogueSystem
 
     // Typewriter state - using milliseconds per character for smooth typing
     private static float _msPerChar = 30f;          // milliseconds between characters
-    private static float _timeAccumulator;          // accumulated time since last character reveal
+    private static float _timeSinceStart;           // total time since this line started (more stable than pure accumulator)
     private static int _revealedChars;              // how many characters have been revealed so far
     private static bool _isComplete;
 
@@ -68,7 +68,7 @@ public static class DialogueSystem
 
         // Store speed in milliseconds per character (more convenient for tuning)
         _msPerChar = msPerChar <= 0 ? 1f : msPerChar; // 1ms = very fast, practically instant
-        _timeAccumulator = 0f;
+        _timeSinceStart = 0f;
         _revealedChars = 0;
         _isComplete = false;
 
@@ -94,7 +94,7 @@ public static class DialogueSystem
         _visible = false;
         _speaker = string.Empty;
         _fullText = string.Empty;
-        _timeAccumulator = 0f;
+        _timeSinceStart = 0f;
         _revealedChars = 0;
         _isComplete = false;
         _color = "#FFFFFF";
@@ -156,7 +156,7 @@ public static class DialogueSystem
 
         _revealedChars = _fullText.Length;
         _isComplete = true;
-        _timeAccumulator = 0f;
+        _timeSinceStart = float.MaxValue; // prevent any further revealing
 
         // Fill the builder with the entire text
         _displayBuilder.Clear();
@@ -167,27 +167,45 @@ public static class DialogueSystem
     }
 
     /// <summary>
-    /// Advances the typewriter effect using a time accumulator + while loop.
-    /// This produces smooth, Ren'Py-like per-character reveal even with variable frame times.
+    /// Advances the typewriter effect.
+    /// Uses time-since-start for stable target calculation + per-frame reveal limit
+    /// to eliminate visible jerks even on unstable frame times.
     /// </summary>
-    public static void Update(double deltaTime)
+    /// <summary>
+    /// Advances the typewriter. 
+    /// If no deltaTime is provided, it automatically uses <see cref="Engine.Time.SmoothDeltaTime"/>.
+    /// </summary>
+    public static void Update(double deltaTime = 0)
     {
         if (!_visible || _isComplete || string.IsNullOrEmpty(_fullText))
             return;
 
-        // Accumulate real elapsed time
-        _timeAccumulator += (float)deltaTime;
+        // Use passed delta only as fallback. Prefer the centralized smooth time.
+        float dt = deltaTime > 0 
+            ? (float)deltaTime 
+            : (Engine.Time.SmoothDeltaTime > 0 ? Engine.Time.SmoothDeltaTime : 0.016f);
+
+        _timeSinceStart += dt;
 
         float secondsPerChar = _msPerChar / 1000f;
 
+        // Calculate the ideal number of characters that should be visible by now
+        float idealRevealed = _timeSinceStart / secondsPerChar;
+        int targetRevealed = (int)idealRevealed;
+
+        // Hard cap on characters revealed per frame.
+        // Prevents ugly "bursts" when the game has a lag spike.
+        const int MaxCharsPerFrame = 3;
+
+        int charsToReveal = Math.Min(targetRevealed - _revealedChars, MaxCharsPerFrame);
+        charsToReveal = Math.Max(0, charsToReveal);
+
         int charsRevealedThisFrame = 0;
 
-        // Reveal characters one by one as time allows (this is the key to smoothness)
-        while (_timeAccumulator >= secondsPerChar && _revealedChars < _fullText.Length)
+        for (int i = 0; i < charsToReveal && _revealedChars < _fullText.Length; i++)
         {
             _displayBuilder.Append(_fullText[_revealedChars]);
             _revealedChars++;
-            _timeAccumulator -= secondsPerChar;
             charsRevealedThisFrame++;
         }
 
@@ -201,7 +219,6 @@ public static class DialogueSystem
         {
             _isComplete = true;
 
-            // Ensure builder is fully populated
             if (_displayBuilder.Length < _fullText.Length)
             {
                 _displayBuilder.Clear();

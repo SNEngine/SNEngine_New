@@ -244,6 +244,9 @@ public class SNEngineHost : IDisposable, IFrameDataProvider
     {
         if (_isDisposing) return;
 
+        // Update global Time system first (must happen before any system uses delta)
+        Engine.Time.Update(deltaTime);
+
         _profiler.BeginUpdate();
 
         _profiler.Time("Update/Scene", () =>
@@ -260,7 +263,8 @@ public class SNEngineHost : IDisposable, IFrameDataProvider
         // Drive Core-level systems that produce runtime data for UI
         _profiler.Time("Update/DialogueSystem", () =>
         {
-            DialogueSystem.Update(deltaTime);
+            // DialogueSystem now prefers Engine.Time.SmoothDeltaTime internally
+            DialogueSystem.Update();
         });
 
         // Push runtime data (FPS + current dialogue with typewriter progress, etc.)

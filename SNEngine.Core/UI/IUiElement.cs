@@ -102,4 +102,17 @@ public interface IUiElement : IDisposable
     /// Called when a character is input (for text fields).
     /// </summary>
     void OnTextInput(char character) { }
+
+    // ==================== Focus Management ====================
+
+    /// <summary>
+    /// Called when this element should receive input focus.
+    /// For Ultralight views this usually means calling Focus() on the underlying View.
+    /// </summary>
+    void OnFocus() { }
+
+    /// <summary>
+    /// Called when this element should lose input focus.
+    /// </summary>
+    void OnBlur() { }
 }

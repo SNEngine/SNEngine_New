@@ -271,50 +271,88 @@ public sealed class UiManager : IDisposable
 
     /// <summary>
     /// Processes a mouse button press or release.
+    /// When a button is pressed, the target element receives focus.
     /// </summary>
     public IUiElement? ProcessMouseButton(MouseButton button, bool isDown, float x, float y)
     {
         var target = HitTest(x, y);
+
         target?.OnMouseButton(button, isDown, x, y);
+
+        // Manage focus on mouse down
+        if (isDown)
+        {
+            SetFocus(target);
+        }
+
         return target;
     }
 
-    // ==================== Keyboard Input ====================
+    // ==================== Focus Management ====================
+
+    private IUiElement? _focusedElement;
 
     /// <summary>
-    /// Sends a key down event to the topmost interactive UI element.
-    /// 
-    /// Note: For production, you should track a "focused" element (last clicked UI element)
-    /// and send keyboard input only to it, similar to how browsers work.
-    /// Current simple implementation sends to the highest Z interactive element.
+    /// Returns the currently focused UI element (if any).
     /// </summary>
-    public void ProcessKeyDown(Key key)
+    public IUiElement? FocusedElement => _focusedElement;
+
+    /// <summary>
+    /// Sets focus to the specified element. The previous focused element (if any) will receive OnBlur.
+    /// </summary>
+    public void SetFocus(IUiElement? element)
     {
-        var target = _elements
+        if (_focusedElement == element)
+            return;
+
+        var previous = _focusedElement;
+        _focusedElement = element;
+
+        previous?.OnBlur();
+        element?.OnFocus();
+    }
+
+    /// <summary>
+    /// Removes focus from the currently focused element.
+    /// </summary>
+    public void ClearFocus()
+    {
+        SetFocus(null);
+    }
+
+    // ==================== Keyboard Input (improved with focus) ====================
+
+    private IUiElement? GetTargetForKeyboardInput()
+    {
+        // Prefer focused element if it's still valid and interactive
+        if (_focusedElement != null && _focusedElement.Visible && _focusedElement.IsInteractive)
+            return _focusedElement;
+
+        // Fallback to topmost interactive element
+        return _elements
             .Where(e => e.Visible && e.IsInteractive)
             .OrderByDescending(e => e.ZIndex)
             .FirstOrDefault();
+    }
 
+    /// <summary>
+    /// Sends a key down event. Prefers the currently focused element.
+    /// </summary>
+    public void ProcessKeyDown(Key key)
+    {
+        var target = GetTargetForKeyboardInput();
         target?.OnKeyDown(key);
     }
 
     public void ProcessKeyUp(Key key)
     {
-        var target = _elements
-            .Where(e => e.Visible && e.IsInteractive)
-            .OrderByDescending(e => e.ZIndex)
-            .FirstOrDefault();
-
+        var target = GetTargetForKeyboardInput();
         target?.OnKeyUp(key);
     }
 
     public void ProcessTextInput(char character)
     {
-        var target = _elements
-            .Where(e => e.Visible && e.IsInteractive)
-            .OrderByDescending(e => e.ZIndex)
-            .FirstOrDefault();
-
+        var target = GetTargetForKeyboardInput();
         target?.OnTextInput(character);
     }
 

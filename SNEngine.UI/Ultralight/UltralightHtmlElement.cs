@@ -511,6 +511,36 @@ public override void OnMouseMove(float x, float y)
         }
     }
 
+    // ==================== Focus ====================
+
+    public override void OnFocus()
+    {
+        if (_ulView == null) return;
+
+        try
+        {
+            _ulView.Focus();
+        }
+        catch (Exception ex)
+        {
+            SNEngine.Core.Debug.LogWarning($"[UltralightHtmlElement] Focus failed: {ex.Message}");
+        }
+    }
+
+    public override void OnBlur()
+    {
+        if (_ulView == null) return;
+
+        try
+        {
+            _ulView.Unfocus();
+        }
+        catch (Exception ex)
+        {
+            SNEngine.Core.Debug.LogWarning($"[UltralightHtmlElement] Unfocus failed: {ex.Message}");
+        }
+    }
+
     /// <summary>
     /// Legacy hook. Runtime data pushing has been moved to Update() to follow
     /// the proper Silk.NET OnUpdateFrame / OnRenderFrame separation.

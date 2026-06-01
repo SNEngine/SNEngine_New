@@ -61,4 +61,8 @@ public abstract class UiElementBase : IUiElement
     public virtual void OnKeyDown(Key key) { }
     public virtual void OnKeyUp(Key key) { }
     public virtual void OnTextInput(char character) { }
+
+    // Focus
+    public virtual void OnFocus() { }
+    public virtual void OnBlur() { }
 }

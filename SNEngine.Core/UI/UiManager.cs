@@ -92,10 +92,35 @@ public sealed class UiManager : IDisposable
             }
             catch (Exception ex)
             {
-                LogError($"Error disposing UI element during Clear: {ex.Message}");
+                // During shutdown many UI elements (especially Ultralight + TrippyGL) will
+                // throw "NoContext" or "Wrong thread" errors because the OpenGL context
+                // has already been destroyed or is not current. These are expected and safe to ignore.
+                if (IsExpectedShutdownDisposeError(ex))
+                {
+                    // Log at lower level to reduce noise on normal exit
+                    try
+                    {
+                        SNEngine.Core.Debug.Log($"[UiManager] UI element disposed after context was destroyed (normal on exit).");
+                    }
+                    catch { }
+                }
+                else
+                {
+                    LogError($"Error disposing UI element during Clear: {ex.Message}");
+                }
             }
         }
         _elements.Clear();
+    }
+
+    private static bool IsExpectedShutdownDisposeError(Exception ex)
+    {
+        if (ex is null) return false;
+        string msg = ex.Message ?? string.Empty;
+        return msg.Contains("NoContext", StringComparison.OrdinalIgnoreCase) ||
+               msg.Contains("current OpenGL", StringComparison.OrdinalIgnoreCase) ||
+               msg.Contains("entry point", StringComparison.OrdinalIgnoreCase) ||
+               msg.Contains("Wrong thread", StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>

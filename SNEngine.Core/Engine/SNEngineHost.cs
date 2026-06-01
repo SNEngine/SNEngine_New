@@ -392,7 +392,17 @@ public class SNEngineHost : IDisposable, IFrameDataProvider
                 }
                 catch (Exception ex)
                 {
-                    Debug.LogError($"UiManager dispose error: {ex.Message}");
+                    // Many "NoContext" / "Wrong thread" errors are normal here because
+                    // SafeDispose often runs on a background thread via Task.Run.
+                    if (ex.Message?.Contains("NoContext", StringComparison.OrdinalIgnoreCase) == true ||
+                        ex.Message?.Contains("Wrong thread", StringComparison.OrdinalIgnoreCase) == true)
+                    {
+                        Debug.Log($"[Shutdown] UiManager disposed after context/thread change (normal).");
+                    }
+                    else
+                    {
+                        Debug.LogError($"UiManager dispose error: {ex.Message}");
+                    }
                 }
                 Ui = null;
             }

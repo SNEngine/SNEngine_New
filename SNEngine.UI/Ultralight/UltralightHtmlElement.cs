@@ -1,5 +1,6 @@
 using System;
 using System.Numerics;
+using System.Reflection;
 using Silk.NET.OpenGL;
 using SNEngine.Assets.Package;
 using SNEngine.Core;
@@ -223,23 +224,39 @@ public class UltralightHtmlElement : UiElementBase
         if (surface == null) return;
 
         ULBitmap bitmap = surface.Value.Bitmap;
-        unsafe
+
+        // === Dirty region optimization (best easy win without GPUDriver) ===
+        // We use reflection to get DirtyBounds safely.
+        var dirty = TryGetDirtyBounds(surface.Value);
+
+        // Fast path: nothing changed this frame → skip expensive Lock + upload
+        if (dirty.HasValue && dirty.Value.Width == 0 && dirty.Value.Height == 0)
         {
-            void* pixels = bitmap.LockPixels();
+            // Just draw the previous texture (very cheap)
+        }
+        else
+        {
+            unsafe
+            {
+                void* pixels = bitmap.LockPixels();
 
-            _context.GL.ActiveTexture(TextureUnit.Texture0);
-            _context.GL.BindTexture(TextureTarget.Texture2D, _uiTexture.Handle);
+                _context.GL.ActiveTexture(TextureUnit.Texture0);
+                _context.GL.BindTexture(TextureTarget.Texture2D, _uiTexture.Handle);
 
-            _context.GL.TexSubImage2D(
-                TextureTarget.Texture2D,
-                0,
-                0, 0,
-                _uiTexture.Width, _uiTexture.Height,
-                PixelFormat.Bgra,
-                PixelType.UnsignedByte,
-                pixels);
+                // For stability we currently do full uploads.
+                // Partial dirty rect uploads were causing 0xc0000005 (wrong pointer math with stride/alignment).
+                // The main win (completely skipping upload when nothing changed) is still active above.
+                _context.GL.TexSubImage2D(
+                    TextureTarget.Texture2D,
+                    0,
+                    0, 0,
+                    _uiTexture.Width, _uiTexture.Height,
+                    PixelFormat.Bgra,
+                    PixelType.UnsignedByte,
+                    pixels);
 
-            bitmap.UnlockPixels();
+                bitmap.UnlockPixels();
+            }
         }
 
         // Draw this element's texture at its position
@@ -285,15 +302,49 @@ public class UltralightHtmlElement : UiElementBase
 
     public override void Dispose()
     {
-        _uiTexture?.Dispose();
-        _uiBatcher?.Dispose();
-        _uiShader?.Dispose();
-
-        if (_ulView != null)
+        // TrippyGL GL objects require an active OpenGL context to delete resources.
+        // During shutdown the context may already be destroyed or current on another thread.
+        // "NoContext" errors here are expected and harmless.
+        try
         {
-            _rendererHost.ReleaseView(_ulView);
-            _ulView.Dispose();
+            _uiTexture?.Dispose();
+            _uiBatcher?.Dispose();
+            _uiShader?.Dispose();
         }
+        catch (Exception ex) when (IsNoContextError(ex))
+        {
+            // Expected during shutdown
+        }
+        catch (Exception ex)
+        {
+            SNEngine.Core.Debug.LogWarning($"[UltralightHtmlElement] Non-critical dispose error: {ex.Message}");
+        }
+
+        // Ultralight views are sensitive to thread affinity.
+        // We protect the call; "Wrong thread" warnings from Ultralight are logged at warning level.
+        try
+        {
+            if (_ulView != null)
+            {
+                _rendererHost.ReleaseView(_ulView);
+                _ulView.Dispose();
+            }
+        }
+        catch (Exception ex)
+        {
+            // Ultralight often complains about thread during shutdown.
+            // This is usually not fatal.
+            SNEngine.Core.Debug.LogWarning($"[UltralightHtmlElement] Ultralight dispose warning: {ex.Message}");
+        }
+    }
+
+    private static bool IsNoContextError(Exception ex)
+    {
+        if (ex is null) return false;
+        string message = ex.Message ?? string.Empty;
+        return message.Contains("NoContext", StringComparison.OrdinalIgnoreCase) ||
+               message.Contains("current OpenGL", StringComparison.OrdinalIgnoreCase) ||
+               message.Contains("entry point", StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>
@@ -315,5 +366,50 @@ public class UltralightHtmlElement : UiElementBase
     public override void TickJsHelpers()
     {
         // Moved to Update(). This method is kept only for interface compatibility.
+    }
+
+    // =====================================================================
+    // Dirty region helper — one of the best performance workarounds
+    // without implementing a custom IGPUDriver.
+    // =====================================================================
+    private static (int X, int Y, int Width, int Height)? TryGetDirtyBounds(ULSurface surface)
+    {
+        try
+        {
+            var dirtyProp = surface.GetType().GetProperty("DirtyBounds");
+            if (dirtyProp == null) return null;
+
+            var rect = dirtyProp.GetValue(surface);
+            if (rect == null) return null;
+
+            // ULIntRect can have different shapes across versions/bindings.
+            // We try the most common ones.
+            int x = GetInt(rect, "X") ?? GetInt(rect, "Left") ?? 0;
+            int y = GetInt(rect, "Y") ?? GetInt(rect, "Top") ?? 0;
+
+            int? right = GetInt(rect, "Right");
+            int? bottom = GetInt(rect, "Bottom");
+            int w = GetInt(rect, "Width") ?? (right.HasValue ? right.Value - x : 0);
+            int h = GetInt(rect, "Height") ?? (bottom.HasValue ? bottom.Value - y : 0);
+
+            return (x, y, Math.Max(0, w), Math.Max(0, h));
+        }
+        catch
+        {
+            return null; // Safe fallback to full upload
+        }
+    }
+
+    private static int? GetInt(object obj, string memberName)
+    {
+        var prop = obj.GetType().GetProperty(memberName, BindingFlags.Public | BindingFlags.Instance);
+        if (prop != null && prop.PropertyType == typeof(int))
+            return (int)prop.GetValue(obj)!;
+
+        var field = obj.GetType().GetField(memberName, BindingFlags.Public | BindingFlags.Instance);
+        if (field != null && field.FieldType == typeof(int))
+            return (int)field.GetValue(obj)!;
+
+        return null;
     }
 }

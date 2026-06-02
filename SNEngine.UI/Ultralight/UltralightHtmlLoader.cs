@@ -1,5 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
+using System.Text.RegularExpressions;
 using SNEngine.Assets.Package;
 using SNEngine.Core.Assets;
 using UltralightNet;
@@ -8,14 +10,26 @@ namespace SNEngine.UI.Ultralight;
 
 /// <summary>
 /// Handles loading HTML content into an Ultralight View.
-/// Supports asset loading with caching, LoadScreen, LoadHtml, and LoadHtmlAsset.
-/// Extracted from UltralightHtmlElement.
+/// Supports asset loading with caching and notifies SnpkFileSystem about current screen context.
 /// </summary>
 public class UltralightHtmlLoader
 {
     // Static cache for HTML content (shared between all elements)
     private static readonly Dictionary<string, string> _htmlCache =
         new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Reference to our custom file system to set screen context.
+    /// </summary>
+    private static SnpkFileSystem? _snpkFileSystem;
+
+    /// <summary>
+    /// Sets the custom SnpkFileSystem instance (called once during initialization).
+    /// </summary>
+    public static void SetSnpkFileSystem(SnpkFileSystem fileSystem)
+    {
+        _snpkFileSystem = fileSystem;
+    }
 
     /// <summary>
     /// Loads a screen by convention (ui/{screenName}/index.html)
@@ -43,6 +57,17 @@ public class UltralightHtmlLoader
 
         if (!string.IsNullOrEmpty(htmlContent))
         {
+            // Set context BEFORE inlining + HTML assignment so relative resolution (e.g. media/) works for inliner
+            if (_snpkFileSystem != null)
+            {
+                _snpkFileSystem.SetCurrentScreen(ulView, screenName);
+            }
+
+            // Inline local assets (img src="media/...", style url(...) etc) as data: URIs.
+            // This ensures <img> and similar from packaged HTML work reliably even if
+            // Ultralight does not query IFileSystem for relative paths in .HTML-set content.
+            htmlContent = InlineLocalAssets(htmlContent, _snpkFileSystem);
+
             ulView.HTML = htmlContent;
         }
     }
@@ -67,8 +92,36 @@ public class UltralightHtmlLoader
 
         if (!string.IsNullOrEmpty(htmlContent))
         {
+            // Set context first (for relative asset resolution during inlining)
+            string screenName = "";
+            if (_snpkFileSystem != null)
+            {
+                screenName = ExtractScreenName(assetPath);
+                if (!string.IsNullOrEmpty(screenName))
+                {
+                    _snpkFileSystem.SetCurrentScreen(ulView, screenName);
+                }
+            }
+
+            htmlContent = InlineLocalAssets(htmlContent, _snpkFileSystem);
+
             ulView.HTML = htmlContent;
         }
+    }
+
+    /// <summary>
+    /// Attempts to extract screen name from path (e.g. "ui/dialog/index.html" → "dialog")
+    /// </summary>
+    private static string ExtractScreenName(string assetPath)
+    {
+        string normalized = assetPath.Replace('\\', '/').TrimStart('/');
+        if (normalized.StartsWith("ui/"))
+        {
+            var parts = normalized.Split('/');
+            if (parts.Length >= 2)
+                return parts[1];
+        }
+        return "";
     }
 
     /// <summary>
@@ -78,7 +131,6 @@ public class UltralightHtmlLoader
     {
         string normalizedPath = assetPath.Replace('\\', '/').TrimStart('/');
 
-        // Check cache
         if (_htmlCache.TryGetValue(normalizedPath, out var cached))
             return cached;
 
@@ -98,5 +150,86 @@ public class UltralightHtmlLoader
     public static void ClearCache()
     {
         _htmlCache.Clear();
+    }
+
+    /// <summary>
+    /// Rewrites the HTML to embed local assets (referenced via relative paths like "media/foo.png")
+    /// as data: URIs using the SnpkFileSystem resolution (which knows the current screen).
+    /// This guarantees that &lt;img&gt;, CSS url(), etc. work inside UI screens loaded from .snpk
+    /// even though Ultralight may not invoke the custom IFileSystem for subresources when HTML
+    /// content is injected directly via the .HTML setter.
+    /// </summary>
+    private static string InlineLocalAssets(string html, SnpkFileSystem? fs)
+    {
+        if (string.IsNullOrEmpty(html) || fs == null)
+            return html;
+
+        // 1. src="..." or src='...' (img, script, link, etc.)
+        html = Regex.Replace(html, @"(src|href)\s*=\s*[""'](?<path>[^""'#>]+?)[""']", m =>
+        {
+            string attr = m.Groups[1].Value;
+            string p = m.Groups["path"].Value.Trim();
+            if (IsSkippableRef(p))
+                return m.Value;
+
+            byte[]? data = fs.ResolveAsset(p);
+            if (data != null && data.Length > 0)
+            {
+                string mime = GuessMime(p);
+                string b64 = Convert.ToBase64String(data);
+                return $"{attr}=\"data:{mime};base64,{b64}\"";
+            }
+            return m.Value;
+        });
+
+        // 2. url(...) inside style="" or <style> blocks (background, @font-face, etc.)
+        html = Regex.Replace(html, @"url\s*\(\s*[""']?(?<path>[^""')#>\s]+?)[""']?\s*\)", m =>
+        {
+            string p = m.Groups["path"].Value.Trim();
+            if (IsSkippableRef(p))
+                return m.Value;
+
+            byte[]? data = fs.ResolveAsset(p);
+            if (data != null && data.Length > 0)
+            {
+                string mime = GuessMime(p);
+                string b64 = Convert.ToBase64String(data);
+                return $"url(\"data:{mime};base64,{b64}\")";
+            }
+            return m.Value;
+        });
+
+        return html;
+    }
+
+    private static bool IsSkippableRef(string p)
+    {
+        if (string.IsNullOrWhiteSpace(p)) return true;
+        if (p.Contains("://")) return true; // http, https, etc.
+        if (p.StartsWith("data:", StringComparison.OrdinalIgnoreCase)) return true;
+        if (p.StartsWith("#")) return true; // anchors
+        if (p.StartsWith("javascript:", StringComparison.OrdinalIgnoreCase)) return true;
+        return false;
+    }
+
+    private static string GuessMime(string path)
+    {
+        string ext = Path.GetExtension(path).ToLowerInvariant().TrimStart('.');
+        return ext switch
+        {
+            "png" => "image/png",
+            "jpg" or "jpeg" => "image/jpeg",
+            "gif" => "image/gif",
+            "webp" => "image/webp",
+            "svg" => "image/svg+xml",
+            "css" => "text/css",
+            "js" => "application/javascript",
+            "json" => "application/json",
+            "woff" => "font/woff",
+            "woff2" => "font/woff2",
+            "ttf" => "font/ttf",
+            "otf" => "font/otf",
+            _ => "application/octet-stream"
+        };
     }
 }

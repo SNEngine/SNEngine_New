@@ -39,7 +39,9 @@ public sealed class UltralightRendererHost : IDisposable
 
         // Use our custom filesystem that can read from .snpk packages.
         // This is the clean way to support fully packaged games.
-        ULPlatform.FileSystem = new SnpkFileSystem(assetManager);
+        SnpkFileSystem snpkFileSystem = new SnpkFileSystem(assetManager);
+        ULPlatform.FileSystem = snpkFileSystem;
+        UltralightHtmlLoader.SetSnpkFileSystem(snpkFileSystem);
 
         var config = new ULConfig();
         _renderer = ULPlatform.CreateRenderer(config);

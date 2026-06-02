@@ -16,6 +16,9 @@
     <None Update="assets\bg\classroom_day.png">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
+    <None Update="assets\ui\test_images\media\portrait.png">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
     <None Update="assets\ultralight\icudt67l.dat">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>

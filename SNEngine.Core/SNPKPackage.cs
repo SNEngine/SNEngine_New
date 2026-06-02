@@ -71,10 +71,10 @@ public class SNPKPackage : IDisposable
                 return data;
         }
 
-        // Логируем все ключи в пакете для отладки (один раз)
-        if (_assets.Count > 0)
+        // Логируем только "интересные" промахи (не probe'ы от inliner'а для media/ или bare filenames)
+        if (_assets.Count > 0 && key.Contains("/") && !key.Contains("/media/") && !key.StartsWith("media/"))
         {
-            Debug.LogWarning($"[SNPK] Asset not found: '{key}'. Available keys: {string.Join(", ", _assets.Keys.Take(10))}");
+            Debug.Log($"[SNPK] Asset not found: '{key}'. Available keys (sample): {string.Join(", ", _assets.Keys.Take(5))}");
         }
 
         return null;

@@ -4,7 +4,9 @@ using SNEngine.Core.Assets;
 using SNEngine.Core.Rendering;
 using System;
 using System.Drawing;
+using System.IO;
 using System.Numerics;
+using System.Text.RegularExpressions;
 using TrippyGL;
 using UltralightNet;
 using UltralightNet.AppCore;
@@ -127,6 +129,10 @@ public unsafe class UltralightOverlay : IUiOverlay
         if (!string.IsNullOrEmpty(htmlContent))
         {
             _currentScreen = screenName;
+
+            // Inline assets for legacy path too (supports test_images style <img src="media/...">)
+            htmlContent = InlineLocalAssetsLegacy(htmlContent, _assetManager, screenName);
+
             _ulView.HTML = htmlContent;
         }
     }
@@ -273,5 +279,96 @@ public unsafe class UltralightOverlay : IUiOverlay
         return message.Contains("NoContext", StringComparison.OrdinalIgnoreCase) ||
                message.Contains("current OpenGL", StringComparison.OrdinalIgnoreCase) ||
                message.Contains("entry point", StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// Legacy-path asset inliner (no SnpkFileSystem instance available here).
+    /// Uses the same "ui/{screen}/" + common fallbacks as the main SnpkFileSystem.
+    /// </summary>
+    private static string InlineLocalAssetsLegacy(string html, AssetManager? am, string? screenName)
+    {
+        if (string.IsNullOrEmpty(html) || am == null)
+            return html;
+
+        html = Regex.Replace(html, @"(src|href)\s*=\s*[""'](?<path>[^""'#>]+?)[""']", m =>
+        {
+            string attr = m.Groups[1].Value;
+            string p = m.Groups["path"].Value.Trim();
+            if (IsSkippableRef(p)) return m.Value;
+
+            byte[]? data = TryResolveAsset(am, p, screenName);
+            if (data != null && data.Length > 0)
+            {
+                string mime = GuessMime(p);
+                string b64 = Convert.ToBase64String(data);
+                return $"{attr}=\"data:{mime};base64,{b64}\"";
+            }
+            return m.Value;
+        });
+
+        html = Regex.Replace(html, @"url\s*\(\s*[""']?(?<path>[^""')#>\s]+?)[""']?\s*\)", m =>
+        {
+            string p = m.Groups["path"].Value.Trim();
+            if (IsSkippableRef(p)) return m.Value;
+
+            byte[]? data = TryResolveAsset(am, p, screenName);
+            if (data != null && data.Length > 0)
+            {
+                string mime = GuessMime(p);
+                string b64 = Convert.ToBase64String(data);
+                return $"url(\"data:{mime};base64,{b64}\")";
+            }
+            return m.Value;
+        });
+
+        return html;
+    }
+
+    private static bool IsSkippableRef(string p)
+    {
+        if (string.IsNullOrWhiteSpace(p)) return true;
+        if (p.Contains("://")) return true;
+        if (p.StartsWith("data:", StringComparison.OrdinalIgnoreCase)) return true;
+        if (p.StartsWith("#") || p.StartsWith("javascript:", StringComparison.OrdinalIgnoreCase)) return true;
+        return false;
+    }
+
+    private static byte[]? TryResolveAsset(AssetManager am, string path, string? screen)
+    {
+        // Mirror the priority in SnpkFileSystem.GetAssetData
+        // 1. direct (rare for media/)
+        var d = am.GetRawAsset(path);
+        if (d != null) return d;
+
+        // 2. ui/{screen}/path
+        if (!string.IsNullOrEmpty(screen))
+        {
+            d = am.GetRawAsset($"ui/{screen}/{path}");
+            if (d != null) return d;
+        }
+
+        // 3. ui/path and ui/common/path
+        d = am.GetRawAsset($"ui/{path}");
+        if (d != null) return d;
+
+        d = am.GetRawAsset($"ui/common/{path}");
+        if (d != null) return d;
+
+        return null;
+    }
+
+    private static string GuessMime(string path)
+    {
+        string ext = Path.GetExtension(path).ToLowerInvariant().TrimStart('.');
+        return ext switch
+        {
+            "png" => "image/png",
+            "jpg" or "jpeg" => "image/jpeg",
+            "gif" => "image/gif",
+            "webp" => "image/webp",
+            "svg" => "image/svg+xml",
+            "css" => "text/css",
+            _ => "application/octet-stream"
+        };
     }
 }

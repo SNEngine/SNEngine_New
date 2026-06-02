@@ -1,29 +1,39 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using UltralightNet;
 using UltralightNet.Platform;
-using SNEngine.Core.Assets;           // for AssetManager
-using SNEngine.Assets.Package;        // for AssetType enum
+using SNEngine.Core.Assets;
+using SNEngine.Assets.Package;
 
 namespace SNEngine.UI.Ultralight;
 
 /// <summary>
-/// Custom IFileSystem implementation that serves files from SNEngine's AssetManager / .snpk packages.
-/// 
-/// This allows Ultralight to load resources (HTML, CSS, JS, fonts, and even icudt67l.dat)
-/// directly from packaged assets instead of requiring loose files on disk.
-/// 
-/// Usage:
-///     ULPlatform.FileSystem = new SnpkFileSystem(assetManager);
+/// Custom IFileSystem that serves files from .snpk packages (primarily ui.snpk).
+/// Supports relative paths from HTML without requiring 'sn://' prefix.
+/// Example: <img src="media/portrait.png"> will resolve to ui/{screen}/media/portrait.png
 /// </summary>
 public sealed class SnpkFileSystem : IFileSystem
 {
     private readonly AssetManager _assetManager;
     private bool _disposed;
 
+    // Stores current screen context for each View to support relative paths (media/, ../common/, etc.)
+    private readonly Dictionary<View, string> _currentScreenContext = new();
+
     public SnpkFileSystem(AssetManager assetManager)
     {
         _assetManager = assetManager ?? throw new ArgumentNullException(nameof(assetManager));
+    }
+
+    /// <summary>
+    /// Sets the current screen context when a new HTML screen is loaded.
+    /// This enables relative path resolution like "media/xxx.png".
+    /// </summary>
+    public void SetCurrentScreen(View view, string screenName)
+    {
+        if (view != null)
+            _currentScreenContext[view] = screenName?.Trim() ?? "";
     }
 
     public bool FileExists(string path)
@@ -31,23 +41,73 @@ public sealed class SnpkFileSystem : IFileSystem
         if (string.IsNullOrWhiteSpace(path))
             return false;
 
-        string normalized = NormalizePath(path);
+        return GetAssetData(path) != null;
+    }
 
-        var candidates = GetLookupCandidates(normalized);
+    public unsafe ULBuffer OpenFile(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+            return default;
 
-        foreach (var candidate in candidates)
+        byte[]? data = GetAssetData(path);
+        if (data == null || data.Length == 0)
+            return default;
+
+        return ULBuffer.CreateFromDataCopy<byte>(data.AsSpan());
+    }
+
+    /// <summary>
+    /// Main method that resolves path and returns asset data.
+    /// Priority: direct → relative to current screen → common fallbacks.
+    /// </summary>
+    private byte[]? GetAssetData(string rawPath)
+    {
+        string normalized = NormalizePath(rawPath);
+
+        // Skip external URLs
+        if (IsExternalUrl(normalized))
+            return null;
+
+        // 1. Try direct path
+        byte[]? data = TryGetAsset(normalized);
+        if (data != null) return data;
+
+        // 2. Try relative to current screen (most important for media/ folder)
+        foreach (var kvp in _currentScreenContext)
         {
-            if (_assetManager.GetRawAsset(candidate, AssetType.UI) != null)
-                return true;
+            if (string.IsNullOrEmpty(kvp.Value)) continue;
 
-            if (_assetManager.GetRawAsset(candidate, AssetType.Misc) != null)
-                return true;
-
-            if (_assetManager.GetRawAsset(candidate) != null)
-                return true;
+            string relativePath = $"ui/{kvp.Value}/{normalized}";
+            data = TryGetAsset(relativePath);
+            if (data != null) return data;
         }
 
-        return false;
+        // 3. Additional common fallbacks
+        data = TryGetAsset($"ui/{normalized}");
+        if (data != null) return data;
+
+        data = TryGetAsset($"ui/common/{normalized}");
+        if (data != null) return data;
+
+        return null;
+    }
+
+    private byte[]? TryGetAsset(string path)
+    {
+        return _assetManager.GetRawAsset(path, AssetType.UI)
+            ?? _assetManager.GetRawAsset(path);
+    }
+
+    private static bool IsExternalUrl(string path)
+    {
+        return path.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+               path.StartsWith("https://", StringComparison.OrdinalIgnoreCase) ||
+               path.StartsWith("data:", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string NormalizePath(string path)
+    {
+        return path.Replace('\\', '/').TrimStart('/');
     }
 
     public string GetFileMimeType(string path)
@@ -55,35 +115,37 @@ public sealed class SnpkFileSystem : IFileSystem
         if (string.IsNullOrWhiteSpace(path))
             return "application/octet-stream";
 
-        string normalized = NormalizePath(path);
-        string ext = Path.GetExtension(normalized).ToLowerInvariant();
+        string ext = Path.GetExtension(NormalizePath(path)).ToLowerInvariant();
 
         return ext switch
         {
             ".html" or ".htm" => "text/html",
-            ".css"            => "text/css",
-            ".js"             => "application/javascript",
-            ".json"           => "application/json",
-            ".png"            => "image/png",
+            ".css" => "text/css",
+            ".js" => "application/javascript",
+            ".json" => "application/json",
+            ".png" => "image/png",
             ".jpg" or ".jpeg" => "image/jpeg",
-            ".gif"            => "image/gif",
-            ".svg"            => "image/svg+xml",
-            ".woff"           => "font/woff",
-            ".woff2"          => "font/woff2",
-            ".ttf"            => "font/ttf",
-            ".otf"            => "font/otf",
-            ".txt"            => "text/plain",
-            ".dat"            => "application/octet-stream", // icudt67l.dat etc.
-            _                 => "application/octet-stream"
+            ".gif" => "image/gif",
+            ".webp" => "image/webp",
+            ".svg" => "image/svg+xml",
+            ".mp3" => "audio/mpeg",
+            ".wav" => "audio/wav",
+            ".ogg" => "audio/ogg",
+            ".mp4" => "video/mp4",
+            ".webm" => "video/webm",
+            ".woff2" => "font/woff2",
+            ".woff" => "font/woff",
+            ".ttf" => "font/ttf",
+            ".otf" => "font/otf",
+            ".txt" => "text/plain",
+            ".dat" => "application/octet-stream",
+            _ => "application/octet-stream"
         };
     }
 
     public string GetFileCharset(string path)
     {
-        // For text-based assets we assume UTF-8.
-        // Binary files like .dat don't need charset.
-        string normalized = NormalizePath(path);
-        string ext = Path.GetExtension(normalized).ToLowerInvariant();
+        string ext = Path.GetExtension(NormalizePath(path)).ToLowerInvariant();
 
         return ext switch
         {
@@ -92,69 +154,18 @@ public sealed class SnpkFileSystem : IFileSystem
         };
     }
 
-    public unsafe ULBuffer OpenFile(string path)
-    {
-        if (string.IsNullOrWhiteSpace(path))
-            return default;
-
-        string normalized = NormalizePath(path);
-
-        var candidates = GetLookupCandidates(normalized);
-
-        byte[]? data = null;
-        foreach (var candidate in candidates)
-        {
-            data = _assetManager.GetRawAsset(candidate, AssetType.UI);
-            if (data != null) break;
-
-            data = _assetManager.GetRawAsset(candidate, AssetType.Misc);
-            if (data != null) break;
-
-            data = _assetManager.GetRawAsset(candidate);
-            if (data != null) break;
-        }
-
-        if (data == null || data.Length == 0)
-        {
-            return default;
-        }
-
-        // Create a copy because Ultralight expects to own the memory or we give it ownership semantics.
-        // Using CreateFromDataCopy is the safest approach here.
-        return ULBuffer.CreateFromDataCopy<byte>(data.AsSpan());
-    }
-
-    private static string NormalizePath(string path)
-    {
-        // Ultralight may pass paths with backslashes or leading slashes.
-        string normalized = path.Replace('\\', '/').TrimStart('/');
-        return normalized;
-    }
-
-    /// <summary>
-    /// Generates possible lookup keys to support both "icudt67l.dat" at root
-    /// and "resources/icudt67l.dat" (matching Ultralight's default ResourcePathPrefix).
-    /// </summary>
-    private static IEnumerable<string> GetLookupCandidates(string normalizedPath)
-    {
-        var candidates = new List<string> { normalizedPath };
-
-        if (!normalizedPath.StartsWith("resources/", StringComparison.OrdinalIgnoreCase))
-        {
-            candidates.Add("resources/" + normalizedPath);
-        }
-        else
-        {
-            candidates.Add(normalizedPath.Substring("resources/".Length));
-        }
-
-        return candidates.Distinct(StringComparer.OrdinalIgnoreCase);
-    }
-
     public void Dispose()
     {
         if (_disposed) return;
         _disposed = true;
-        // No unmanaged resources owned by this class
+        _currentScreenContext.Clear();
     }
+
+    /// <summary>
+    /// Exposes the asset resolution logic (including screen-relative) for use by
+    /// HTML loaders that want to inline assets (e.g. as data: URIs) so that &lt;img src="media/..."&gt;
+    /// and similar work even if Ultralight does not invoke the IFileSystem for relative
+    /// references inside HTML set via the .HTML property.
+    /// </summary>
+    public byte[]? ResolveAsset(string path) => GetAssetData(path);
 }

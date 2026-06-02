@@ -35,7 +35,8 @@ class Program
             CharacterAPI.Show("yuki", "happy");
             SNEngine.API.SNEngine.LoadScreen("dialog");
             SNEngine.API.SNEngine.LoadScreen("fps");
-            SNEngine.API.SNEngine.LoadScreen("buttons", zIndex: 18);
+            SNEngine.API.SNEngine.LoadScreen("test_images", zIndex: 18);
+
 
             SNEngine.Core.Debug.Log("Scene loaded via SNEngine.API");
             await Task.Delay(3000);

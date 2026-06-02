@@ -47,6 +47,7 @@ public class UltralightHtmlElement : UiElementBase
         _renderer = new UltralightViewRenderer();
         _inputHandler = new UltralightInputHandler();
         _loader = new UltralightHtmlLoader();
+
     }
 
     public override void Initialize(IGraphicsContext context)

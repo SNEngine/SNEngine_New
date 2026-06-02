@@ -24,10 +24,20 @@ public sealed class UiManager : IDisposable
     private IGraphicsContext? _context;
     private bool _disposed;
 
+    // Cached render list + dirty flag to avoid allocating+sorting every frame in Render().
+    private List<IUiElement>? _renderList;
+    private bool _renderListDirty = true;
+
     /// <summary>
     /// All currently registered UI elements (read-only view).
     /// </summary>
     public IReadOnlyList<IUiElement> Elements => _elements;
+
+    /// <summary>
+    /// Call this after manually changing ZIndex (or Visible in a way that affects draw order) on elements at runtime
+    /// so that the next Render() will re-sort instead of using a stale cached list.
+    /// </summary>
+    public void MarkRenderOrderDirty() => _renderListDirty = true;
 
     /// <summary>
     /// Whether the manager has been initialized with a graphics context.
@@ -47,6 +57,7 @@ public sealed class UiManager : IDisposable
         if (_elements.Contains(element)) return;
 
         _elements.Add(element);
+        _renderListDirty = true;
 
         if (_context != null)
         {
@@ -69,6 +80,7 @@ public sealed class UiManager : IDisposable
         if (element == null) return;
         if (_elements.Remove(element))
         {
+            _renderListDirty = true;
             try
             {
                 element.Dispose();
@@ -112,6 +124,7 @@ public sealed class UiManager : IDisposable
             }
         }
         _elements.Clear();
+        _renderListDirty = true;
     }
 
     private static bool IsExpectedShutdownDisposeError(Exception ex)
@@ -185,14 +198,18 @@ public sealed class UiManager : IDisposable
 
         if (_elements.Count == 0) return;
 
-        // Sort by ZIndex every frame (cheap for small number of elements).
-        // For very dynamic UIs a dirty-flag + cached sorted list can be added later.
-        var sorted = _elements
-            .Where(e => e.Visible)
-            .OrderBy(e => e.ZIndex)
-            .ToList();
+        // Use a cached sorted list + dirty flag to avoid per-frame LINQ + ToList allocation
+        // and sort work. Rebuild only when elements are added/removed or their Z/Visible changes.
+        if (_renderListDirty || _renderList == null || _renderList.Count != _elements.Count)
+        {
+            _renderList = _elements
+                .Where(e => e.Visible)
+                .OrderBy(e => e.ZIndex)
+                .ToList();
+            _renderListDirty = false;
+        }
 
-        foreach (var element in sorted)
+        foreach (var element in _renderList)
         {
             try
             {

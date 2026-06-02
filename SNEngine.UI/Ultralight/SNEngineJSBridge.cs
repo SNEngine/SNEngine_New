@@ -187,22 +187,30 @@ public static class SNEngineJSBridge
             }
         }
     }
+    // Cached reflection for the C# call dispatcher (avoid GetAssemblies + GetType + GetMethod every frame).
+    private static System.Reflection.MethodInfo? _cachedCallMethod;
+
     public static void ProcessPendingJSCalls(View view)
     {
         if (view == null) return;
 
         try
         {
-            var apiAssembly = AppDomain.CurrentDomain.GetAssemblies()
-                .FirstOrDefault(a => a.GetName().Name == "SNEngine.API");
+            if (_cachedCallMethod == null)
+            {
+                var apiAssembly = AppDomain.CurrentDomain.GetAssemblies()
+                    .FirstOrDefault(a => a.GetName().Name == "SNEngine.API");
 
-            if (apiAssembly == null) return;
+                if (apiAssembly == null) return;
 
-            var hostType = apiAssembly.GetType("SNEngine.API.SNEngineHostAPI");
-            if (hostType == null) return;
+                var hostType = apiAssembly.GetType("SNEngine.API.SNEngineHostAPI");
+                if (hostType == null) return;
 
-            var callMethod = hostType.GetMethod("Call", BindingFlags.Public | BindingFlags.Static);
-            if (callMethod == null) return;
+                _cachedCallMethod = hostType.GetMethod("Call", BindingFlags.Public | BindingFlags.Static);
+                if (_cachedCallMethod == null) return;
+            }
+
+            var callMethod = _cachedCallMethod;
 
             string getQueueScript = @"
             (function() {

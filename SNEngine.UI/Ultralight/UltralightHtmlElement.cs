@@ -39,10 +39,15 @@ public class UltralightHtmlElement : UiElementBase
     /// </summary>
     public Vector2 Size { get; private set; }
 
-    public UltralightHtmlElement(UltralightRendererHost rendererHost, AssetManager? assetManager = null)
+    private int _desiredViewWidth;
+    private int _desiredViewHeight;
+
+    public UltralightHtmlElement(UltralightRendererHost rendererHost, AssetManager? assetManager = null, int desiredWidth = 0, int desiredHeight = 0)
     {
         _rendererHost = rendererHost ?? throw new ArgumentNullException(nameof(rendererHost));
         _assetManager = assetManager;
+        _desiredViewWidth = desiredWidth;
+        _desiredViewHeight = desiredHeight;
 
         _renderer = new UltralightViewRenderer();
         _inputHandler = new UltralightInputHandler();
@@ -57,9 +62,10 @@ public class UltralightHtmlElement : UiElementBase
             _rendererHost.Initialize(_assetManager);
         }
 
-        _ulView = _rendererHost.CreateView(
-            (uint)context.ViewportWidth,
-            (uint)context.ViewportHeight);
+        uint viewW = _desiredViewWidth > 0 ? (uint)_desiredViewWidth : (uint)context.ViewportWidth;
+        uint viewH = _desiredViewHeight > 0 ? (uint)_desiredViewHeight : (uint)context.ViewportHeight;
+
+        _ulView = _rendererHost.CreateView(viewW, viewH);
 
         if (_ulView != null)
         {
@@ -68,10 +74,12 @@ public class UltralightHtmlElement : UiElementBase
 
         SNEngineJSBridge.Inject(_ulView);
 
-        _renderer.Initialize(context, _ulView);
+        int rw = _desiredViewWidth > 0 ? _desiredViewWidth : 0;
+        int rh = _desiredViewHeight > 0 ? _desiredViewHeight : 0;
+        _renderer.Initialize(context, _ulView, rw, rh);
         _inputHandler.SetView(_ulView);
 
-        Size = new Vector2(context.ViewportWidth, context.ViewportHeight);
+        Size = new Vector2(viewW, viewH);
     }
 
     // ==================== HTML Loading ====================

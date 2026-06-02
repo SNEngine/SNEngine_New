@@ -165,6 +165,24 @@ public sealed class SNEngineRuntimeBridge
     /// </summary>
     public void SetDialogState(string speaker, string text, string color, bool visible, bool isComplete = false)
     {
+        // Skip expensive script build + EvaluateScript if nothing material changed.
+        // This is called every update frame for visible dialogue elements; avoiding re-send when idle saves
+        // string allocations, escaping, and JS interop cost.
+        var lastSpeaker = _lastValues.TryGetValue("dialog_speaker", out var ls) ? ls as string : null;
+        var lastText = _lastValues.TryGetValue("dialog_text", out var lt) ? lt as string : null;
+        var lastColor = _lastValues.TryGetValue("dialog_color", out var lc) ? lc as string : null;
+        var lastVisible = _lastValues.TryGetValue("dialog_visible", out var lv) ? lv is bool b && b : false;
+        var lastComplete = _lastValues.TryGetValue("dialog_complete", out var lcomp) ? lcomp is bool bc && bc : false;
+
+        bool changed = !string.Equals(lastSpeaker, speaker) ||
+                       !string.Equals(lastText, text) ||
+                       !string.Equals(lastColor, color) ||
+                       lastVisible != visible ||
+                       lastComplete != isComplete;
+
+        if (!changed)
+            return;
+
         // Прямой скрипт — самый надёжный способ для Ultralight 1.3.0
         string escapedSpeaker = (speaker ?? string.Empty).Replace("\\", "\\\\").Replace("\"", "\\\"").Replace("\n", "\\n");
         string escapedText = (text ?? string.Empty).Replace("\\", "\\\\").Replace("\"", "\\\"").Replace("\n", "\\n");
@@ -203,6 +221,7 @@ public sealed class SNEngineRuntimeBridge
         // Обновляем кэш (чтобы не спамить одинаковыми значениями)
         _lastValues["dialog_speaker"] = speaker;
         _lastValues["dialog_text"] = text;
+        _lastValues["dialog_color"] = color;
         _lastValues["dialog_visible"] = visible;
         _lastValues["dialog_complete"] = isComplete;
     }

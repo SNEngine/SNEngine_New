@@ -25,15 +25,17 @@ public class UltralightViewRenderer : IDisposable
 
     /// <summary>
     /// Initializes rendering resources (texture, batcher, shader).
+    /// The optional overrideWidth/Height allow per-element views to have their own canvas size
+    /// (smaller panels create smaller textures and Ultralight rasterizes fewer pixels).
     /// </summary>
-    public void Initialize(IGraphicsContext context, View? ulView)
+    public void Initialize(IGraphicsContext context, View? ulView, int? overrideWidth = null, int? overrideHeight = null)
     {
         if (_isInitialized) return;
 
         _context = context ?? throw new ArgumentNullException(nameof(context));
 
-        int width = context.ViewportWidth;
-        int height = context.ViewportHeight;
+        int width = (overrideWidth.HasValue && overrideWidth.Value > 0) ? overrideWidth.Value : context.ViewportWidth;
+        int height = (overrideHeight.HasValue && overrideHeight.Value > 0) ? overrideHeight.Value : context.ViewportHeight;
 
         _uiTexture = new Texture2D(context.GraphicsDevice,
             (uint)width,
@@ -65,15 +67,16 @@ public class UltralightViewRenderer : IDisposable
 
         ULBitmap bitmap = surface.Value.Bitmap;
 
-        // Fast path: skip upload if nothing changed
+        // Fast path: skip upload if nothing changed.
+        // When there is dirty area, pass the rect so we can do a partial TexSubImage2D (less CPU/GPU upload bandwidth).
         var dirty = TryGetDirtyBounds(surface.Value);
         if (dirty.HasValue && dirty.Value.Width == 0 && dirty.Value.Height == 0)
         {
-            // Just draw existing texture
+            // Just draw existing texture (no pixels changed)
         }
         else
         {
-            UploadTexture(bitmap);
+            UploadTexture(bitmap, dirty);
         }
 
         // Draw
@@ -87,11 +90,34 @@ public class UltralightViewRenderer : IDisposable
         context.GL.BindTexture(TextureTarget.Texture2D, 0);
     }
 
-    private unsafe void UploadTexture(ULBitmap bitmap)
+    private unsafe void UploadTexture(ULBitmap bitmap, (int X, int Y, int Width, int Height)? dirtyRect = null)
     {
         if (_uiTexture == null || _context == null) return;
 
         void* pixels = bitmap.LockPixels();
+
+        int uploadX = 0;
+        int uploadY = 0;
+        uint uploadW = _uiTexture.Width;
+        uint uploadH = _uiTexture.Height;
+        void* uploadPixels = pixels;
+
+        if (dirtyRect.HasValue)
+        {
+            var d = dirtyRect.Value;
+            if (d.Width > 0 && d.Height > 0 && ((uint)d.Width < uploadW || (uint)d.Height < uploadH))
+            {
+                uploadX = d.X;
+                uploadY = d.Y;
+                uploadW = (uint)d.Width;
+                uploadH = (uint)d.Height;
+
+                // Source data stride is based on full surface width (standard BGRA packing assumed, matching the full-upload path).
+                int bytesPerPixel = 4;
+                int rowStride = (int)_uiTexture.Width * bytesPerPixel;
+                uploadPixels = (byte*)pixels + (d.Y * rowStride) + (d.X * bytesPerPixel);
+            }
+        }
 
         _context.GL.ActiveTexture(TextureUnit.Texture0);
         _context.GL.BindTexture(TextureTarget.Texture2D, _uiTexture.Handle);
@@ -99,12 +125,12 @@ public class UltralightViewRenderer : IDisposable
         _context.GL.TexSubImage2D(
             TextureTarget.Texture2D,
             0,
-            0, 0,
-            _uiTexture.Width,
-            _uiTexture.Height,
+            uploadX, uploadY,
+            uploadW,
+            uploadH,
             PixelFormat.Bgra,
             PixelType.UnsignedByte,
-            pixels);
+            uploadPixels);
 
         bitmap.UnlockPixels();
     }
@@ -139,26 +165,35 @@ public class UltralightViewRenderer : IDisposable
         UpdateProjection(width, height);
     }
 
+    // Reflection caches to eliminate repeated GetProperty/GetField name lookups on every Render() call.
+    private static System.Reflection.PropertyInfo? _dirtyBoundsProp;
+    private static readonly System.Collections.Generic.Dictionary<string, System.Reflection.MemberInfo> _rectMemberCache =
+        new System.Collections.Generic.Dictionary<string, System.Reflection.MemberInfo>(System.StringComparer.Ordinal);
+
     /// <summary>
     /// Attempts to get dirty bounds using reflection (safe fallback for different UltralightNet versions).
+    /// Caches are populated on first use to avoid per-frame reflection overhead.
     /// </summary>
     private static (int X, int Y, int Width, int Height)? TryGetDirtyBounds(ULSurface surface)
     {
         try
         {
-            var dirtyProp = surface.GetType().GetProperty("DirtyBounds");
-            if (dirtyProp == null) return null;
+            if (_dirtyBoundsProp == null)
+            {
+                _dirtyBoundsProp = surface.GetType().GetProperty("DirtyBounds", BindingFlags.Public | BindingFlags.Instance);
+            }
+            if (_dirtyBoundsProp == null) return null;
 
-            var rect = dirtyProp.GetValue(surface);
+            var rect = _dirtyBoundsProp.GetValue(surface);
             if (rect == null) return null;
 
-            int x = GetInt(rect, "X") ?? GetInt(rect, "Left") ?? 0;
-            int y = GetInt(rect, "Y") ?? GetInt(rect, "Top") ?? 0;
+            int x = GetCachedInt(rect, "X") ?? GetCachedInt(rect, "Left") ?? 0;
+            int y = GetCachedInt(rect, "Y") ?? GetCachedInt(rect, "Top") ?? 0;
 
-            int? right = GetInt(rect, "Right");
-            int? bottom = GetInt(rect, "Bottom");
-            int w = GetInt(rect, "Width") ?? (right.HasValue ? right.Value - x : 0);
-            int h = GetInt(rect, "Height") ?? (bottom.HasValue ? bottom.Value - y : 0);
+            int? right = GetCachedInt(rect, "Right");
+            int? bottom = GetCachedInt(rect, "Bottom");
+            int w = GetCachedInt(rect, "Width") ?? (right.HasValue ? right.Value - x : 0);
+            int h = GetCachedInt(rect, "Height") ?? (bottom.HasValue ? bottom.Value - y : 0);
 
             return (x, y, Math.Max(0, w), Math.Max(0, h));
         }
@@ -168,16 +203,33 @@ public class UltralightViewRenderer : IDisposable
         }
     }
 
-    private static int? GetInt(object obj, string memberName)
+    private static System.Reflection.MemberInfo? GetCachedRectMember(object rect, string name)
     {
-        var prop = obj.GetType().GetProperty(memberName, BindingFlags.Public | BindingFlags.Instance);
-        if (prop?.PropertyType == typeof(int))
-            return (int)prop.GetValue(obj)!;
+        if (_rectMemberCache.TryGetValue(name, out var member)) return member;
 
-        var field = obj.GetType().GetField(memberName, BindingFlags.Public | BindingFlags.Instance);
-        if (field?.FieldType == typeof(int))
-            return (int)field.GetValue(obj)!;
+        var t = rect.GetType();
+        var prop = t.GetProperty(name, BindingFlags.Public | BindingFlags.Instance);
+        if (prop != null)
+        {
+            _rectMemberCache[name] = prop;
+            return prop;
+        }
+        var field = t.GetField(name, BindingFlags.Public | BindingFlags.Instance);
+        if (field != null)
+        {
+            _rectMemberCache[name] = field;
+            return field;
+        }
+        return null;
+    }
 
+    private static int? GetCachedInt(object obj, string memberName)
+    {
+        var member = GetCachedRectMember(obj, memberName);
+        if (member is System.Reflection.PropertyInfo pi && pi.PropertyType == typeof(int))
+            return (int)pi.GetValue(obj)!;
+        if (member is System.Reflection.FieldInfo fi && fi.FieldType == typeof(int))
+            return (int)fi.GetValue(obj)!;
         return null;
     }
 

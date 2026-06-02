@@ -11,7 +11,10 @@ namespace SNEngine.UI.Ultralight;
 /// <summary>
 /// Custom IFileSystem that serves files from .snpk packages (primarily ui.snpk).
 /// Supports relative paths from HTML without requiring 'sn://' prefix.
-/// Example: <img src="media/portrait.png"> will resolve to ui/{screen}/media/portrait.png
+/// 
+/// Resolution prefers the most recently SetCurrentScreen (the "active" screen) so that
+/// media/ and other relatives from the current HTML document resolve correctly.
+/// The per-View dictionary is kept for multi-element scenarios.
 /// </summary>
 public sealed class SnpkFileSystem : IFileSystem
 {
@@ -20,6 +23,11 @@ public sealed class SnpkFileSystem : IFileSystem
 
     // Stores current screen context for each View to support relative paths (media/, ../common/, etc.)
     private readonly Dictionary<View, string> _currentScreenContext = new();
+
+    // The most recently SetCurrentScreen screen name. Used as preferred context for relative asset resolution.
+    // This makes resolution prefer the "current" screen's folder (e.g. ui/test_images/media/...) without
+    // needing the specific View at FS call time (IFileSystem interface has no View parameter).
+    private string _activeScreenContext = "";
 
     public SnpkFileSystem(AssetManager assetManager)
     {
@@ -33,7 +41,12 @@ public sealed class SnpkFileSystem : IFileSystem
     public void SetCurrentScreen(View view, string screenName)
     {
         if (view != null)
-            _currentScreenContext[view] = screenName?.Trim() ?? "";
+        {
+            string name = screenName?.Trim() ?? "";
+            _currentScreenContext[view] = name;
+            if (!string.IsNullOrEmpty(name))
+                _activeScreenContext = name;
+        }
     }
 
     public bool FileExists(string path)
@@ -58,7 +71,11 @@ public sealed class SnpkFileSystem : IFileSystem
 
     /// <summary>
     /// Main method that resolves path and returns asset data.
-    /// Priority: direct → relative to current screen → common fallbacks.
+    /// Priority:
+    ///   1. direct
+    ///   2. most recently activated screen (ui/{active}/...)  -- best for the current HTML's relatives
+    ///   3. any other registered screens
+    ///   4. ui/ + common fallbacks
     /// </summary>
     private byte[]? GetAssetData(string rawPath)
     {
@@ -72,17 +89,28 @@ public sealed class SnpkFileSystem : IFileSystem
         byte[]? data = TryGetAsset(normalized);
         if (data != null) return data;
 
-        // 2. Try relative to current screen (most important for media/ folder)
+        // 2. Prefer the active (most recently loaded) screen context.
+        //    This is the key improvement: relatives like "media/foo.png" will resolve against
+        //    the screen that is currently "in focus" (last LoadScreen), without needing View from the FS interface.
+        if (!string.IsNullOrEmpty(_activeScreenContext))
+        {
+            string relativePath = $"ui/{_activeScreenContext}/{normalized}";
+            data = TryGetAsset(relativePath);
+            if (data != null) return data;
+        }
+
+        // 3. Try other registered screen contexts (for multi-screen cases or fallbacks)
         foreach (var kvp in _currentScreenContext)
         {
             if (string.IsNullOrEmpty(kvp.Value)) continue;
+            if (kvp.Value == _activeScreenContext) continue; // already preferred above
 
             string relativePath = $"ui/{kvp.Value}/{normalized}";
             data = TryGetAsset(relativePath);
             if (data != null) return data;
         }
 
-        // 3. Additional common fallbacks
+        // 4. Additional common fallbacks (ui/ root, ui/common/)
         data = TryGetAsset($"ui/{normalized}");
         if (data != null) return data;
 
@@ -159,6 +187,7 @@ public sealed class SnpkFileSystem : IFileSystem
         if (_disposed) return;
         _disposed = true;
         _currentScreenContext.Clear();
+        _activeScreenContext = "";
     }
 
     /// <summary>

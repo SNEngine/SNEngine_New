@@ -22,16 +22,24 @@ public static class SNEngine
     private static SNEngineHost? _host;
     private static Scene? _currentScene;
 
+    // Guard to make LoadDefaultPackages idempotent (called automatically early + often from user OnInitialized).
+    private static bool _defaultPackagesLoaded;
+
     /// <summary>
     /// Fired when the engine is fully initialized and ready to load content.
     /// </summary>
     public static event Action? OnInitialized;
 
     /// <summary>
-    /// UI overlay to be used by the engine (e.g. Ultralight-based UI).
-    /// Assign this before calling Run(). If left null, a default UltralightOverlay will be created.
+    /// Optional legacy single-view UI overlay.
     /// 
-    /// Note: This is the legacy path. New projects should use the <see cref="Ui"/> manager for multiple HTML elements.
+    /// Assign this BEFORE calling Run() ONLY if you want the old single-UltralightOverlay behavior.
+    /// 
+    /// Default (null) + modern API = recommended path:
+    /// Uses SNEngine.Ui (UiManager) + CreateHtmlElement/LoadScreen + shared UltralightRendererHost.
+    /// Guarantees single Renderer + single SnpkFileSystem (no duplicates/overwrites).
+    /// 
+    /// The legacy UltralightOverlay is still supported for backward compatibility if you explicitly assign one.
     /// </summary>
     public static IUiOverlay? UiOverlay { get; set; }
 
@@ -199,15 +207,15 @@ public static class SNEngine
         // for SnpkFileSystem to be applied before any Ultralight Initialize() calls).
         _host.AssetManagerInitialized += assetManager =>
         {
-            // Wire the manager to existing overlays/elements for SnpkFileSystem
+            // Wire only if a legacy overlay was explicitly provided by the user.
             if (UiOverlay is UI.Ultralight.UltralightOverlay ulOverlay)
             {
                 ulOverlay.SetAssetManager(assetManager);
             }
 
-
             // Load packages as early as possible (right after AssetManager is created).
             // This is required for Ultralight to find icudt67l.dat etc. during Renderer creation.
+            // The method is now idempotent (safe to call again from user code / OnInitialized).
             LoadDefaultPackages();
         };
 
@@ -228,18 +236,31 @@ public static class SNEngine
         {
         }
 
-        // Auto-initialize default Ultralight overlay if none was provided (convenience for development)
-        if (UiOverlay == null)
+        // Do NOT auto-create the legacy single-view UltralightOverlay by default.
+        // 
+        // Modern usage (recommended):
+        //   - Leave UiOverlay null.
+        //   - Use SNEngine.Ui (UiManager) + CreateHtmlElement / LoadScreen (the multi-element path).
+        //   - This uses the shared UltralightRendererHost (single Renderer, single SnpkFileSystem).
+        //
+        // Legacy single-overlay path (backward compat only):
+        //   - Explicitly assign before Run():
+        //       SNEngine.UiOverlay = new UI.Ultralight.UltralightOverlay(...);
+        //   - Then old LoadScreen etc. on the overlay will still work.
+        if (UiOverlay != null)
         {
-            UiOverlay = new UI.Ultralight.UltralightOverlay(assetManager: _host.AssetManager, transparent: UiTransparentBackground);
+            _host.UiOverlay = UiOverlay;
         }
-
-        _host.UiOverlay = UiOverlay;
+        else
+        {
+            // No legacy overlay. The new UiManager + shared RendererHost will handle all HTML elements.
+            _host.UiOverlay = null;
+        }
         _host.JavaScriptBridge = new UI.Ultralight.SNEngineJSBridgeAdapter(_host);
 
         _host.OnInitialized += () =>
         {
-            // Safety net: re-wire AssetManager after packages are loaded (in case it was null at creation time)
+            // Safety net: re-wire only legacy overlay if one was explicitly provided.
             if (_host.AssetManager != null)
             {
                 if (UiOverlay is UI.Ultralight.UltralightOverlay ulOverlay)
@@ -320,6 +341,11 @@ public static class SNEngine
             return;
         }
 
+        if (_defaultPackagesLoaded)
+        {
+            return; // already loaded (automatic call from AssetManagerInitialized + user code etc.)
+        }
+
         string buildDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory!, "build");
 
         var defaultPackages = new[]
@@ -358,6 +384,8 @@ public static class SNEngine
             Debug.LogWarning("[SNEngine.API] No .snpk packages found in /build/. Running in loose files mode.");
         else
             Debug.Log($"[SNEngine.API] Successfully loaded {loadedCount} default packages.");
+
+        _defaultPackagesLoaded = true;
     }
 
     // ================================================================

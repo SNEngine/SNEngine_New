@@ -24,7 +24,8 @@ class Program
         SNEngine.API.SNEngine.OnInitialized += async () =>
         {
             SNEngine.Core.Debug.Log("Engine initialized! Loading visual novel scene...");
-            SNEngine.API.SNEngine.LoadDefaultPackages();
+            // LoadDefaultPackages() is called automatically early (AssetManagerInitialized).
+            // The method is idempotent, so an extra call here is safe but unnecessary.
             SNEngine.API.SNEngine.LoadEmptyScene();
             BackgroundAPI.Show("assets/bg/classroom_day.png");
             CharacterAPI.AddExampleYuki();

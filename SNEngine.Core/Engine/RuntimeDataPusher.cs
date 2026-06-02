@@ -1,4 +1,5 @@
-﻿using System;
+﻿using SNEngine.Core.Engine.Systems.DialogSystem;
+using System;
 using System.Diagnostics;
 
 namespace SNEngine.Core.Engine;
@@ -30,7 +31,7 @@ public class RuntimeDataPusher
         var snapshot = new RuntimeSnapshot
         {
             Fps = _profiler?.NativeFps ?? 0.0,
-            Dialogue = DialogueSystem.GetSnapshot()
+            Dialogue = SNEngineHost.Current.GetSystem<DialogueSystem>().GetSnapshot()
         };
 
         foreach (var element in _uiManager.Elements)

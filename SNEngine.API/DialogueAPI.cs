@@ -1,4 +1,5 @@
 using SNEngine.Core.Engine;
+using SNEngine.Core.Engine.Systems.DialogSystem;
 using System;
 using System.Threading.Tasks;
 
@@ -10,13 +11,14 @@ namespace SNEngine.API;
 /// </summary>
 public static class DialogueAPI
 {
+
     /// <summary>
     /// Fire-and-forget version (starts the line but does not wait).
     /// For proper waiting until typing finishes, use <see cref="SayAsync"/>.
     /// </summary>
     public static void Say(string speaker, string text, string? color = null, float msPerChar = 30f)
     {
-        DialogueSystem.SayInternal(speaker, text, color, msPerChar);
+        SNEngineHost.Current.GetSystem<DialogueSystem>().SayInternal(speaker, text, color, msPerChar);
     }
 
     /// <summary>
@@ -25,7 +27,7 @@ public static class DialogueAPI
     /// </summary>
     public static Task SayAsync(string speaker, string text, string? color = null, float msPerChar = 30f)
     {
-        return DialogueSystem.SayAsync(speaker, text, color, msPerChar);
+        return SNEngineHost.Current.GetSystem<DialogueSystem>().SayAsync(speaker, text, color, msPerChar);
     }
 
     /// <summary>
@@ -34,7 +36,7 @@ public static class DialogueAPI
     /// </summary>
     public static void CompleteLine()
     {
-        DialogueSystem.CompleteCurrentLine();
+        SNEngineHost.Current.GetSystem<DialogueSystem>().CompleteCurrentLine();
     }
 
     /// <summary>
@@ -48,7 +50,7 @@ public static class DialogueAPI
     /// </summary>
     public static void Advance()
     {
-        DialogueSystem.Advance();
+        SNEngineHost.Current.GetSystem<DialogueSystem>().Advance();
     }
 
     /// <summary>
@@ -56,7 +58,7 @@ public static class DialogueAPI
     /// </summary>
     public static void Clear()
     {
-        DialogueSystem.Clear();
+        SNEngineHost.Current.GetSystem<DialogueSystem>().Clear();
     }
 
     /// <summary>
@@ -64,7 +66,7 @@ public static class DialogueAPI
     /// </summary>
     public static void SayDirect(string speaker, string text, string color = "#FFFFFF", float msPerChar = 30f)
     {
-        DialogueSystem.SayInternal(speaker, text, color, msPerChar);
+        SNEngineHost.Current.GetSystem<DialogueSystem>().SayInternal(speaker, text, color, msPerChar);
     }
 
     /// <summary>
@@ -72,6 +74,6 @@ public static class DialogueAPI
     /// </summary>
     public static Task SayDirectAsync(string speaker, string text, string color = "#FFFFFF", float msPerChar = 30f)
     {
-        return DialogueSystem.SayAsync(speaker, text, color, msPerChar);
+        return SNEngineHost.Current.GetSystem<DialogueSystem>().SayAsync(speaker, text, color, msPerChar);
     }
 }

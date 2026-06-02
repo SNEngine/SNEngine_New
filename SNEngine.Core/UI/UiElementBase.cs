@@ -1,4 +1,4 @@
-using SNEngine.Core.Engine;
+using SNEngine.Core.Engine.Systems.DialogSystem;
 using SNEngine.Core.Input;
 using SNEngine.Core.Rendering;
 

@@ -1,6 +1,9 @@
+using SNEngine.Core.Engine.Systems.DialogSystem;
 using System;
 
 namespace SNEngine.Core.Engine;
+
+
 
 /// <summary>
 /// [Obsolete] Legacy compatibility shim.
@@ -10,9 +13,12 @@ namespace SNEngine.Core.Engine;
 /// 
 /// Will be removed in a future version.
 /// </summary>
+/// 
+
 [Obsolete("Use DialogueSystem instead. This is a temporary compatibility layer.")]
 public static class DialogueState
 {
+    private static DialogueSystem DialogueSystem => SNEngineHost.Current.GetSystem<DialogueSystem>();
     [Obsolete("Use DialogueSystem.Say instead.")]
     public static void Set(string speaker, string text, string color, bool visible)
     {

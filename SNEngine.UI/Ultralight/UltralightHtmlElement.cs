@@ -1,7 +1,7 @@
 using SNEngine.Assets.Package;
 using SNEngine.Core;
 using SNEngine.Core.Assets;
-using SNEngine.Core.Engine;
+using SNEngine.Core.Engine.Systems.DialogSystem;
 using SNEngine.Core.Input;
 using SNEngine.Core.Rendering;
 using SNEngine.Core.UI;

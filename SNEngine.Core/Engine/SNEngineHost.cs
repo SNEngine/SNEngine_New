@@ -2,9 +2,12 @@
 using Silk.NET.OpenGL;
 using Silk.NET.Windowing;
 using SNEngine.Core.Assets;
+using SNEngine.Core.Engine.Systems;
+using SNEngine.Core.Engine.Systems.DialogSystem;
 using SNEngine.Core.Input;
 using SNEngine.Core.Rendering;
 using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using TrippyGL;
 
@@ -12,6 +15,7 @@ namespace SNEngine.Core.Engine;
 
 /// <summary>
 /// Main engine host with support for normal window mode and Shared Memory preview.
+/// Automatically creates and registers all ISystem implementations.
 /// </summary>
 public partial class SNEngineHost : IDisposable, IFrameDataProvider
 {
@@ -30,6 +34,14 @@ public partial class SNEngineHost : IDisposable, IFrameDataProvider
 
     public IUiOverlay? UiOverlay { get; set; }
     public UI.UiManager Ui { get; set; } = new UI.UiManager();
+
+    // Collection of all registered systems
+    private readonly Dictionary<Type, ISystem> _systems = new();
+
+    /// <summary>
+    /// Static reference to the current engine host instance.
+    /// </summary>
+    public static SNEngineHost? Current { get; private set; }
 
     public event Action<int, int>? Resized;
     public event Action<AssetManager>? AssetManagerInitialized;
@@ -71,6 +83,9 @@ public partial class SNEngineHost : IDisposable, IFrameDataProvider
 
         _windowFacade.CreateWindow();
 
+        // Set static Current reference
+        Current = this;
+
         // Subscribe to window events
         _windowFacade.Load += OnLoad;
         _windowFacade.Update += OnUpdateFrame;
@@ -88,7 +103,6 @@ public partial class SNEngineHost : IDisposable, IFrameDataProvider
         var inputProvider = new Input.SilkInputProvider(_windowFacade.Window!);
         Input.Input.Initialize(inputProvider);
 
-        // Теперь безопасно подписываемся
         _inputRouter.Initialize();
         Debug.Log("[SNEngineHost] Input system initialized (Silk.NET).");
 
@@ -113,6 +127,9 @@ public partial class SNEngineHost : IDisposable, IFrameDataProvider
 
         _previewSystem.Initialize();
 
+        // === Automatic ISystem creation and registration ===
+        RegisterAllSystems();
+
         Debug.Log("SNEngineHost: All systems initialized successfully.");
 
         // UI Graphics Context
@@ -126,6 +143,50 @@ public partial class SNEngineHost : IDisposable, IFrameDataProvider
         UiOverlay?.Initialize(_graphicsContext);
 
         OnInitialized?.Invoke();
+    }
+
+    /// <summary>
+    /// Automatically discovers and registers all ISystem implementations from the current assembly.
+    /// </summary>
+    private void RegisterAllSystems()
+    {
+        var assembly = System.Reflection.Assembly.GetExecutingAssembly();
+
+        var systemTypes = assembly.GetTypes()
+            .Where(t =>
+                t.IsClass &&
+                !t.IsAbstract &&
+                typeof(ISystem).IsAssignableFrom(t) &&
+                t != typeof(ISystem)) // exclude the interface itself
+            .ToList();
+
+        Debug.Log($"[SNEngineHost] Found {systemTypes.Count} ISystem implementations.");
+
+        foreach (var type in systemTypes)
+        {
+            try
+            {
+                if (Activator.CreateInstance(type) is ISystem system)
+                {
+                    _systems[type] = system;
+                    _inputRouter.RegisterSystem(system);
+                    Debug.Log($"[SNEngineHost] Registered system: {system.SystemName}");
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[SNEngineHost] Failed to create system {type.Name}: {ex.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Gets a registered system by type.
+    /// </summary>
+    public T? GetSystem<T>() where T : class, ISystem
+    {
+        var type = typeof(T);
+        return _systems.TryGetValue(type, out var system) ? system as T : null;
     }
 
     private void OnUpdateFrame(double deltaTime)
@@ -142,7 +203,8 @@ public partial class SNEngineHost : IDisposable, IFrameDataProvider
         _profiler.Time("Update/Scene", () => SceneManager?.Update(deltaTime));
         _profiler.Time("Update/UI", () => Ui?.Update(deltaTime));
 
-        _profiler.Time("Update/DialogueSystem", () => DialogueSystem.Update());
+        // Update all registered ISystems
+        _profiler.Time("Update/Systems", () => _inputRouter.UpdateSystems(deltaTime));
 
         _profiler.Time("Update/RuntimeDataPush", () => _runtimeDataPusher.PushData());
 
@@ -171,7 +233,6 @@ public partial class SNEngineHost : IDisposable, IFrameDataProvider
             UiOverlay?.Render(_graphicsContext);
         });
 
-        // Preview
         if (_previewSystem.IsEnabled)
         {
             _previewSystem.PublishFrame(_graphicsInitializer.GetGL());
@@ -236,6 +297,8 @@ public partial class SNEngineHost : IDisposable, IFrameDataProvider
             SceneManager = null!;
             FileManager = null!;
             _graphicsContext = null;
+            _systems.Clear();
+            Current = null; // Clear static reference on dispose
         }
     }
 

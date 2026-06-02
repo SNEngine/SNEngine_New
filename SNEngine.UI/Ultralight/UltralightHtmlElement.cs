@@ -148,6 +148,9 @@ public class UltralightHtmlElement : UiElementBase
 
         _runtimeBridge.SetFps(data.Fps);
 
+        // Push visibility state so the FPS HTML can decide to show/hide itself (like dialog)
+        _runtimeBridge.Set("fpsVisible", data.FpsState.Visible);
+
         var d = data.Dialogue;
         _runtimeBridge.SetDialogState(d.Speaker, d.Text, d.Color, d.Visible, d.IsComplete);
     }

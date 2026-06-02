@@ -81,6 +81,36 @@ public class InputRouter : IDisposable
         MouseButtonDown?.Invoke(button);
     }
 
+    private void NotifySystemsKeyDown(Key key)
+    {
+        foreach (var system in _systems.ToArray())
+        {
+            try
+            {
+                system.OnKeyDown(key);
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[InputRouter] Error in system {system.SystemName} OnKeyDown: {ex.Message}");
+            }
+        }
+    }
+
+    private void NotifySystemsKeyUp(Key key)
+    {
+        foreach (var system in _systems.ToArray())
+        {
+            try
+            {
+                system.OnKeyUp(key);
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[InputRouter] Error in system {system.SystemName} OnKeyUp: {ex.Message}");
+            }
+        }
+    }
+
     private void ProcessMouseButtons(float x, float y)
     {
         bool left = Input.Input.GetMouseButton(MouseButton.Left);
@@ -106,8 +136,18 @@ public class InputRouter : IDisposable
         _prevMiddleMouse = middle;
     }
 
-    private void OnGlobalKeyDown(Key key) => _uiManager?.ProcessKeyDown(key);
-    private void OnGlobalKeyUp(Key key) => _uiManager?.ProcessKeyUp(key);
+    private void OnGlobalKeyDown(Key key)
+    {
+        _uiManager?.ProcessKeyDown(key);
+        NotifySystemsKeyDown(key);
+    }
+
+    private void OnGlobalKeyUp(Key key)
+    {
+        _uiManager?.ProcessKeyUp(key);
+        NotifySystemsKeyUp(key);
+    }
+
     private void OnGlobalTextInput(char ch) => _uiManager?.ProcessTextInput(ch);
 
     public void ProcessInput()

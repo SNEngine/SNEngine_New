@@ -1,4 +1,5 @@
 ﻿using SNEngine.Core.Engine.Systems.DialogSystem;
+using SNEngine.Core.Engine.Systems.FpsSystem;
 using System;
 using System.Diagnostics;
 
@@ -34,9 +35,16 @@ public class RuntimeDataPusher
             _dialogueSystem = SNEngineHost.Current.GetSystem<DialogueSystem>();
         }
 
+        var fpsSystem = SNEngineHost.Current?.GetSystem<FPSSystem>();
+        // Always update fps value in the system (for snapshot)
+        fpsSystem?.SetFps(_profiler?.NativeFps ?? 0.0);
+
+        var fpsState = fpsSystem?.GetSnapshot() ?? new FpsSnapshot { Value = _profiler?.NativeFps ?? 0.0, Visible = true };
+
         var snapshot = new RuntimeSnapshot
         {
-            Fps = _profiler?.NativeFps ?? 0.0,
+            Fps = fpsState.Value,
+            FpsState = fpsState,
             Dialogue = _dialogueSystem?.GetSnapshot() ?? default
         };
 

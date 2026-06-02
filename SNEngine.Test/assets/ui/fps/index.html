@@ -29,7 +29,7 @@
             white-space: nowrap;
             box-shadow: 0 4px 15px rgba(0, 0, 0, 0.6);
             z-index: 10000;
-            animation: fps-outline-blink 1.1s infinite ease-in-out;
+            /* visibility and pulsation controlled by JS via runtime.fpsVisible (set by FPSSystem) */
         }
 
         @keyframes fps-outline-blink {
@@ -66,15 +66,39 @@
     <div id="fps"><span class="fps-label">FPS:</span><span id="fps-value">--</span></div>
 
     <script>
+        const fpsEl = document.getElementById('fps');
         const fpsValueElement = document.getElementById('fps-value');
 
+        /**
+         * Simple update: always refresh the FPS value.
+         * Visibility is controlled by the C# FPSSystem via runtime.fpsVisible (true/false).
+         * The JS just reads it each tick and sets opacity (no complex classes/raf/state).
+         * Defaults to visible if the flag is not (yet) present — matches browser behavior and FPSSystem default.
+         */
         function updateFPS() {
-            // Новый путь: window.SNEngine.runtime.fps (через SNEngineRuntimeBridge)
-            const fps = (window.SNEngine && window.SNEngine.runtime && window.SNEngine.runtime.fps) || 0;
-            fpsValueElement.textContent = Math.round(fps);
+            const runtime = (window.SNEngine && window.SNEngine.runtime) || {};
+            // fpsVisible may be undefined on first frames — treat as "show"
+            const show = (runtime.fpsVisible !== false);
+            if (fpsEl) {
+                fpsEl.style.opacity = show ? '1' : '0';
+                fpsEl.style.pointerEvents = show ? 'auto' : 'none';
+                fpsEl.style.animation = show ? 'fps-outline-blink 1.1s infinite ease-in-out' : 'none';
+            }
+            if (fpsValueElement) {
+                const fps = runtime.fps || 0;
+                fpsValueElement.textContent = Math.round(fps);
+            }
         }
 
+        // Simple interval like the original — reliable and easy to debug.
         setInterval(updateFPS, 100);
+
+        // Run once immediately so it shows right after the HTML is injected (no waiting for first tick).
+        updateFPS();
+
+        // No complex public API or raf needed for a debug counter.
+        // The C# FPSSystem controls visibility by setting runtime.fpsVisible (true/false) each frame.
+        // Keys (F1/F) are handled in C# FPSSystem.OnKeyDown and affect the pushed data.
     </script>
 </body>
 </html>

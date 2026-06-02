@@ -192,4 +192,7 @@ public class DialogueSystem : ISystem
     }
 
     void ISystem.Update(double deltaTime) => Update(deltaTime);
+
+    void ISystem.OnKeyDown(Key key) { /* not used by dialogue */ }
+    void ISystem.OnKeyUp(Key key) { /* not used by dialogue */ }
 }

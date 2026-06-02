@@ -18,6 +18,16 @@ public interface ISystem
     void Update(double deltaTime = 0);
 
     /// <summary>
+    /// Called when a key is pressed down.
+    /// </summary>
+    void OnKeyDown(Key key);
+
+    /// <summary>
+    /// Called when a key is released.
+    /// </summary>
+    void OnKeyUp(Key key);
+
+    /// <summary>
     /// Optional: system name for debugging.
     /// </summary>
     string SystemName => GetType().Name;

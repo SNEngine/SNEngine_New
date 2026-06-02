@@ -1,3 +1,5 @@
+using SNEngine.Core.Engine.Systems.FpsSystem;
+
 namespace SNEngine.Core.Engine.Systems.DialogSystem;
 
 /// <summary>
@@ -6,5 +8,6 @@ namespace SNEngine.Core.Engine.Systems.DialogSystem;
 public readonly struct RuntimeSnapshot
 {
     public double Fps { get; init; }
+    public FpsSnapshot FpsState { get; init; }
     public DialogueSnapshot Dialogue { get; init; }
 }

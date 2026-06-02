@@ -25,6 +25,12 @@ public sealed class UltralightRendererHost : IDisposable
     public Renderer? Renderer => _renderer;
 
     /// <summary>
+    /// When true (default), JS console messages from Ultralight Views are forwarded to Console.WriteLine.
+    /// Set to false in release builds or when you want to suppress JS console noise.
+    /// </summary>
+    public static bool ForwardConsoleMessages { get; set; } = true;
+
+    /// <summary>
     /// Initializes the shared Renderer (with platform font loader and file system).
     /// Should be called once, early in the UI initialization.
     /// </summary>
@@ -65,23 +71,30 @@ public sealed class UltralightRendererHost : IDisposable
         };
 
         var view = _renderer.CreateView(width, height, viewConfig);
-        view.OnAddConsoleMessage += (source, level, message, line, column, sourceId) =>
+
+        // Console forwarding can be disabled (e.g. in release or when JS console spam is unwanted).
+        // By default on for development visibility of JS errors/logs from UI screens.
+        if (ForwardConsoleMessages)
         {
-            string levelStr = level switch
+            view.OnAddConsoleMessage += (source, level, message, line, column, sourceId) =>
             {
-                ULMessageLevel.Log => "LOG",
-                ULMessageLevel.Warning => "WARN",
-                ULMessageLevel.Error => "ERROR",
-                ULMessageLevel.Info => "INFO",
-                ULMessageLevel.Debug => "DEBUG",
-                _ => level.ToString()
+                string levelStr = level switch
+                {
+                    ULMessageLevel.Log => "LOG",
+                    ULMessageLevel.Warning => "WARN",
+                    ULMessageLevel.Error => "ERROR",
+                    ULMessageLevel.Info => "INFO",
+                    ULMessageLevel.Debug => "DEBUG",
+                    _ => level.ToString()
+                };
+
+                Console.WriteLine($"[JS {levelStr}] {message} (at {line}:{column})");
+
+                // Опционально дублируем в Debug
+                // Debug.Log($"[JS {levelStr}] {message}");
             };
+        }
 
-            Console.WriteLine($"[JS {levelStr}] {message} (at {line}:{column})");
-
-            // Опционально дублируем в Debug
-            // Debug.Log($"[JS {levelStr}] {message}");
-        };
         _ownedViews.Add(view);
 
 

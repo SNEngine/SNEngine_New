@@ -12,6 +12,7 @@ public class RuntimeDataPusher
 {
     private readonly UI.UiManager? _uiManager;
     private readonly FrameProfiler? _profiler;
+    private DialogueSystem? _dialogueSystem; // cached to avoid dictionary lookup every frame
 
     public RuntimeDataPusher(UI.UiManager? uiManager, FrameProfiler? profiler)
     {
@@ -28,10 +29,15 @@ public class RuntimeDataPusher
         if (_uiManager == null || _uiManager.Elements.Count == 0)
             return;
 
+        if (_dialogueSystem == null)
+        {
+            _dialogueSystem = SNEngineHost.Current.GetSystem<DialogueSystem>();
+        }
+
         var snapshot = new RuntimeSnapshot
         {
             Fps = _profiler?.NativeFps ?? 0.0,
-            Dialogue = SNEngineHost.Current.GetSystem<DialogueSystem>().GetSnapshot()
+            Dialogue = _dialogueSystem?.GetSnapshot() ?? default
         };
 
         foreach (var element in _uiManager.Elements)

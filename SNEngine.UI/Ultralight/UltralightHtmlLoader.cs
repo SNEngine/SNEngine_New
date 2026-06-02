@@ -18,6 +18,12 @@ public class UltralightHtmlLoader
     private static readonly Dictionary<string, string> _htmlCache =
         new(StringComparer.OrdinalIgnoreCase);
 
+    // Cache for post-inlined (assets turned into data: URIs) HTML.
+    // Keyed by the html asset path (for LoadScreen paths this includes the screen name so is unique).
+    // Avoids re-running regex + asset resolution on repeated loads of the same screen (hot reload, re-entry, etc.).
+    private static readonly Dictionary<string, string> _processedHtmlCache =
+        new(StringComparer.OrdinalIgnoreCase);
+
     /// <summary>
     /// Reference to our custom file system to set screen context.
     /// </summary>
@@ -63,10 +69,24 @@ public class UltralightHtmlLoader
                 _snpkFileSystem.SetCurrentScreen(ulView, screenName);
             }
 
-            // Inline local assets (img src="media/...", style url(...) etc) as data: URIs.
-            // This ensures <img> and similar from packaged HTML work reliably even if
-            // Ultralight does not query IFileSystem for relative paths in .HTML-set content.
-            htmlContent = InlineLocalAssets(htmlContent, _snpkFileSystem);
+            // Check processed (inlined) cache first. For LoadScreen the htmlPath already encodes the screen
+            // ("ui/{screenName}/index.html"), so the inlined result (with resolved media/ etc.) is stable per screen.
+            string processedKey = htmlPath;
+            if (_processedHtmlCache.TryGetValue(processedKey, out var processed))
+            {
+                htmlContent = processed;
+            }
+            else
+            {
+                // Inline local assets (img src="media/...", style url(...) etc) as data: URIs.
+                // This ensures <img> and similar from packaged HTML work reliably even if
+                // Ultralight does not query IFileSystem for relative paths in .HTML-set content.
+                htmlContent = InlineLocalAssets(htmlContent, _snpkFileSystem);
+                if (!string.IsNullOrEmpty(htmlContent))
+                {
+                    _processedHtmlCache[processedKey] = htmlContent;
+                }
+            }
 
             ulView.HTML = htmlContent;
         }
@@ -103,7 +123,24 @@ public class UltralightHtmlLoader
                 }
             }
 
-            htmlContent = InlineLocalAssets(htmlContent, _snpkFileSystem);
+            // Compute normalized path for cache key (same logic as internal loader)
+            string normalized = assetPath.Replace('\\', '/').TrimStart('/');
+            string processedKey = normalized;
+            if (!string.IsNullOrEmpty(screenName))
+                processedKey += "|" + screenName;
+
+            if (_processedHtmlCache.TryGetValue(processedKey, out var processed))
+            {
+                htmlContent = processed;
+            }
+            else
+            {
+                htmlContent = InlineLocalAssets(htmlContent, _snpkFileSystem);
+                if (!string.IsNullOrEmpty(htmlContent))
+                {
+                    _processedHtmlCache[processedKey] = htmlContent;
+                }
+            }
 
             ulView.HTML = htmlContent;
         }
@@ -150,6 +187,7 @@ public class UltralightHtmlLoader
     public static void ClearCache()
     {
         _htmlCache.Clear();
+        _processedHtmlCache.Clear();
     }
 
     /// <summary>

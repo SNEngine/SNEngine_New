@@ -79,14 +79,14 @@ public class UltralightViewRenderer : IDisposable
             UploadTexture(bitmap, dirty);
         }
 
-        // Draw
-        context.GraphicsDevice.BlendState = BlendState.NonPremultiplied;
+        // BlendState is hoisted to UiManager.Render for the entire UI pass (avoids N redundant sets per frame).
+        // We assume it has been set to NonPremultiplied by the manager before calling element renders.
 
         _uiBatcher.Begin(BatcherBeginMode.Deferred);
         _uiBatcher.Draw(_uiTexture, position, null, Color4b.White, 1f, 0f, Vector2.Zero);
         _uiBatcher.End();
 
-        // Restore state
+        // Restore state (texture only; blend is managed at UiManager level for the pass)
         context.GL.BindTexture(TextureTarget.Texture2D, 0);
     }
 

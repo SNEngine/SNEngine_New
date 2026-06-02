@@ -4,6 +4,7 @@ using System.Linq;
 using static SNEngine.Core.Debug;
 using SNEngine.Core.Rendering;
 using SNEngine.Core.Input;
+using TrippyGL;
 
 namespace SNEngine.Core.UI;
 
@@ -209,6 +210,11 @@ public sealed class UiManager : IDisposable
             _renderListDirty = false;
         }
 
+        // Hoist BlendState once for the entire UI pass. All Ultralight elements use NonPremultiplied.
+        // This avoids repeated state changes inside each element's renderer (minor but measurable on hot path).
+        var previousBlendState = context.GraphicsDevice.BlendState;
+        context.GraphicsDevice.BlendState = BlendState.NonPremultiplied;
+
         foreach (var element in _renderList)
         {
             try
@@ -222,6 +228,9 @@ public sealed class UiManager : IDisposable
                 LogError($"Error rendering UI element (Z={element.ZIndex}): {ex.Message}");
             }
         }
+
+        // Restore previous blend state so scene rendering after UI (or other passes) is not affected.
+        context.GraphicsDevice.BlendState = previousBlendState;
     }
 
     /// <summary>

@@ -29,6 +29,10 @@ public sealed class SnpkFileSystem : IFileSystem
     // needing the specific View at FS call time (IFileSystem interface has no View parameter).
     private string _activeScreenContext = "";
 
+    // Cached "ui/{screen}/" prefixes to avoid repeated string concat on runtime relative asset requests
+    // (e.g. JS dynamic images, css url() that weren't inlined).
+    private readonly Dictionary<string, string> _screenPrefixCache = new(StringComparer.OrdinalIgnoreCase);
+
     public SnpkFileSystem(AssetManager assetManager)
     {
         _assetManager = assetManager ?? throw new ArgumentNullException(nameof(assetManager));
@@ -45,7 +49,11 @@ public sealed class SnpkFileSystem : IFileSystem
             string name = screenName?.Trim() ?? "";
             _currentScreenContext[view] = name;
             if (!string.IsNullOrEmpty(name))
+            {
                 _activeScreenContext = name;
+                if (!_screenPrefixCache.ContainsKey(name))
+                    _screenPrefixCache[name] = "ui/" + name + "/";
+            }
         }
     }
 
@@ -92,9 +100,10 @@ public sealed class SnpkFileSystem : IFileSystem
         // 2. Prefer the active (most recently loaded) screen context.
         //    This is the key improvement: relatives like "media/foo.png" will resolve against
         //    the screen that is currently "in focus" (last LoadScreen), without needing View from the FS interface.
-        if (!string.IsNullOrEmpty(_activeScreenContext))
+        if (!string.IsNullOrEmpty(_activeScreenContext) &&
+            _screenPrefixCache.TryGetValue(_activeScreenContext, out var prefix))
         {
-            string relativePath = $"ui/{_activeScreenContext}/{normalized}";
+            string relativePath = prefix + normalized; // one concat instead of repeated $"ui/.."
             data = TryGetAsset(relativePath);
             if (data != null) return data;
         }
@@ -105,7 +114,12 @@ public sealed class SnpkFileSystem : IFileSystem
             if (string.IsNullOrEmpty(kvp.Value)) continue;
             if (kvp.Value == _activeScreenContext) continue; // already preferred above
 
-            string relativePath = $"ui/{kvp.Value}/{normalized}";
+            string relativePath;
+            if (_screenPrefixCache.TryGetValue(kvp.Value, out var pfx))
+                relativePath = pfx + normalized;
+            else
+                relativePath = $"ui/{kvp.Value}/{normalized}";
+
             data = TryGetAsset(relativePath);
             if (data != null) return data;
         }
@@ -188,6 +202,7 @@ public sealed class SnpkFileSystem : IFileSystem
         _disposed = true;
         _currentScreenContext.Clear();
         _activeScreenContext = "";
+        _screenPrefixCache.Clear();
     }
 
     /// <summary>

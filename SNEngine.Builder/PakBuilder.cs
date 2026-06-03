@@ -1,17 +1,32 @@
-﻿using SNEngine.Core;
+﻿using SNEngine.Converters.Interfaces;
+using SNEngine.Converters.Optimizers;
+using SNEngine.Core;
 using System;
 using System.IO;
 using System.IO.Compression;
-using System.Linq;
 
 namespace SNEngine.Assets.Package;
 
 /// <summary>
-/// Smart Pak Builder — создаёт отдельные пакеты с правильной структурой папок.
+/// Smart Pak Builder — creates separate .snpk packages with proper folder structure.
+/// Supports post-packing WebP optimization for ui.snpk.
 /// </summary>
 public static class PakBuilder
 {
-    public static void PackSmart(string inputRoot = "assets", string outputDir = "build")
+    /// <summary>
+    /// Main smart packing method. Builds all .snpk packages from assets folder,
+    /// then optionally optimizes ui.snpk by converting images to WebP.
+    /// </summary>
+    /// <param name="inputRoot">Root folder containing asset subfolders (default: "assets")</param>
+    /// <param name="outputDir">Output directory for .snpk files (default: "build")</param>
+    /// <param name="optimizeWebP">Enable post-packing WebP optimization for ui.snpk</param>
+    /// <param name="webpQuality">WebP quality level (0-100)</param>
+    /// <param name="lossless">Use lossless WebP compression</param>
+    public static void PackSmart(string inputRoot = "assets",
+                                 string outputDir = "build",
+                                 bool optimizeWebP = false,
+                                 int webpQuality = 85,
+                                 bool lossless = false)
     {
         if (!Directory.Exists(inputRoot))
         {
@@ -25,13 +40,15 @@ public static class PakBuilder
         {
             ("backgrounds.snpk", AssetType.Backgrounds, "bg"),
             ("sprites.snpk",     AssetType.Sprites,     "sprites"),
-            ("characters.snpk",  AssetType.Characters,  "characters"),   // ← важно
+            ("characters.snpk",  AssetType.Characters,  "characters"),
             ("ui.snpk",          AssetType.UI,          "ui"),
             ("audio.snpk",       AssetType.Audio,       "audio"),
             ("data.snpk",        AssetType.Data,        "data")
         };
 
         int totalFiles = 0;
+
+        Console.WriteLine("Starting smart packing...");
 
         foreach (var (pakName, assetType, subFolder) in rules)
         {
@@ -45,19 +62,32 @@ public static class PakBuilder
             }
         }
 
-        // Остальные файлы в misc
+        // Pack root-level and unknown files into misc.snpk
         string miscPath = Path.Combine(outputDir, "misc.snpk");
         int miscCount = PackRootAndUnknown(inputRoot, miscPath);
         totalFiles += miscCount;
 
-        // Place icudt67l.dat under resources/ inside ui.snpk (matches Ultralight ResourcePathPrefix)
+        // Inject icudt67l.dat into ui.snpk for Ultralight
         string uiPakPath = Path.Combine(outputDir, "ui.snpk");
         PackIcuDataIfFound(inputRoot, uiPakPath);
 
         Debug.Log($"[PakBuilder] Smart pack completed. Total files: {totalFiles}");
-        Console.WriteLine($"\nSmart packing finished → {outputDir}");
+
+        // === POST-PACKING OPTIMIZATION (WebP) ===
+        if (optimizeWebP && File.Exists(uiPakPath))
+        {
+            Console.WriteLine("\n[Optimizer] Starting post-packing WebP optimization for ui.snpk...");
+
+            var optimizer = new ImageToWebPOptimizer(webpQuality, lossless);
+            optimizer.OptimizePakAsync(uiPakPath).Wait(); // Blocking for CLI simplicity
+        }
+
+        Console.WriteLine($"\nSmart packing finished successfully → {outputDir}");
     }
 
+    /// <summary>
+    /// Packs all files from a folder into a .snpk package.
+    /// </summary>
     private static int PackFolder(string inputFolder, string outputPakPath, AssetType type, string baseSubFolder = "")
     {
         if (!Directory.Exists(inputFolder)) return 0;
@@ -92,6 +122,9 @@ public static class PakBuilder
         return count;
     }
 
+    /// <summary>
+    /// Packs files located directly in the root of the assets folder into misc.snpk.
+    /// </summary>
     private static int PackRootAndUnknown(string inputRoot, string outputPakPath)
     {
         int count = 0;
@@ -104,9 +137,9 @@ public static class PakBuilder
             string relative = Path.GetFileName(file);
             var entry = zip.CreateEntry(relative, CompressionLevel.Optimal);
 
-            using var es = entry.Open();
-            using var fsFile = File.OpenRead(file);
-            fsFile.CopyTo(es);
+            using var entryStream = entry.Open();
+            using var fileStream = File.OpenRead(file);
+            fileStream.CopyTo(entryStream);
             count++;
         }
 
@@ -120,16 +153,14 @@ public static class PakBuilder
     }
 
     /// <summary>
-    /// Searches for icudt67l.dat anywhere under the assets folder and places it inside the target .snpk
-    /// under the "resources/" path (resources/icudt67l.dat).
-    /// This matches Ultralight's default ResourcePathPrefix = "resources/".
+    /// Searches for icudt67l.dat anywhere under the assets folder and places it inside ui.snpk
+    /// under the "resources/" path (required by Ultralight).
     /// </summary>
     private static void PackIcuDataIfFound(string inputRoot, string outputPakPath)
     {
         const string icuFileName = "icudt67l.dat";
         const string targetEntryPath = "resources/icudt67l.dat";
 
-        // Recursively search for the file
         string? icuSourcePath = Directory
             .GetFiles(inputRoot, icuFileName, SearchOption.AllDirectories)
             .FirstOrDefault();
@@ -137,11 +168,9 @@ public static class PakBuilder
         if (icuSourcePath == null)
             return;
 
-        // Open the existing archive and inject the file under resources/
         using var fs = File.Open(outputPakPath, FileMode.OpenOrCreate, FileAccess.ReadWrite);
         using var zip = new ZipArchive(fs, ZipArchiveMode.Update, true);
 
-        // Skip if already present
         if (zip.Entries.Any(e => e.FullName.Equals(targetEntryPath, StringComparison.OrdinalIgnoreCase)))
         {
             Debug.Log($"[PakBuilder] {targetEntryPath} already present in {Path.GetFileName(outputPakPath)}");
@@ -154,7 +183,7 @@ public static class PakBuilder
         using var fileStream = File.OpenRead(icuSourcePath);
         fileStream.CopyTo(entryStream);
 
-        Debug.Log($"[PakBuilder] {targetEntryPath} placed in {Path.GetFileName(outputPakPath)} (source: {Path.GetRelativePath(inputRoot, icuSourcePath)})");
+        Debug.Log($"[PakBuilder] {targetEntryPath} placed in {Path.GetFileName(outputPakPath)}");
         Console.WriteLine($"  ✓ {icuFileName} → {Path.GetFileName(outputPakPath)} (as {targetEntryPath})");
     }
 }

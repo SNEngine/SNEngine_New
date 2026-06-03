@@ -81,4 +81,49 @@ public class SNPKPackage : IDisposable
     }
 
     public void Dispose() => _assets.Clear();
+
+    /// <summary>
+    /// Returns all assets in the package for iteration (read-only view).
+    /// </summary>
+    public IReadOnlyDictionary<string, byte[]> GetAllEntries()
+    {
+        return _assets;
+    }
+
+    public void Save(string filePath)
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(filePath)!);
+
+        using var fs = new FileStream(filePath, FileMode.Create);
+        using var zip = new ZipArchive(fs, ZipArchiveMode.Create);
+
+        foreach (var kvp in _assets)
+        {
+            var entry = zip.CreateEntry(kvp.Key, CompressionLevel.Optimal);
+            using var entryStream = entry.Open();
+            entryStream.Write(kvp.Value, 0, kvp.Value.Length);
+        }
+
+        Debug.Log($"[SNPK] Saved package with {_assets.Count} assets to {Path.GetFileName(filePath)}");
+    }
+
+    /// <summary>
+    /// Adds or replaces an asset in the package.
+    /// </summary>
+    public void AddAsset(string virtualPath, byte[] data)
+    {
+        if (string.IsNullOrEmpty(virtualPath))
+            throw new ArgumentException("Virtual path cannot be null or empty", nameof(virtualPath));
+
+        string key = virtualPath.Replace('\\', '/').TrimStart('/');
+        _assets[key] = data ?? Array.Empty<byte>();
+    }
+
+    /// <summary>
+    /// Creates a new empty package for building/saving.
+    /// </summary>
+    public static SNPKPackage Create(string packagePath, AssetType type)
+    {
+        return new SNPKPackage(packagePath, type);
+    }
 }

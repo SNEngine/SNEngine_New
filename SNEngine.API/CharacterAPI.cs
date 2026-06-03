@@ -313,11 +313,11 @@ public static class CharacterAPI
             DefaultEmotion = "happy",
             Emotions = new[]
             {
-                new EmotionData { Name = "happy",     SpritePath = "yuki/happy.png",     Description = "Радостная" },
-                new EmotionData { Name = "sad",       SpritePath = "yuki/sad.png",       Description = "Грустная" },
-                new EmotionData { Name = "angry",     SpritePath = "yuki/angry.png",     Description = "Злая" },
-                new EmotionData { Name = "blush",     SpritePath = "yuki/blush.png",     Description = "Смущённая" },
-                new EmotionData { Name = "surprised", SpritePath = "yuki/surprised.png", Description = "Удивлённая" }
+                new EmotionData { Name = "happy",     SpritePath = "yuki/happy",     Description = "Радостная" },
+                new EmotionData { Name = "sad",       SpritePath = "yuki/sad",       Description = "Грустная" },
+                new EmotionData { Name = "angry",     SpritePath = "yuki/angry",     Description = "Злая" },
+                new EmotionData { Name = "blush",     SpritePath = "yuki/blush",     Description = "Смущённая" },
+                new EmotionData { Name = "surprised", SpritePath = "yuki/surprised", Description = "Удивлённая" }
             }
         };
 

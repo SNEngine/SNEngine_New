@@ -17,7 +17,7 @@ public class NovelScene : Scene
         // Background GameObject
         var bgObj = new GameObject { Name = "Background" };
         var bgComp = bgObj.AddComponent(new BackgroundComponent(_assetManager));
-        bgComp.Load("assets/bg/classroom_day.png");
+        bgComp.Load("classroom_day");
         AddGameObject(bgObj);
 
     }

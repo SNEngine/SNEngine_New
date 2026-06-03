@@ -28,6 +28,18 @@ public class AssetManager : IDisposable
     /// </summary>
     private readonly Dictionary<string, float> _bounceCache = new(StringComparer.OrdinalIgnoreCase);
 
+    /// <summary>
+    /// Supported image extensions for runtime texture loading. WebP is first because
+    /// post-pack optimization converts png/jpg/etc to webp (except UI).
+    /// Central place for extension selection / fallback (no more hardcoding .png in character sprites etc).
+    /// </summary>
+    public static readonly string[] SupportedImageExtensions = { ".webp", ".png", ".jpg", ".jpeg", ".bmp", ".tiff", ".gif" };
+
+    /// <summary>
+    /// Source image formats that get converted to .webp by the optimizer in SNEngine.Converters.
+    /// </summary>
+    public static readonly string[] ConvertibleImageExtensions = { ".png", ".jpg", ".jpeg", ".bmp", ".tiff" };
+
     public AssetManager(GraphicsDevice device)
     {
         _device = device ?? throw new ArgumentNullException(nameof(device));
@@ -117,23 +129,83 @@ public class AssetManager : IDisposable
         return tex;
     }
 
+    /// <summary>
+    /// Generates lookup candidates for a texture path, trying the requested extension first (if any),
+    /// then falling back across supported extensions (webp prioritized for optimized packages).
+    /// This centralizes extension selection so callers (CharacterData.GetSpritePath etc.) don't hardcode .png.
+    /// </summary>
+    private static IEnumerable<string> GetAssetCandidates(string path)
+    {
+        if (string.IsNullOrEmpty(path)) yield break;
+
+        string normalized = path.Replace('\\', '/').TrimStart('/');
+        string originalExt = Path.GetExtension(normalized).ToLowerInvariant();
+        string basePath = string.IsNullOrEmpty(originalExt)
+            ? normalized
+            : normalized.Substring(0, normalized.Length - originalExt.Length);
+
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        // Exact requested (with its ext) has highest priority if present
+        if (!string.IsNullOrEmpty(originalExt))
+        {
+            if (seen.Add(normalized))
+                yield return normalized;
+        }
+
+        // Then try all supported (webp first in the list)
+        foreach (var e in SupportedImageExtensions)
+        {
+            string cand = basePath + e;
+            if (seen.Add(cand))
+                yield return cand;
+        }
+
+        // Bare name without extension as final fallback
+        if (seen.Add(basePath))
+            yield return basePath;
+
+        // Support simplified calls like BackgroundAPI.Show("classroom_day") or script "Show Background classroom_day"
+        // by treating bare (no-slash) names as potential background assets and yielding the packed "bg/..." and "assets/bg/..." forms early.
+        // This makes the short form work cleanly (direct hit in package) and reduces noisy "not found" probes for other variants.
+        // Character names usually contain "/" (e.g. "yuki/happy") so they are unaffected.
+        if (!normalized.Contains('/'))
+        {
+            foreach (var e in SupportedImageExtensions)
+            {
+                string bgPrefixed = "bg/" + basePath + e;
+                if (seen.Add(bgPrefixed))
+                    yield return bgPrefixed;
+
+                string assetsBg = "assets/bg/" + basePath + e;
+                if (seen.Add(assetsBg))
+                    yield return assetsBg;
+            }
+        }
+    }
+
     private byte[]? TryGetAssetFromPackage(SNPKPackage pkg, string path)
     {
-        var variants = new[]
+        foreach (var candidate in GetAssetCandidates(path))
         {
-            path,
-            path.Replace("assets/", ""),
-            path.Replace("assets/bg/", "bg/"),
-            path.Replace("assets/bg/", ""),
-            "bg/" + Path.GetFileName(path),
-            Path.GetFileName(path)
-        };
+            var variants = new[]
+            {
+                candidate,
+                candidate.Replace("assets/", ""),
+                candidate.Replace("assets/bg/", "bg/"),
+                candidate.Replace("assets/bg/", ""),
+                "bg/" + Path.GetFileName(candidate),
+                Path.GetFileName(candidate),
+                "characters/" + Path.GetFileName(candidate),
+                "sprites/" + Path.GetFileName(candidate)
+            };
 
-        foreach (var v in variants)
-        {
-            var data = pkg.GetAsset(v);
-            if (data != null)
-                return data;
+            foreach (var v in variants)
+            {
+                var data = pkg.GetAsset(v);
+                if (data != null)
+                    return data;
+            }
         }
         return null;
     }
@@ -176,19 +248,23 @@ public class AssetManager : IDisposable
 
         string normalized = path.Replace('\\', '/').TrimStart('/');
 
-        // Try exact and common variants (same logic as texture loading)
-        var candidates = new[]
+        // Use same candidate generation as texture lookup (supports ext fallback, no hard-coded png etc.)
+        foreach (var c in GetAssetCandidates(normalized))
         {
-            normalized,
-            normalized.Replace("assets/", ""),
-            "characters/" + Path.GetFileName(normalized),
-            Path.GetFileName(normalized)
-        };
+            // common prefix/filename variants (mirrors old logic + subdir cases)
+            var candidates = new[]
+            {
+                c,
+                c.Replace("assets/", ""),
+                "characters/" + Path.GetFileName(c),
+                Path.GetFileName(c)
+            };
 
-        foreach (var c in candidates)
-        {
-            if (_bounceCache.TryGetValue(c, out var b))
-                return b;
+            foreach (var cand in candidates)
+            {
+                if (_bounceCache.TryGetValue(cand, out var b))
+                    return b;
+            }
         }
 
         return 0f;

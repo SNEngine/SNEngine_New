@@ -1,4 +1,5 @@
 ﻿using System;
+using System.IO;
 using System.Text.Json.Serialization;
 
 namespace SNEngine.Data;
@@ -44,6 +45,14 @@ public class CharacterData : GameData
 
         // Добавляем префикс "characters/", если его нет
         string path = emotion.SpritePath.Replace('\\', '/').TrimStart('/');
+
+        // Strip image extension — extension choice is centralized in AssetManager (supports png/jpg/webp etc after packaging/optimization).
+        // This prevents hardcoding .png (or other) from character data files.
+        string ext = Path.GetExtension(path).ToLowerInvariant();
+        if (ext is ".png" or ".jpg" or ".jpeg" or ".webp" or ".bmp" or ".tiff" or ".gif")
+        {
+            path = path.Substring(0, path.Length - ext.Length);
+        }
 
         if (!path.StartsWith("characters/", StringComparison.OrdinalIgnoreCase))
         {

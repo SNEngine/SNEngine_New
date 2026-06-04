@@ -17,7 +17,8 @@
   </ItemGroup>
 
   <!-- Post-Build: копируем ВСЁ в PlayerTemplates -->
-  <Target Name="CopyFullRuntimeToPlayerTemplates" AfterTargets="Build">
+  <Target Name="CopyFullRuntimeToPlayerTemplates" AfterTargets="Build"
+          Condition=" '$(SolutionDir)' != '' And Exists('$(SolutionDir)SNEngine.Studio') ">
     <PropertyGroup>
       <PlayerTemplatesDir>$(SolutionDir)SNEngine.Studio\PlayerTemplates\Windows</PlayerTemplatesDir>
       <SourceBinDir>$(TargetDir)</SourceBinDir>

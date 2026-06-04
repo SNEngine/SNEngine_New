@@ -5,6 +5,11 @@ namespace SNEngine.Core.Engine.Systems;
 /// <summary>
 /// Base interface for engine systems that can receive input and lifecycle events.
 /// </summary>
+/// <remarks>
+/// Known implementations live in subfolders (DialogSystem, FpsSystem, AudioSystem).
+/// IAudioSystem contract is defined here in Core; the FMOD-based implementation lives in SNEngine.Audio
+/// (no compile dependency from Core to Audio — discovery is by runtime reflection on loaded assemblies).
+/// </remarks>
 public interface ISystem
 {
     /// <summary>

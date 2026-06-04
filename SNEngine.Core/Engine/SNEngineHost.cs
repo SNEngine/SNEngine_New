@@ -8,6 +8,9 @@ using SNEngine.Core.Input;
 using SNEngine.Core.Rendering;
 using System;
 using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Reflection;
 using System.Threading.Tasks;
 using TrippyGL;
 
@@ -146,21 +149,76 @@ public partial class SNEngineHost : IDisposable, IFrameDataProvider
     }
 
     /// <summary>
-    /// Automatically discovers and registers all ISystem implementations from the current assembly.
+    /// Dynamically loads optional SNEngine.* modules (e.g. SNEngine.Audio.dll + fmod.dll)
+    /// if they are physically present next to the executable. This enables ISystem discovery
+    /// (including IAudioSystem) without any compile-time ProjectReference from Runtime/Core/Test
+    /// to the audio implementation.
+    /// </summary>
+    private static void LoadOptionalModulesIfPresent()
+    {
+        try
+        {
+            string baseDir = AppContext.BaseDirectory;
+            // List of optional modules that can provide ISystem implementations
+            string[] optionalModules = { "SNEngine.Audio.dll" };
+
+            foreach (var moduleName in optionalModules)
+            {
+                string path = Path.Combine(baseDir, moduleName);
+                if (!File.Exists(path))
+                    continue;
+
+                // Check if already loaded
+                bool alreadyLoaded = AppDomain.CurrentDomain.GetAssemblies()
+                    .Any(a =>
+                    {
+                        var n = a.GetName().Name;
+                        return n != null && n.Equals(Path.GetFileNameWithoutExtension(moduleName), StringComparison.OrdinalIgnoreCase);
+                    });
+
+                if (alreadyLoaded)
+                    continue;
+
+                var asm = Assembly.LoadFrom(path);
+                Debug.Log($"[SNEngineHost] Dynamically loaded optional module: {moduleName} (for ISystem discovery)");
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.LogWarning($"[SNEngineHost] Failed to load optional module(s): {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Automatically discovers and registers all ISystem implementations.
+    /// Scans executing assembly + other loaded SNEngine.* assemblies at runtime.
+    /// This allows SNEngine.Audio (and future modules) to provide implementations of interfaces
+    /// such as IAudioSystem without SNEngine.Core taking a compile-time project reference to them.
     /// </summary>
     private void RegisterAllSystems()
     {
-        var assembly = System.Reflection.Assembly.GetExecutingAssembly();
+        LoadOptionalModulesIfPresent();
 
-        var systemTypes = assembly.GetTypes()
+        var assemblies = AppDomain.CurrentDomain.GetAssemblies()
+            .Where(a => !a.IsDynamic)
+            .Where(a =>
+            {
+                var name = a.GetName().Name;
+                return name != null && (name.Equals("SNEngine.Core", StringComparison.Ordinal) || name.StartsWith("SNEngine.", StringComparison.Ordinal));
+            })
+            .ToArray();
+
+        var systemTypes = assemblies
+            .SelectMany(a => a.GetTypes())
             .Where(t =>
                 t.IsClass &&
                 !t.IsAbstract &&
                 typeof(ISystem).IsAssignableFrom(t) &&
                 t != typeof(ISystem)) // exclude the interface itself
+            .Distinct()
             .ToList();
 
-        Debug.Log($"[SNEngineHost] Found {systemTypes.Count} ISystem implementations.");
+        Debug.Log($"[SNEngineHost] Found {systemTypes.Count} ISystem implementations across {assemblies.Length} assemblies.");
 
         foreach (var type in systemTypes)
         {
@@ -168,7 +226,7 @@ public partial class SNEngineHost : IDisposable, IFrameDataProvider
             {
                 if (Activator.CreateInstance(type) is ISystem system)
                 {
-                    _systems[type] = system;
+                    RegisterSystemInternal(type, system);
                     _inputRouter.RegisterSystem(system);
                     Debug.Log($"[SNEngineHost] Registered system: {system.SystemName}");
                 }
@@ -181,12 +239,49 @@ public partial class SNEngineHost : IDisposable, IFrameDataProvider
     }
 
     /// <summary>
+    /// Registers a system instance both under its concrete type and under all
+    /// ISystem-derived interfaces it implements. This enables resolution by interface
+    /// (e.g. GetSystem&lt;IAudioSystem&gt;()) for optional modules like SNEngine.Audio.
+    /// </summary>
+    private void RegisterSystemInternal(Type concreteType, ISystem system)
+    {
+        // Always register by the concrete implementation type
+        _systems[concreteType] = system;
+
+        // Also register under every interface that derives from ISystem.
+        // This is what makes GetSystem<IAudioSystem>() succeed when the actual
+        // instance is AudioSystem from a dynamically loaded assembly.
+        foreach (var iface in concreteType.GetInterfaces())
+        {
+            if (typeof(ISystem).IsAssignableFrom(iface) && iface != typeof(ISystem))
+            {
+                // Last writer wins in case of multiple implementations for the same interface.
+                _systems[iface] = system;
+            }
+        }
+    }
+
+    /// <summary>
     /// Gets a registered system by type.
+    /// Supports both concrete types (e.g. DialogueSystem) and interfaces (e.g. IAudioSystem).
     /// </summary>
     public T? GetSystem<T>() where T : class, ISystem
     {
         var type = typeof(T);
-        return _systems.TryGetValue(type, out var system) ? system as T : null;
+
+        // Fast path: exact key (works for concretes and for interfaces we pre-registered)
+        if (_systems.TryGetValue(type, out var system))
+            return system as T;
+
+        // Fallback: find any registered system that implements/derives from T.
+        // This makes GetSystem<IAudioSystem>() work even without pre-indexing interfaces.
+        foreach (var sys in _systems.Values)
+        {
+            if (sys is T match)
+                return match;
+        }
+
+        return null;
     }
 
     private void OnUpdateFrame(double deltaTime)
@@ -294,6 +389,20 @@ public partial class SNEngineHost : IDisposable, IFrameDataProvider
         }
         finally
         {
+            // Dispose any systems that implement IDisposable (e.g. AudioSystem releases FMOD)
+            try
+            {
+                foreach (var sys in _systems.Values)
+                {
+                    if (sys is IDisposable d)
+                        d.Dispose();
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[SNEngineHost] Error disposing systems: {ex.Message}");
+            }
+
             SceneManager = null!;
             FileManager = null!;
             _graphicsContext = null;

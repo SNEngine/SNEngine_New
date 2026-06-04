@@ -13,4 +13,8 @@
     </None>
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\SNEngine.Core\SNEngine.Core.csproj" />
+  </ItemGroup>
+
 </Project>

@@ -40,6 +40,8 @@ class Program
 
 
             SNEngine.Core.Debug.Log("Scene loaded via SNEngine.API");
+            await Task.Delay(1000);
+            SNEngine.API.AudioAPI.PlaySE("audio/sample-3s.mp3");
             await Task.Delay(3000);
             for (int i = 0; i < 10; i++)
             {

@@ -13,6 +13,9 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Update="assets\audio\sample-3s.mp3">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
     <None Update="assets\bg\classroom_day.png">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>

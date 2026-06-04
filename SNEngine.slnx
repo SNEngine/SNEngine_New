@@ -2,6 +2,7 @@
   <Project Path="E:/repos/SNEngine/SNEngine.Core/SNEngine.Core.csproj" />
   <Project Path="SNEngine.API.Generators/SNEngine.API.Generators.csproj" />
   <Project Path="SNEngine.API/SNEngine.API.csproj" Id="ca1ba8ab-9b98-4e2a-8189-6a11d52e2b14" />
+  <Project Path="SNEngine.Audio/SNEngine.Audio.csproj" Id="681f0f48-7c1e-4e21-b2f8-5f497fc5fe6f" />
   <Project Path="SNEngine.Backend/SNEngine.Backend.csproj" />
   <Project Path="SNEngine.Build/SNEngine.Build.csproj" Id="606fd1e3-6fd8-4a34-8052-bc07129909f5" />
   <Project Path="SNEngine.Builder/SNEngine.Builder.csproj" Id="ebdd6991-2983-485b-be8d-f10a78760c3d" />

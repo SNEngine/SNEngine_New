@@ -1,4 +1,5 @@
 ﻿using SNEngine.API;
+using SNEngine.Audio;
 using System;
 using System.Linq;
 
@@ -41,12 +42,26 @@ class Program
 
             SNEngine.Core.Debug.Log("Scene loaded via SNEngine.API");
             await Task.Delay(1000);
-            SNEngine.API.AudioAPI.PlaySE("audio/sample-3s.mp3");
+            MusicAPI.SetPlaylist(new[]
+            {
+    "audio/music/music1.mp3",
+    "audio/music/music2.mp3",
+    "audio/music/music3.mp3"
+});
+
+            MusicAPI.Shuffle = true;
+            MusicAPI.Repeat = MusicRepeatMode.All;
+            MusicAPI.CrossfadeSeconds = 5f;
+
+            MusicAPI.Play();     // или просто MusicAPI.Play();
             await Task.Delay(3000);
+            MusicAPI.Next();
             for (int i = 0; i < 10; i++)
             {
                 await CharacterAPI.Say("yuki", GenerateRandomText(450)); // примерно как lorem
             }
+
+            MusicAPI.Next();
         };
 
         // Используем удобный публичный API

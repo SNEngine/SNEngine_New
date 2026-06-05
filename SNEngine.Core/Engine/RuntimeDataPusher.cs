@@ -1,4 +1,5 @@
 ﻿using SNEngine.Core.Engine.Systems.DialogSystem;
+using SNEngine.Core.Engine.Systems.DialogOnScreenSystem;
 using SNEngine.Core.Engine.Systems.FpsSystem;
 using System;
 using System.Diagnostics;
@@ -14,6 +15,7 @@ public class RuntimeDataPusher
     private readonly UI.UiManager? _uiManager;
     private readonly FrameProfiler? _profiler;
     private DialogueSystem? _dialogueSystem; // cached to avoid dictionary lookup every frame
+    private DialogOnScreenSystem? _onScreenSystem; // for the separate full-screen dialog variant (thoughts etc.)
 
     public RuntimeDataPusher(UI.UiManager? uiManager, FrameProfiler? profiler)
     {
@@ -35,6 +37,11 @@ public class RuntimeDataPusher
             _dialogueSystem = SNEngineHost.Current.GetSystem<DialogueSystem>();
         }
 
+        if (_onScreenSystem == null)
+        {
+            _onScreenSystem = SNEngineHost.Current.GetSystem<DialogOnScreenSystem>();
+        }
+
         var fpsSystem = SNEngineHost.Current?.GetSystem<FPSSystem>();
         // Always update fps value in the system (for snapshot)
         fpsSystem?.SetFps(_profiler?.NativeFps ?? 0.0);
@@ -45,7 +52,8 @@ public class RuntimeDataPusher
         {
             Fps = fpsState.Value,
             FpsState = fpsState,
-            Dialogue = _dialogueSystem?.GetSnapshot() ?? default
+            Dialogue = _dialogueSystem?.GetSnapshot() ?? default,
+            OnScreenDialogue = _onScreenSystem?.GetSnapshot() ?? default
         };
 
         foreach (var element in _uiManager.Elements)

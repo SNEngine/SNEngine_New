@@ -152,7 +152,12 @@ public class UltralightHtmlElement : UiElementBase
         _runtimeBridge.Set("fpsVisible", data.FpsState.Visible);
 
         var d = data.Dialogue;
-        _runtimeBridge.SetDialogState(d.Speaker, d.Text, d.Color, d.Visible, d.IsComplete);
+        // Classic dialog (untouched DialogueSystem)
+        _runtimeBridge.SetDialogState(d.Speaker, d.Text, d.Color, d.Visible, d.IsComplete, "dialog", d.Type ?? "dialog");
+
+        // On-screen / full-screen variant (e.g. thoughts) - separate channel and HTML
+        var on = data.OnScreenDialogue;
+        _runtimeBridge.SetDialogState(on.Speaker, on.Text, on.Color, on.Visible, on.IsComplete, "dialogOnScreen", on.Type ?? "onscreen");
     }
 
     // ==================== Cleanup ====================

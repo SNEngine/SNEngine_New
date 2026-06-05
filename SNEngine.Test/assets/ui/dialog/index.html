@@ -73,6 +73,59 @@
             }
         }
 
+        /* === VARIANT: Full-screen "thought" / internal monologue (black bg, text centered) ===
+           Activated via snapshot.type === 'thought' from IDialogSystem / unified printer.
+           Full screen black background + text, like character's inner voice.
+           Reuses most typewriter/advance logic for unification with standard dialog.
+        */
+        #dialog-container.thought {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            max-width: none;
+            background: #000000;
+            border: none;
+            border-radius: 0;
+            box-shadow: none;
+            padding: 15% 12% 15%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            animation: none;
+            opacity: 0;
+            transform: none;
+            transition: opacity 400ms ease-out;
+        }
+
+        #dialog-container.thought.visible {
+            opacity: 1;
+        }
+
+        #dialog-container.thought #speaker {
+            display: none; /* no speaker for pure thoughts */
+        }
+
+        #dialog-container.thought #dialog-text {
+            font-size: 26px;
+            line-height: 1.65;
+            color: #e0e0e0;
+            text-align: center;
+            max-width: 820px;
+            min-height: 120px;
+        }
+
+        #dialog-container.thought #continue-indicator {
+            position: absolute;
+            bottom: 8%;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 22px;
+            color: #888;
+        }
+
         /* Блок имени говорящего */
         #speaker {
             font-weight: 600;
@@ -272,6 +325,19 @@
             // Плавное появление
             container.classList.add('visible');
 
+            // === Variant support for unified IDialogSystem ===
+            // If type === 'thought' (or similar), switch to full-screen black thought style.
+            // This unifies the "text output" printers: same core logic + snapshot, different visual.
+            const isThought = (state.type === 'thought' || state.type === 'inner' || state.type === 'monologue');
+            if (isThought) {
+                container.classList.add('thought');
+                // hide speaker block for pure thoughts
+                if (nameEl) nameEl.style.display = 'none';
+            } else {
+                container.classList.remove('thought');
+                if (nameEl) nameEl.style.display = '';
+            }
+
             // Автоматическая смена анимации, если движок передал новое значение в snapshot
             if (state.animationType) {
                 setAnimationClass(state.animationType);
@@ -284,6 +350,7 @@
             }
 
             // Логика смены спикера: при новом имени очищаем текстовое поле
+            // For thoughts we usually have empty speaker
             if (state.speaker !== lastSpeaker) {
                 nameEl.textContent = state.speaker || '';
                 nameEl.style.color = state.color || '#ffffff';
@@ -366,18 +433,21 @@
                 const container = document.getElementById('dialog-container');
                 if (textEl) textEl.innerHTML = '';
                 if (nameEl) nameEl.textContent = '';
-                if (container) container.classList.remove('visible');
+                if (container) {
+                    container.classList.remove('visible');
+                    container.classList.remove('thought');
+                }
                 currentText = '';
                 lastSpeaker = '';
                 const indicator = document.getElementById('continue-indicator');
                 if (indicator) indicator.style.display = 'none';
             },
             // Принудительное отображение статического состояния диалога
-            forceShow(speaker, text, color, animType = 'pop') {
+            forceShow(speaker, text, color, animType = 'pop', type = 'dialog') {
                 currentText = '';
                 lastSpeaker = '';
                 setAnimationClass(animType);
-                applyDialogState({ speaker, text, color, visible: true, animationType: animType });
+                applyDialogState({ speaker, text, color, visible: true, animationType: animType, type });
             }
         };
 

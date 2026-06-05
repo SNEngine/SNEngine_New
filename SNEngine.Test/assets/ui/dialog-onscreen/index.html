@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>On-Screen Dialog (Thoughts)</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        html, body {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            width: 100%;
+            background: transparent;
+            position: relative;
+            overflow: hidden;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            font-size: 20px;
+            color: #eeeeee;
+        }
+
+        #dialog-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #000000;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            opacity: 0;
+            transition: opacity 400ms ease-out;
+            pointer-events: none;
+        }
+
+            #dialog-container.visible {
+                opacity: 1;
+                pointer-events: auto;
+            }
+
+        #speaker {
+            display: none;
+            font-weight: 400;
+            font-size: 14px;
+            color: #888;
+            margin-bottom: 16px;
+            opacity: 0.6;
+        }
+
+        #dialog-text {
+            font-size: 26px;
+            line-height: 1.65;
+            color: #e0e0e0;
+            text-align: justify; /* или center, если хочешь */
+            width: 82%; /* подогнано под твои зелёные маркеры */
+            max-width: 1080px;
+            max-height: 78vh; /* ограничиваем высоту, чтобы был скролл */
+            padding: 0 50px;
+            margin: 0 auto;
+            overflow-y: auto; /* ← главный скролл */
+            overflow-x: hidden;
+            scrollbar-width: thin;
+            scrollbar-color: #555 #222;
+            white-space: pre-wrap;
+            word-break: break-word;
+            overflow-wrap: break-word;
+        }
+
+            /* Красивый скроллбар */
+            #dialog-text::-webkit-scrollbar {
+                width: 8px;
+            }
+
+            #dialog-text::-webkit-scrollbar-thumb {
+                background: #555;
+                border-radius: 4px;
+            }
+
+                #dialog-text::-webkit-scrollbar-thumb:hover {
+                    background: #777;
+                }
+
+        #continue-indicator {
+            position: absolute;
+            bottom: 8%;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 22px;
+            color: #666;
+            animation: blink 1.2s infinite;
+            z-index: 10;
+        }
+
+        @keyframes blink {
+            0%, 100% {
+                opacity: 0.4;
+            }
+
+            50% {
+                opacity: 1;
+            }
+        }
+
+        .char {
+            display: inline;
+        }
+    </style>
+</head>
+<body>
+    <div id="dialog-container">
+        <div id="speaker"></div>
+        <div id="dialog-text"></div>
+        <div id="continue-indicator">▼</div>
+    </div>
+
+    <script>
+        let rafId = null;
+        let currentText = '';
+        let lastSpeaker = '';
+
+        function createCharNode(char) {
+            const span = document.createElement('span');
+            span.className = 'char';
+            span.innerHTML = char === ' ' ? '&nbsp;' : char;
+            return span;
+        }
+
+        function applyDialogState(state) {
+            const container = document.getElementById('dialog-container');
+            const nameEl = document.getElementById('speaker');
+            const textEl = document.getElementById('dialog-text');
+
+            if (!container || !nameEl || !textEl) return;
+
+            const hasContent = state && state.visible !== false && (state.text || state.speaker);
+
+            if (!hasContent) {
+                container.classList.remove('visible');
+                currentText = '';
+                lastSpeaker = '';
+                const indicator = document.getElementById('continue-indicator');
+                if (indicator) indicator.style.display = 'none';
+                return;
+            }
+
+            container.classList.add('visible');
+
+            if (state.speaker && state.speaker !== lastSpeaker) {
+                nameEl.textContent = state.speaker;
+                lastSpeaker = state.speaker;
+            } else if (!state.speaker) {
+                nameEl.textContent = '';
+            }
+
+            const newText = state.text || '';
+
+            if (newText.length > currentText.length && newText.startsWith(currentText)) {
+                const newPart = newText.slice(currentText.length);
+                for (let char of newPart) {
+                    textEl.appendChild(createCharNode(char));
+                }
+            } else if (newText !== currentText) {
+                textEl.innerHTML = '';
+                for (let char of newText) {
+                    textEl.appendChild(createCharNode(char));
+                }
+            }
+
+            currentText = newText;
+
+            const indicator = document.getElementById('continue-indicator');
+            if (indicator) {
+                indicator.style.display = (state.complete === true) ? 'block' : 'none';
+            }
+
+            // Прокручиваем в конец при новом тексте
+            textEl.scrollTop = textEl.scrollHeight;
+        }
+
+        function updateFromRuntime() {
+            try {
+                const runtime = (window.SNEngine && window.SNEngine.runtime) || {};
+                const dialogState = runtime.dialogOnScreen;
+                applyDialogState(dialogState);
+            } catch (e) {
+                console.warn('[DialogOnScreenUI] update error', e);
+            }
+            rafId = requestAnimationFrame(updateFromRuntime);
+        }
+
+        function startListening() {
+            if (rafId) cancelAnimationFrame(rafId);
+            rafId = requestAnimationFrame(updateFromRuntime);
+        }
+
+        window.DialogOnScreenUI = {
+            clear() {
+                const textEl = document.getElementById('dialog-text');
+                const nameEl = document.getElementById('speaker');
+                const container = document.getElementById('dialog-container');
+                if (textEl) textEl.innerHTML = '';
+                if (nameEl) nameEl.textContent = '';
+                if (container) container.classList.remove('visible');
+                currentText = '';
+                lastSpeaker = '';
+                const indicator = document.getElementById('continue-indicator');
+                if (indicator) indicator.style.display = 'none';
+            }
+        };
+
+        function setupClickAdvance() {
+            const container = document.getElementById('dialog-container');
+            const textEl = document.getElementById('dialog-text');
+            const indicator = document.getElementById('continue-indicator');
+            if (!container || !textEl) return;
+
+            let downInfo = null;
+            let scrollSuppressUntil = 0;
+
+            // Wheel scrolling → temporarily suppress advance clicks (prevents "ложный ЛКМ" after колёсико)
+            textEl.addEventListener('wheel', () => {
+                scrollSuppressUntil = Date.now() + 650;
+            }, { passive: true });
+
+            // Track mousedown to detect real clicks vs scrollbar drag / text selection / scroll gesture
+            textEl.addEventListener('mousedown', (e) => {
+                downInfo = {
+                    x: e.clientX,
+                    y: e.clientY,
+                    scrollTop: textEl.scrollTop,
+                    time: Date.now()
+                };
+            });
+
+            function tryAdvance(e) {
+                if (container.style.display === 'none') return;
+
+                // Always allow advance via the indicator (▼)
+                if (indicator && indicator.contains(e.target)) {
+                    doAdvance();
+                    return;
+                }
+
+                // Only consider clicks that landed inside the scrollable text area
+                if (!textEl.contains(e.target)) {
+                    // Click on the black padding/background → treat as advance (intent to dismiss)
+                    doAdvance();
+                    return;
+                }
+
+                // Suppress after recent wheel scroll
+                if (Date.now() < scrollSuppressUntil) {
+                    return;
+                }
+
+                // If we have mousedown info, check for drag/scroll gesture
+                if (downInfo) {
+                    const dx = Math.abs(e.clientX - downInfo.x);
+                    const dy = Math.abs(e.clientY - downInfo.y);
+                    const dScroll = Math.abs(textEl.scrollTop - downInfo.scrollTop);
+                    const dt = Date.now() - downInfo.time;
+
+                    // Significant movement or scroll change or long press → user was scrolling or selecting
+                    // → do NOT advance (prevents ложный ЛКМ when grabbing scrollbar or using wheel+click)
+                    if (dx > 7 || dy > 7 || dScroll > 3 || dt > 420) {
+                        downInfo = null;
+                        return;
+                    }
+                }
+
+                // Clean, intentional click on the text content → advance
+                doAdvance();
+                downInfo = null;
+            }
+
+            function doAdvance() {
+                try {
+                    if (window.SNEngineHost && typeof window.SNEngineHost.call === 'function') {
+                        window.SNEngineHost.call('OnScreenDialogueAPI.Advance', []);
+                    }
+                } catch (e) {
+                    console.warn('[DialogOnScreenUI] Advance call failed', e);
+                }
+            }
+
+            // Main listener on the container (so background clicks also advance)
+            // The logic inside filters out scrollbar / wheel / drag cases when the target is the text
+            container.addEventListener('click', tryAdvance);
+
+            // Visual feedback: pointer on background, default/text on the scrollable area
+            container.style.cursor = 'pointer';
+            textEl.style.cursor = 'text';
+
+            // Optional: dynamically adjust cursor when mouse is over the scrollable text
+            textEl.addEventListener('mouseenter', () => {
+                container.style.cursor = 'default';
+            });
+            textEl.addEventListener('mouseleave', () => {
+                container.style.cursor = 'pointer';
+            });
+        }
+
+        (function init() {
+            const container = document.getElementById('dialog-container');
+            if (container) {
+                container.style.display = 'flex';
+                container.classList.remove('visible');
+            }
+            setupClickAdvance();
+        })();
+
+        startListening();
+    </script>
+</body>
+</html>

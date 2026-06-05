@@ -36,14 +36,16 @@ class Program
             // Character will sit correctly without legs being cut off.
             CharacterAPI.Show("yuki", "happy");
             SNEngine.API.SNEngine.LoadScreen("dialog");
+            SNEngine.API.SNEngine.LoadScreen("dialog-onscreen");
             SNEngine.API.SNEngine.LoadScreen("fps");
           //  SNEngine.API.SNEngine.LoadScreen("test_images", zIndex: 18);
 
 
             SNEngine.Core.Debug.Log("Scene loaded via SNEngine.API");
             await Task.Delay(1000);
+            await OnScreenDialogueAPI.Think("Sed ut perspiciatis, unde omnis iste natus error sit voluptatem accusantium doloremque laudantium, totam rem aperiam eaque ipsa, quae ab illo inventore veritatis et quasi architecto beatae vitae dicta sunt, explicabo. Nemo enim ipsam voluptatem, quia voluptas sit, aspernatur aut odit aut fugit, sed quia consequuntur magni dolores eos, qui ratione voluptatem sequi nesciunt, neque porro quisquam est, qui dolorem ipsum, quia dolor sit, amet, consectetur, adipisci velit, sed quia non numquam eius modi tempora incidunt, ut labore et dolore magnam aliquam quaerat voluptatem. Ut enim ad minima veniam, quis nostrum exercitationem ullam corporis suscipit laboriosam, nisi ut aliquid ex ea commodi consequatur? Quis autem vel eum iure reprehenderit, qui in ea voluptate velit esse, quam nihil molestiae consequatur, vel illum, qui dolorem eum fugiat, quo voluptas nulla pariatur? At vero eos et accusamus et iusto odio dignissimos ducimus, qui blanditiis praesentium voluptatum deleniti atque corrupti, quos dolores et quas molestias excepturi sint, obcaecati cupiditate non provident, similique sunt in culpa, qui officia deserunt mollitia animi, id est laborum et dolorum fuga. Et harum quidem rerum facilis est et expedita distinctio. Nam libero tempore, cum soluta nobis est eligendi optio, cumque nihil impedit, quo minus id, quod maxime placeat, facere possimus, omnis voluptas assumenda est, omnis dolor repellendus. Temporibus autem quibusdam et aut officiis debitis aut rerum necessitatibus saepe eveniet, ut et voluptates repudiandae sint et molestiae non recusandae. Itaque earum rerum hic tenetur a sapiente delectus, ut aut reiciendis voluptatibus maiores alias consequatur aut perferendis doloribus asperiores repellat.");
             MusicAPI.SetPlaylist(new[]
-            {
+{
     "audio/music/music1.mp3",
     "audio/music/music2.mp3",
     "audio/music/music3.mp3"
@@ -54,14 +56,10 @@ class Program
             MusicAPI.CrossfadeSeconds = 5f;
 
             MusicAPI.Play();     // или просто MusicAPI.Play();
-            await Task.Delay(3000);
-            MusicAPI.Next();
-            for (int i = 0; i < 10; i++)
-            {
-                await CharacterAPI.Say("yuki", GenerateRandomText(450)); // примерно как lorem
-            }
 
-            MusicAPI.Next();
+            await Task.Delay(1000);
+            CharacterAPI.Hide("yuki");
+            await CharacterAPI.Say("yuki", GenerateRandomText(450));
         };
 
         // Используем удобный публичный API

@@ -4,22 +4,24 @@ using SNEngine.Core;
 using System;
 using System.IO;
 using System.IO.Compression;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace SNEngine.Assets.Package;
 
 /// <summary>
 /// Smart Pak Builder — creates separate .snpk packages with proper folder structure.
-/// Supports post-packing WebP optimization for ui.snpk.
+/// Supports post-packing WebP optimization for all packages EXCEPT ui.snpk.
 /// </summary>
 public static class PakBuilder
 {
     /// <summary>
     /// Main smart packing method. Builds all .snpk packages from assets folder,
-    /// then optionally optimizes ui.snpk by converting images to WebP.
+    /// then optionally optimizes all packages except ui.snpk by converting images to WebP.
     /// </summary>
     /// <param name="inputRoot">Root folder containing asset subfolders (default: "assets")</param>
     /// <param name="outputDir">Output directory for .snpk files (default: "build")</param>
-    /// <param name="optimizeWebP">Enable post-packing WebP optimization for ui.snpk</param>
+    /// <param name="optimizeWebP">Enable post-packing WebP optimization for all .snpk except ui.snpk</param>
     /// <param name="webpQuality">WebP quality level (0-100)</param>
     /// <param name="lossless">Use lossless WebP compression</param>
     public static void PackSmart(string inputRoot = "assets",
@@ -50,6 +52,8 @@ public static class PakBuilder
 
         Console.WriteLine("Starting smart packing...");
 
+        var packedPaks = new List<string>();
+
         foreach (var (pakName, assetType, subFolder) in rules)
         {
             string sourcePath = Path.Combine(inputRoot, subFolder);
@@ -59,6 +63,7 @@ public static class PakBuilder
                 string outputPath = Path.Combine(outputDir, pakName);
                 int count = PackFolder(sourcePath, outputPath, assetType, subFolder);
                 totalFiles += count;
+                packedPaks.Add(outputPath);
             }
         }
 
@@ -66,6 +71,10 @@ public static class PakBuilder
         string miscPath = Path.Combine(outputDir, "misc.snpk");
         int miscCount = PackRootAndUnknown(inputRoot, miscPath);
         totalFiles += miscCount;
+        if (miscCount > 0)
+        {
+            packedPaks.Add(miscPath);
+        }
 
         // Inject icudt67l.dat into ui.snpk for Ultralight
         string uiPakPath = Path.Combine(outputDir, "ui.snpk");
@@ -74,12 +83,25 @@ public static class PakBuilder
         Debug.Log($"[PakBuilder] Smart pack completed. Total files: {totalFiles}");
 
         // === POST-PACKING OPTIMIZATION (WebP) ===
-        if (optimizeWebP && File.Exists(uiPakPath))
+        if (optimizeWebP)
         {
-            Console.WriteLine("\n[Optimizer] Starting post-packing WebP optimization for ui.snpk...");
+            Console.WriteLine("\n[Optimizer] Starting post-packing WebP optimization for all .snpk except ui.snpk...");
 
             var optimizer = new ImageToWebPOptimizer(webpQuality, lossless);
-            optimizer.OptimizePakAsync(uiPakPath).Wait(); // Blocking for CLI simplicity
+
+            // List of all packages except ui.snpk
+            var paksToOptimize = packedPaks
+                .Where(p => !Path.GetFileName(p).Equals("ui.snpk", StringComparison.OrdinalIgnoreCase))
+                .ToList();
+
+            foreach (var pakPath in paksToOptimize)
+            {
+                if (File.Exists(pakPath))
+                {
+                    Console.WriteLine($"  Optimizing: {Path.GetFileName(pakPath)}");
+                    optimizer.OptimizePakAsync(pakPath).Wait(); // Blocking for CLI simplicity
+                }
+            }
         }
 
         Console.WriteLine($"\nSmart packing finished successfully → {outputDir}");

@@ -163,16 +163,18 @@ public sealed class SNEngineRuntimeBridge
     /// поллит HTML-диалог (dialog/index.html) через requestAnimationFrame.
     /// Теперь также передаёт флаг complete (типинг закончен) — UI показывает индикатор ожидания клика.
     /// </summary>
-    public void SetDialogState(string speaker, string text, string color, bool visible, bool isComplete = false)
+    public void SetDialogState(string speaker, string text, string color, bool visible, bool isComplete = false, string channel = "dialog", string dialogType = "dialog")
     {
-        // Skip expensive script build + EvaluateScript if nothing material changed.
-        // This is called every update frame for visible dialogue elements; avoiding re-send when idle saves
-        // string allocations, escaping, and JS interop cost.
-        var lastSpeaker = _lastValues.TryGetValue("dialog_speaker", out var ls) ? ls as string : null;
-        var lastText = _lastValues.TryGetValue("dialog_text", out var lt) ? lt as string : null;
-        var lastColor = _lastValues.TryGetValue("dialog_color", out var lc) ? lc as string : null;
-        var lastVisible = _lastValues.TryGetValue("dialog_visible", out var lv) ? lv is bool b && b : false;
-        var lastComplete = _lastValues.TryGetValue("dialog_complete", out var lcomp) ? lcomp is bool bc && bc : false;
+        // Support for unified IDialogPrinter / IDialogSystem: different channels for different styles
+        // e.g. "dialog" for boxed speech, "thought" for full-screen black internal monologue.
+        // The channel becomes the JS key. dialogType (from snapshot) tells the printer which visual variant to use.
+        string prefix = $"dialog_{channel}";
+
+        var lastSpeaker = _lastValues.TryGetValue($"{prefix}_speaker", out var ls) ? ls as string : null;
+        var lastText = _lastValues.TryGetValue($"{prefix}_text", out var lt) ? lt as string : null;
+        var lastColor = _lastValues.TryGetValue($"{prefix}_color", out var lc) ? lc as string : null;
+        var lastVisible = _lastValues.TryGetValue($"{prefix}_visible", out var lv) ? lv is bool b && b : false;
+        var lastComplete = _lastValues.TryGetValue($"{prefix}_complete", out var lcomp) ? lcomp is bool bc && bc : false;
 
         bool changed = !string.Equals(lastSpeaker, speaker) ||
                        !string.Equals(lastText, text) ||
@@ -190,22 +192,26 @@ public sealed class SNEngineRuntimeBridge
 
         string visibleStr = visible.ToString().ToLowerInvariant();
         string completeStr = isComplete.ToString().ToLowerInvariant();
+        string typeStr = (dialogType ?? channel ?? "dialog").Replace("\"", "\\\"");
 
+        // Use dynamic channel key for different printers (dialog box vs full-screen thought etc.)
+        // Include real type so JS/HTML can style correctly (unified IDialog* contracts).
         string script = $@"
             (function() {{
                 if (!window.SNEngine) window.SNEngine = {{}};
                 if (!window.SNEngine.runtime) window.SNEngine.runtime = {{}};
 
                 if ({visibleStr}) {{
-                    window.SNEngine.runtime.dialog = {{
+                    window.SNEngine.runtime.{channel} = {{
                         speaker: ""{escapedSpeaker}"",
                         text: ""{escapedText}"",
                         color: ""{escapedColor}"",
                         visible: true,
-                        complete: {completeStr}
+                        complete: {completeStr},
+                        type: ""{typeStr}""
                     }};
                 }} else {{
-                    window.SNEngine.runtime.dialog = null;
+                    window.SNEngine.runtime.{channel} = null;
                 }}
             }})();
         ";
@@ -215,14 +221,14 @@ public sealed class SNEngineRuntimeBridge
 
         if (!string.IsNullOrEmpty(error))
         {
-            Console.WriteLine($"[RuntimeBridge] SetDialogState error: {error}");
+            Console.WriteLine($"[RuntimeBridge] SetDialogState({channel}) error: {error}");
         }
 
-        // Обновляем кэш (чтобы не спамить одинаковыми значениями)
-        _lastValues["dialog_speaker"] = speaker;
-        _lastValues["dialog_text"] = text;
-        _lastValues["dialog_color"] = color;
-        _lastValues["dialog_visible"] = visible;
-        _lastValues["dialog_complete"] = isComplete;
+        // Обновляем кэш per-channel
+        _lastValues[$"{prefix}_speaker"] = speaker;
+        _lastValues[$"{prefix}_text"] = text;
+        _lastValues[$"{prefix}_color"] = color;
+        _lastValues[$"{prefix}_visible"] = visible;
+        _lastValues[$"{prefix}_complete"] = isComplete;
     }
 }

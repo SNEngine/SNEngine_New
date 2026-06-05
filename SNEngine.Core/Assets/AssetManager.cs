@@ -110,7 +110,7 @@ public class AssetManager : IDisposable
         if (data == null || data.Length == 0)
         {
             Debug.LogError($"[AssetManager] Empty or null data for texture: {logPath}");
-            throw new InvalidOperationException($"Cannot load texture '{logPath}': data is empty (0 bytes). The file might be corrupted or missing in the package.");
+            return null!;
         }
 
         using var image = Image.Load<Rgba32>(data);

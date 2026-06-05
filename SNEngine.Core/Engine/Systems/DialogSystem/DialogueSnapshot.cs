@@ -11,4 +11,11 @@ public readonly struct DialogueSnapshot
     public string Color { get; init; }
     public bool Visible { get; init; }
     public bool IsComplete { get; init; }
+
+    /// <summary>
+    /// Dialog display type/mode. "dialog" for standard character speech (with speaker),
+    /// "thought" for internal monologue / full-screen black text (no speaker box).
+    /// Allows unified handling in IDialogSystem / printers while supporting visual variants.
+    /// </summary>
+    public string Type { get; init; }
 }

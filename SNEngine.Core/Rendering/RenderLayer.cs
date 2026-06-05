@@ -7,6 +7,12 @@ namespace SNEngine.Core.Rendering;
 public enum RenderLayer
 {
     /// <summary>
+    /// Tiled/repeating decorations or side panels that should appear behind the main background.
+    /// Useful for filling letterbox/pillarbox areas with repeating patterns.
+    /// </summary>
+    Backdrop = -10,
+
+    /// <summary>
     /// Background images (usually fullscreen or near-fullscreen).
     /// </summary>
     Background = 0,

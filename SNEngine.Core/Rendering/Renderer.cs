@@ -217,6 +217,50 @@ public class Renderer : IDisposable
     }
 
     /// <summary>
+    /// Draws a texture tiled (repeated) across the entire viewport.
+    /// Ideal for side panel decorations, repeating patterns, or filling letterbox/pillarbox areas
+    /// (draw at Backdrop layer so main BackgroundComponent can cover the center).
+    /// Uses the texture's native size for each tile (no scaling of the pattern itself).
+    /// </summary>
+    public void DrawTiled(Texture2D? texture, float alpha = 1.0f, RenderLayer layer = RenderLayer.Backdrop)
+    {
+        if (texture == null || _deviceContext == null || ViewportWidth <= 0 || ViewportHeight <= 0)
+            return;
+
+        int texW = (int)texture.Width;
+        int texH = (int)texture.Height;
+        if (texW <= 0 || texH <= 0) return;
+
+        float viewW = ViewportWidth;
+        float viewH = ViewportHeight;
+
+        var color = new Color4b(255, 255, 255, (byte)(alpha * 255));
+
+        // Calculate how many tiles are needed to cover the viewport (+1 for partial coverage safety)
+        int tilesX = (int)Math.Ceiling(viewW / texW) + 1;
+        int tilesY = (int)Math.Ceiling(viewH / texH) + 1;
+
+        for (int y = 0; y < tilesY; y++)
+        {
+            for (int x = 0; x < tilesX; x++)
+            {
+                float px = x * texW;
+                float py = y * texH;
+
+                _commandBuffer.Add(new DrawCommand(
+                    texture,
+                    new Vector2(px, py),
+                    null,           // use full texture
+                    color,
+                    1f,             // native size (no scaling of the tile pattern)
+                    0f,
+                    Vector2.Zero,
+                    layer));
+            }
+        }
+    }
+
+    /// <summary>
     /// Full featured sprite draw with transforms. This is the preferred method.
     /// </summary>
     public void DrawSprite(

@@ -14,7 +14,9 @@ public class NovelScene : Scene
 
     public override void OnLoad()
     {
-        // Background GameObject
+        // Main Background GameObject.
+        // Note: Tiled side filler (for black bars) is now automatically handled in core EmptyScene
+        // if "side_repeat" exists in the misc package. This keeps test scenes clean.
         var bgObj = new GameObject { Name = "Background" };
         var bgComp = bgObj.AddComponent(new BackgroundComponent(_assetManager));
         bgComp.Load("classroom_day");
